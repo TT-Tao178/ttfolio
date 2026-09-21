@@ -31,7 +31,7 @@ test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', asyn
   // 1) 粘贴路径登记
   await page.goto('/');
   await page.locator('[data-testid="add-project-btn"]').click();
-  await page.locator('[data-testid="add-project-modal"]').waitFor();
+  await expect(page.locator('[data-testid="paste-paths"]')).toBeVisible({ timeout: 10000 });
   await page.locator('[data-testid="paste-paths"]').fill(FIXTURE);
   await page.locator('[data-testid="paste-add-btn"]').click();
   await page.waitForTimeout(2500);
@@ -58,9 +58,8 @@ test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', asyn
   expect(fs.readFileSync(path.join(FIXTURE, 'notes.md'), 'utf8')).toContain('新增行 by e2e');
 
   // 6) Git 页签：只有 notes.md 未暂存 → 暂存 → 提交
-  await page.keyboard.press('2');
+  await page.keyboard.press('3'); // 快捷键 3 = Git 页签
   await page.waitForTimeout(800);
-  await page.keyboard.press('2'); // 确保落在 Git 页签
   await page.locator('[data-testid="commit-message"]').fill('feat: e2e 提交（只包含暂存文件）');
   // 暂存 notes.md
   const unstagedNode = page.locator('.ant-tree-title', { hasText: 'notes.md' }).first();

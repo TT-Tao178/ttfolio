@@ -36,10 +36,6 @@ test('删除进回收站 → 恢复到原路径 → 内容一致', async ({ page
   await page.waitForTimeout(800);
   expect(fs.existsSync(path.join(FIXTURE, TARGET))).toBe(false);
 
-  // 回收站页可见并预览
-  await page.locator('button:has(.anticon-delete)').first().click(); // 侧栏? 直接开回收站标签
-  await page.waitForTimeout(500);
-  await page.getByRole('button').filter({ has: page.locator('.anticon-restore') }).first();
   // 通过命令面板打开回收站
   await page.keyboard.press('Control+k');
   await page.locator('[data-testid="palette-input"]').fill('回收站');

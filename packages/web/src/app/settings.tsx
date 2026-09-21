@@ -91,6 +91,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     <Ctx.Provider value={{ settings, dark, setSetting }}>
       <ConfigProvider
         locale={zhCN}
+        button={{ autoInsertSpace: false }}
         componentSize={componentSizeOf(settings.density)}
         theme={{
           algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
