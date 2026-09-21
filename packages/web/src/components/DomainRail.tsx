@@ -5,6 +5,7 @@ import {
 } from '@ant-design/icons';
 import React from 'react';
 import { useAppStore, type Domain } from '@/app/store';
+import { SEMANTIC } from '@/theme/tokens';
 
 const DOMAINS: Array<{ key: Domain; icon: React.JSX.Element; label: string }> = [
   { key: 'projects', icon: <AppstoreOutlined />, label: '项目' },
@@ -27,7 +28,7 @@ function RailButton({ active, onClick, label, children }: {
           width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
           background: active ? 'rgba(22,119,255,0.12)' : 'transparent',
-          color: active ? '#1677ff' : 'inherit'
+          color: active ? SEMANTIC.primary : 'inherit'
         }}
       >
         {children}

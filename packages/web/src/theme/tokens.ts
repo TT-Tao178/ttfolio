@@ -32,6 +32,15 @@ export const GITHUB_LANG_COLORS: Record<string, string> = {
   Other: '#8b949e'
 };
 
+/** 语义色常量（组件内唯一允许的取色来源；hex 本体只活在本文件，见约束 C-50 / 机械检查 M10）。 */
+export const SEMANTIC = {
+  primary: '#1677ff',
+  success: '#52c41a',
+  warning: '#faad14',
+  error: '#ff4d4f',
+  layoutBg: '#f5f5f5'
+} as const;
+
 export function langColor(language: string): string {
   return GITHUB_LANG_COLORS[language] ?? GITHUB_LANG_COLORS['Other'] ?? '#8b949e';
 }

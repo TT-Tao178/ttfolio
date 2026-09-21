@@ -10,6 +10,7 @@ import { DRAFT_DEBOUNCE_MS } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { langExtension } from './langExt';
 import { cmTheme, cmHighlight } from '@/theme/codemirror';
+import { SEMANTIC } from '@/theme/tokens';
 import { useSettingsDark } from './useDark';
 
 interface Props {
@@ -178,7 +179,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
         <span className="tt-mono tt-ellipsis" style={{ fontSize: 12 }}>{path}</span>
         {dirty && (
-          <span title="未保存" data-testid="dirty-dot" style={{ width: 8, height: 8, borderRadius: 4, background: '#faad14', display: 'inline-block' }} />
+          <span title="未保存" data-testid="dirty-dot" style={{ width: 8, height: 8, borderRadius: 4, background: SEMANTIC.warning, display: 'inline-block' }} />
         )}
         <Tag>{file.encoding}</Tag>
         <Tag>{file.eol}</Tag>

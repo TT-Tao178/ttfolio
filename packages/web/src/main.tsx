@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './app/App';
 import 'antd/dist/reset.css';
-import './styles/index.css';
+import './theme/base.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

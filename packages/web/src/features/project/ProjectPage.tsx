@@ -14,6 +14,7 @@ import { GitTab } from '@/features/git/GitTab';
 import { ArchivesTab } from '@/features/archives/ArchivesTab';
 import { DocsTab } from '@/features/docs/DocsTab';
 import { TodoList } from '@/features/todos/TodoList';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: string | null }): React.JSX.Element {
   const { data: p, isLoading, error } = useQuery({
@@ -44,7 +45,7 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
         <Space>
           <Button
             size="small"
-            icon={p?.isPinned === true ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+            icon={p?.isPinned === true ? <StarFilled style={{ color: SEMANTIC.warning }} /> : <StarOutlined />}
             onClick={() => patch.mutate({ isPinned: p?.isPinned !== true })}
           />
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void api.post(`/api/projects/${projectId}/analyze`).then(() => message.info('已开始重新分析'))}>

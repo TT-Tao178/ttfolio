@@ -10,16 +10,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { TreeNode } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+import { SEMANTIC } from '@/theme/tokens';
 import { EditorPane } from './EditorPane';
 import { ImagePreview } from './ImagePreview';
 
 const GIT_COLORS: Record<string, string> = {
-  modified: '#faad14',
-  added: '#52c41a',
-  untracked: '#52c41a',
-  deleted: '#ff4d4f',
-  renamed: '#1677ff',
-  conflicted: '#ff4d4f'
+  modified: SEMANTIC.warning,
+  added: SEMANTIC.success,
+  untracked: SEMANTIC.success,
+  deleted: SEMANTIC.error,
+  renamed: SEMANTIC.primary,
+  conflicted: SEMANTIC.error
 };
 
 export function FilesTab({ projectId }: { projectId: string }): React.JSX.Element {

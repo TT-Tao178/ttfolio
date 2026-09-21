@@ -20,6 +20,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import { GitOverview } from '@/features/git/GitTab';
 import { api } from '@/lib/api';
+import { SEMANTIC } from '@/theme/tokens';
 import type { HealthInfo, SessionData } from '@ttfolio/shared';
 
 function Shell(): React.JSX.Element {
@@ -104,7 +105,7 @@ function Shell(): React.JSX.Element {
       {/* 顶栏：LOGO + 标签 + 搜索/导入/设置 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderBottom: '1px solid rgba(128,128,128,.15)' }}>
         <Space size={6}>
-          <Avatar shape="square" size={26} style={{ background: '#1677ff', fontWeight: 700 }}>tf</Avatar>
+          <Avatar shape="square" size={26} style={{ background: SEMANTIC.primary, fontWeight: 700 }}>tf</Avatar>
           <strong>ttFolio</strong>
           <span style={{ fontSize: 12, opacity: 0.6 }}>tt项目仓库 · a local project workbench</span>
         </Space>
@@ -132,7 +133,7 @@ function Shell(): React.JSX.Element {
         <div style={{ width: 220, borderRight: '1px solid rgba(128,128,128,.15)', overflow: 'auto' }}>
           <Sidebar />
         </div>
-        <div style={{ flex: 1, minWidth: 0, background: dark ? 'transparent' : '#f5f5f5', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minWidth: 0, background: dark ? 'transparent' : SEMANTIC.layoutBg, overflow: 'hidden' }}>
           {activeTab === null ? (
             <div />
           ) : activeTab.kind === 'overview' ? (

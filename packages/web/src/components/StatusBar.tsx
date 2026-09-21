@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { HealthInfo, TaskInfo } from '@ttfolio/shared';
 import { fmtBytes, relTime } from '@/lib/format';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'closed' }): React.JSX.Element {
   const { data: health } = useQuery({ queryKey: ['health'], queryFn: () => api.get<HealthInfo>('/api/health'), refetchInterval: 30000 });
@@ -50,7 +51,7 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
       <span style={{ marginLeft: 'auto' }}>
         {sseState === 'open' ? (
           <Tooltip title="实时更新已连接">
-            <ApiFilled style={{ color: '#52c41a' }} />
+            <ApiFilled style={{ color: SEMANTIC.success }} />
           </Tooltip>
         ) : sseState === 'connecting' ? (
           <Tooltip title="连接中…">
@@ -58,7 +59,7 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
           </Tooltip>
         ) : (
           <Tooltip title="实时更新已断开（自动重连中）">
-            <ApiOutlined style={{ color: '#faad14' }} />
+            <ApiOutlined style={{ color: SEMANTIC.warning }} />
           </Tooltip>
         )}
       </span>

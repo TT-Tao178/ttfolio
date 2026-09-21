@@ -10,7 +10,7 @@ export default defineConfig({
     baseURL: process.env['TTFOLIO_E2E_URL'] ?? 'http://127.0.0.1:7733'
   },
   webServer: {
-    command: 'npx tsx packages/server/src/index.ts',
+    command: 'node scripts/e2e-server.mjs',
     url: process.env['TTFOLIO_E2E_URL'] ?? 'http://127.0.0.1:7733',
     reuseExistingServer: false,
     timeout: 60000,

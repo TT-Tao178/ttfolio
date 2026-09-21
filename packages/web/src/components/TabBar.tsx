@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import React from 'react';
 import { useAppStore, type Tab } from '@/app/store';
+import { SEMANTIC } from '@/theme/tokens';
 
 function kindIcon(t: Tab): React.JSX.Element {
   switch (t.kind) {
@@ -41,7 +42,7 @@ function SortableTab({ tab, active, onActivate, onClose }: {
         userSelect: 'none', whiteSpace: 'nowrap',
         background: active ? 'rgba(22,119,255,0.1)' : 'transparent',
         border: active ? '1px solid rgba(22,119,255,0.35)' : '1px solid transparent',
-        color: tab.invalid !== null ? '#ff4d4f' : 'inherit',
+        color: tab.invalid !== null ? SEMANTIC.error : 'inherit',
         maxWidth: 200
       }}
       onClick={onActivate}

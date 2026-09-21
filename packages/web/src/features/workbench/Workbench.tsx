@@ -15,6 +15,7 @@ import { LanguageBar } from '@/components/LanguageBar';
 import { StateView } from '@/components/StateView';
 import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Element {
   const [view, setView] = useState<'card' | 'table'>('card');
@@ -139,12 +140,12 @@ function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     <Card
       hoverable
       size="small"
-      style={{ borderColor: p.pathOk ? undefined : '#ff4d4f' }}
+      style={{ borderColor: p.pathOk ? undefined : SEMANTIC.error }}
       onClick={onOpen}
       data-testid="project-card"
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
-          <Avatar style={{ background: '#1677ff', flexShrink: 0 }} size={24}>
+          <Avatar style={{ background: SEMANTIC.primary, flexShrink: 0 }} size={24}>
             {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
           </Avatar>
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>

@@ -7,6 +7,7 @@ import { detectProjectType } from './analyzer/typeDetect.js';
 import { extractFromManifest, mergeTechStack } from './analyzer/techStack.js';
 import { parseStatusV2 } from './git.js';
 import { detectAndDecode, detectEol, encodeByDetected, looksBinary } from './fsx.js';
+import iconv from 'iconv-lite';
 import { matchScore, normalizeName } from '../routes/docs.js';
 
 function rule(pattern: string, mode: 'hide' | 'analyze_only' = 'hide'): IgnoreRule {
@@ -133,7 +134,6 @@ describe('git status porcelain=v2 -z 解析', () => {
 
 describe('编码与换行（C-08）', () => {
   it('GBK 往返字节级一致', () => {
-    const iconv = require('iconv-lite') as typeof import('iconv-lite');
     const original = '中文内容 Hello';
     const buf = iconv.encode(original, 'gbk');
     const { content, encoding } = detectAndDecode(buf);
