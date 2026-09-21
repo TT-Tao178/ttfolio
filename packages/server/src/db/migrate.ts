@@ -55,8 +55,7 @@ export function runMigrations(db: Database.Database, backupDir: string | null): 
 
 /** 完整性检查 */
 export function integrityCheck(db: Database.Database): { ok: boolean; message: string } {
-  const rows = db.pragma('integrity_check') as Array<unknown>;
-  const first = rows[0];
-  const msg = typeof first === 'string' ? first : 'unknown';
+  const rows = db.pragma('integrity_check') as Array<{ integrity_check?: string }>;
+  const msg = rows[0]?.integrity_check ?? 'unknown';
   return { ok: msg === 'ok', message: msg };
 }

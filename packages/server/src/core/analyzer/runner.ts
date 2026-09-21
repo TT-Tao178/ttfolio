@@ -32,7 +32,7 @@ export async function analyzeProjects(ctx: AppContext, projectIds: string[]): Pr
           { id: row.id, dirPath: row.dir_path, typeSource: row.type_source, defaultArchDir: row.default_arch_dir },
           ctx.sse,
           {
-            taskId,
+            taskId: taskCtx.taskId,
             checkCancelled: taskCtx.checkCancelled,
             isCancelled: taskCtx.isCancelled,
             progress: (done_, total, phase) => {

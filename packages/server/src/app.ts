@@ -38,7 +38,6 @@ function hostAllowed(host: string | undefined, port: number): boolean {
 export function buildApp(ctx: AppContext): FastifyInstance {
   const app = Fastify({
     logger: false,
-    disableRequestLogging: true,
     bodyLimit: 64 * 1024 * 1024
   });
   app.ttfolio = ctx;
