@@ -1,19 +1,58 @@
+# ============================================================
+# ttFolio .gitignore —— 什么进版本库、什么坚决不进
+# 原则（约束 C-47）：只提交源码、配置与文档；
+# 绝不提交：依赖、构建产物、数据库、日志、密钥、运行期数据、测试夹具。
+# ============================================================
+
+# ---- 依赖（npm install 可重建） ----
 node_modules/
+
+# ---- 构建产物（npm run build 可重建） ----
 dist/
 build/
 out/
-.tmp-test/
-coverage/
-test-results/
-playwright-report/
-*.log
-.env
-.env.*
+
+# ---- 数据库与运行期数据（索引库/备份/回收站/缩略图/日志，全部可重建或属用户隐私） ----
 data/
 *.db
 *.db-wal
 *.db-shm
 *.sqlite
+*.sqlite3
+*.db.corrupted-*
+*.db.before-restore
+backups/
+trash/
+thumbs/
+logs/
+runtime.json
+
+# ---- 密钥与环境配置（本地私有） ----
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+id_rsa*
+
+# ---- 测试与临时产物 ----
+.tmp-test/
+coverage/
+test-results/
+playwright-report/
+blob-report/
 .cache/
+
+# ---- 日志 ----
+*.log
+npm-debug.log*
+
+# ---- 操作系统杂物 ----
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# ---- 编辑器（保留共享配置本身，忽略个人态） ----
+.idea/
+.vs/
+*.swp
