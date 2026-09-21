@@ -53,7 +53,6 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   const openFile = (rel: string): void => {
     setSelected(rel);
     useAppStore.getState().updateActiveLocation({ targetPath: rel }, true);
-    void api.post('/api/fs/raw-none', {}).catch(() => {});
   };
   void openFile;
 

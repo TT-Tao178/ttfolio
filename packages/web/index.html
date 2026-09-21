@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ttFolio · tt项目仓库</title>
     <script>
+      window.__TTFOLIO_TOKEN__ = '%%TTFOLIO_TOKEN%%';
+      window.__TTFOLIO_PORT__ = '%%TTFOLIO_PORT%%';
+    </script>
+    <script>
       // TT-THEME-CACHE：仅缓存主题选择用于首帧渲染，业务数据一律走 API 落库（C-29 例外，见 DECISIONS.md）
       try {
         var t = localStorage.getItem('ttfolio-theme');

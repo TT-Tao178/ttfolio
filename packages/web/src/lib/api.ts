@@ -41,16 +41,15 @@ function base(): string {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<T> {
-  const url = new URL(base() + path);
+  const url = new URL(base() + path, window.location.origin);
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== '') url.searchParams.set(k, v);
   }
+  const headers: Record<string, string> = { 'x-ttfolio-token': token() };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(url.toString(), {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-ttfolio-token': token()
-    },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   let payload: ApiResponse<T> | null = null;
