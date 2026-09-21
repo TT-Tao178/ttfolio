@@ -1,0 +1,45 @@
+{
+  "name": "ttfolio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ttFolio - a local project workbench (tt项目仓库)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspace @ttfolio/shared && npm run build --workspace @ttfolio/server && npm run build --workspace @ttfolio/web",
+    "start": "node packages/server/dist/index.js",
+    "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p packages/server/tsconfig.json --noEmit && tsc -p packages/web/tsconfig.json --noEmit",
+    "lint": "eslint packages/shared/src packages/server/src packages/web/src --ext .ts,.tsx --max-warnings 0",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "migrate": "node scripts/migrate.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "@playwright/test": "^1.48.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "postcss": "^8.4.47",
+    "prettier": "^3.3.3",
+    "tailwindcss": "^3.4.13",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  }
+}
