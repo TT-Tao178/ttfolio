@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail } from './helpers.js';
 import { addSearchHistory, listSearchHistory } from '../db/repo/metaRepo.js';
 import { listProjects, getProjectRow } from '../db/repo/projectsRepo.js';
 import { buildProjectIndex, queryContent, indexStats, buildMatcher } from '../core/search.js';

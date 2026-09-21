@@ -29,7 +29,6 @@ export class WatcherManager {
   /** 为项目启动监听（幂等）。enabled=false 时忽略。 */
   watch(projectId: string, root: string, matcher: CompiledIgnore, stabilityMs: number): void {
     if (this.watches.has(projectId)) return;
-    const self = this;
     const pending = new Map<string, 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir'>();
     let timer: NodeJS.Timeout | null = null;
     let gitTimer: NodeJS.Timeout | null = null;
@@ -43,14 +42,13 @@ export class WatcherManager {
       for (const [abs, evt] of pending) {
         pending.delete(abs);
         if (isSelfWrite(abs)) continue; // 自己的写入不当外部修改
-        paths.concat([abs]);
         paths[paths.length] = abs;
         if (evt === 'change') openedModified[openedModified.length] = abs;
         if (evt === 'unlink' || evt === 'unlinkDir') kind = 'delete';
         if (evt === 'add' || evt === 'addDir') kind = 'create';
       }
       if (paths.length === 0) return;
-      self.sse.publish('fs.changed', {
+      this.sse.publish('fs.changed', {
         projectId,
         paths: paths.slice(0, 200),
         kind,
@@ -60,7 +58,7 @@ export class WatcherManager {
       if (gitTimer !== null) clearTimeout(gitTimer);
       gitTimer = setTimeout(() => {
         gitTimer = null;
-        self.sse.publish('git.changed', { projectId });
+        this.sse.publish('git.changed', { projectId });
       }, 1000);
     };
 

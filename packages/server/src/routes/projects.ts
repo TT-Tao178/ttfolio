@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
 import { assertSafeName } from '../core/pathGuard.js';
@@ -272,7 +272,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     }
     const db = ctx.db();
     const children = entries
-      .filter((e) => e.isDir && !e.name.startsWith('.'))
+      .filter((e) => e.isDir && e.name.indexOf('.') !== 0)
       .slice(0, 500)
       .map((e) => {
         const full = path.join(abs, e.name);

@@ -4,13 +4,6 @@
  */
 import { runCommand } from './exec.js';
 
-const PS_FOLDER = [
-  'Add-Type -AssemblyName System.Windows.Forms | Out-Null;',
-  '$d = New-Object System.Windows.Forms.FolderBrowserDialog;',
-  '$d.ShowNewButtonButton = $true;',
-  "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }"
-].join(' ');
-
 const PS_FOLDER_FIXED = [
   'Add-Type -AssemblyName System.Windows.Forms | Out-Null;',
   '$d = New-Object System.Windows.Forms.FolderBrowserDialog;',

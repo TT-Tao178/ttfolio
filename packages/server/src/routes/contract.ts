@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, type RouteRequest } from './helpers.js';
+import { ok, fail } from './helpers.js';
 import { getProjectSummary } from '../db/repo/projectsRepo.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
 import { listTodos } from '../db/repo/sessionRepo.js';

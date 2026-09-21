@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { archiveCreateSchema, archivePatchSchema } from '@ttfolio/shared';
 import { listArchives, upsertArchive, patchArchive, deleteArchive, setArchiveViewed, toArchiveInfo } from '../db/repo/docsRepo.js';

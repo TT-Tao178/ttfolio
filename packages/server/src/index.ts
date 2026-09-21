@@ -161,11 +161,14 @@ async function main(): Promise<void> {
     }
   }
 
-  console.info('ttFolio 已启动：');
-  console.info(`  应用地址    http://127.0.0.1:${port}`);
-  console.info(`  用户内容    http://127.0.0.1:${userContentPort}（架构图/原始文件，只读）`);
-  console.info(`  数据目录    ${dataDir}`);
-  console.info(`  token       ${token.slice(0, 6)}...（已写入 runtime.json，页面自动注入）`);
+  const say = (s: string): void => {
+    process.stdout.write(s + '\n');
+  };
+  say('ttFolio 已启动：');
+  say(`  应用地址    http://127.0.0.1:${port}`);
+  say(`  用户内容    http://127.0.0.1:${userContentPort}（架构图/原始文件，只读）`);
+  say(`  数据目录    ${dataDir}`);
+  say(`  token       ${token.slice(0, 6)}...（已写入 runtime.json，页面自动注入）`);
 
   const shutdown = (): void => {
     logger.info({ mod: 'boot', msg: 'shutting down' });
@@ -178,6 +181,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error(`启动失败：${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+  process.stdout.write(`启动失败：${err instanceof Error ? err.stack ?? err.message : String(err)}
+`);
   process.exit(1);
 });

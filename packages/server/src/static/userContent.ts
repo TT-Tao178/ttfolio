@@ -38,7 +38,7 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
   // token + Host 校验（与主服务一致）
   server.addHook('onRequest', async (req, reply) => {
     const host = req.headers.host ?? '';
-    const hostOk = host.startsWith(`127.0.0.1:`) || host === `127.0.0.1` || host.startsWith(`localhost:`);
+    const hostOk = host.indexOf('127.0.0.1:') === 0 || host === '127.0.0.1' || host.indexOf('localhost:') === 0;
     if (!hostOk) {
       void reply.code(403).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '非法 Host' } });
       return;

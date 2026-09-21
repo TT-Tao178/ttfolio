@@ -50,8 +50,9 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       return;
     }
     if (url === '/api/health') return;
-    if (url.startsWith('/api/') || url.startsWith('/arch/') || url.startsWith('/raw/')) {
-      const isSse = url.startsWith('/api/events');
+    const isApiScope = url.indexOf('/api/') === 0 || url.indexOf('/arch/') === 0 || url.indexOf('/raw/') === 0;
+    if (isApiScope) {
+      const isSse = url.indexOf('/api/events') === 0;
       const headerToken = req.headers['x-ttfolio-token'];
       const token = Array.isArray(headerToken) ? headerToken[0] : headerToken;
       const queryToken = (req.query as Record<string, string | undefined> | undefined)?.['token'];

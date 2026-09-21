@@ -1,5 +1,4 @@
 /** 技术栈标签提取（FR-3.4）：只读解析 ≤512KB 清单文件，限制数量与长度。 */
-import * as fsx from '../fsx.js';
 import { MAX_MANIFEST_BYTES } from '@ttfolio/shared';
 
 const MAX_TAGS = 10;
@@ -82,7 +81,7 @@ export function extractFromManifest(relPath: string, text: string, size: number)
       if (mapped !== undefined) addTag(tags, mapped);
       if (dep === 'vue') {
         const version = versionOf(json, dep);
-        if (version !== null && version.startsWith('3')) addTag(tags, 'Vue 3');
+        if (version !== null && version.indexOf('3') === 0) addTag(tags, 'Vue 3');
       }
     }
     return [...tags];

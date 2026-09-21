@@ -3,7 +3,7 @@
  * 跨盘 = 复制 + 校验 + 删源（失败绝不删源）。
  */
 import path from 'node:path';
-import { existsSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { existsSync, renameSync, rmSync, statSync } from 'node:fs';
 import type Database from 'better-sqlite3';
 import { getAll } from '../db/sql.js';
 import type { TrashItem } from '@ttfolio/shared';

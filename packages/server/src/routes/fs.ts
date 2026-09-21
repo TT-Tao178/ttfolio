@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
 import { assertSafeName } from '../core/pathGuard.js';
@@ -271,7 +271,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     }
     const db = ctx.db();
     const ids = [];
-    let affected = { files: 0, bytes: 0 };
+    const affected = { files: 0, bytes: 0 };
     try {
       for (const p of b.paths) {
         const g = await resolveInProject(db, b.projectId, p, { mustExist: true });

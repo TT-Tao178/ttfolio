@@ -1,21 +1,19 @@
 /** 系统路由：health / settings / ignore-rules / command-templates / backup / restore / activity / export / library reset。 */
 import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
-import { ok, fail, type RouteRequest } from './helpers.js';
+import { ok, fail } from './helpers.js';
 import { getSetting, setSetting, getAllSettings, logActivity, listActivity } from '../db/repo/metaRepo.js';
 import {
   listIgnoreRules, createIgnoreRule, updateIgnoreRule, deleteIgnoreRule,
   listCommandTemplates, createCommandTemplate, updateCommandTemplate, deleteCommandTemplate
 } from '../db/repo/rulesRepo.js';
 import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
-import { currentActor } from '../core/actor.js';
 import { validateTemplateArgs } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
 import { SETTING_KEYS, TRASH_RETENTION_DAYS } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { join } from 'node:path';
 import { listProjects } from '../db/repo/projectsRepo.js';
-import { applyRetention } from '../core/backup.js';
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;

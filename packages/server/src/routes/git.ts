@@ -1,7 +1,7 @@
 /** Git 路由（FR-5.x）：状态/diff/暂存/放弃/提交/历史/分支/总览。 */
 import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail, toApiError } from './helpers.js';
 import { gitAvailable, status, diff, stage, unstage, discard, commit, log, commitDetail, branches, checkout, createBranch, isRepo, inProgress, identity } from '../core/git.js';
 import { runCommand } from '../core/exec.js';
 import { getProjectRow, listProjects } from '../db/repo/projectsRepo.js';

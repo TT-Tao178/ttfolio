@@ -119,7 +119,7 @@ export function hashFile(absPath: string): string {
 export function looksBinary(buf: Buffer): boolean {
   const n = Math.min(buf.length, 8192);
   if (n === 0) return false;
-  let suspicious = 0;
+  const suspicious = 0;
   for (let i = 0; i < n; i++) {
     const b = buf[i];
     if (b === 0) return true;

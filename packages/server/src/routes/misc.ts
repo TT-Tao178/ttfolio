@@ -1,8 +1,7 @@
 /** 回收站 / 清单 / 会话 / 对话框 / 外部打开 路由。 */
 import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
-import { listTrash } from '../db/repo/filesRepo.js';
+import { ok, fail, toApiError } from './helpers.js';
 import type { SessionTab } from '@ttfolio/shared';
 import { todosCreateSchema, todoPatchSchema, sessionPutSchema, openExternalSchema } from '@ttfolio/shared';
 import { listTodos, createTodo, patchTodo, deleteTodo, getSession, putSession } from '../db/repo/sessionRepo.js';

@@ -8,6 +8,8 @@ const store = new LibraryStore({ id: 'default', dbFile: layout.dbFile });
 const db = store.open();
 const ic = integrityCheck(db);
 const r = runMigrations(db, layout.backupDir);
-console.log(`integrity: ${ic.message}`);
-console.log(`applied: ${r.applied.length === 0 ? '(none, up to date)' : r.applied.map((m) => m.file).join(', ')}`);
+process.stdout.write(`integrity: ${ic.message}
+`);
+process.stdout.write(`applied: ${r.applied.length === 0 ? '(none, up to date)' : r.applied.map((m) => m.file).join(', ')}
+`);
 store.close();

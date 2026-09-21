@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ttFolio · tt项目仓库</title>
+    <script>
+      // TT-THEME-CACHE：仅缓存主题选择用于首帧渲染，业务数据一律走 API 落库（C-29 例外，见 DECISIONS.md）
+      try {
+        var t = localStorage.getItem('ttfolio-theme');
+        if (t === 'dark') document.documentElement.style.background = '#141414';
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

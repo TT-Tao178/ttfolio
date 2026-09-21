@@ -2,10 +2,10 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError, type RouteRequest } from './helpers.js';
+import { ok, fail, toApiError } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { AppError } from '../core/errors.js';
-import { docRootCreateSchema, docsContentQuerySchema, docsContentPutSchema, mountCreateSchema, mountRelocateSchema } from '@ttfolio/shared';
+import { docRootCreateSchema, docsContentPutSchema, mountCreateSchema, mountRelocateSchema } from '@ttfolio/shared';
 import {
   listDocRoots, createDocRoot, deleteDocRoot, listMounts, createMount, deleteMount,
   getMount, setMountExists, pathKey, listAllMounts
@@ -276,7 +276,7 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         if (e.isDir) continue;
         const lower = e.name.toLowerCase();
         const isMd = lower.endsWith('.md') || lower.endsWith('.markdown');
-        const isReadme = lower.startsWith('readme');
+        const isReadme = lower.indexOf('readme') === 0;
         if (isMd || isReadme) mdFiles.set(rel, { label: rel });
       }
     };
