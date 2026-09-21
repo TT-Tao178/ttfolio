@@ -23,7 +23,7 @@ export function assertSafeName(name: string): string {
   if (RESERVED_NAME.test(trimmed)) {
     throw new AppError('INVALID_NAME', `名字是 Windows 保留名：${trimmed}`);
   }
-  if (trimmed.endsWith('.') || trimmed.endsWith(' ')) {
+  if (trimmed.endsWith('.') || name.endsWith('.') || name.endsWith(' ')) {
     throw new AppError('INVALID_NAME', '名字不能以点或空格结尾');
   }
   return trimmed;

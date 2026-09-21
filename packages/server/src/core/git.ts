@@ -119,17 +119,19 @@ export function parseStatusV2(buf: string): ParsedV2 {
     }
     if (at(tok, 0) === '1' && at(tok, 1) === ' ') {
       const parts = tok.split(' ');
-      const x = parts[1] ?? '.';
-      const y = parts[2] ?? '.';
+      const xy = parts[1] ?? '..';
+      const x = at(xy, 0);
+      const y = at(xy, 1);
       const p = parts.slice(8).join(' ');
       appendEntry(entries, { path: p, state: classify(x, y), x, y });
       continue;
     }
     if (at(tok, 0) === '2' && at(tok, 1) === ' ') {
       const parts = tok.split(' ');
-      const x = parts[1] ?? '.';
-      const y = parts[2] ?? '.';
-      const p = parts.slice(10).join(' ');
+      const xy = parts[1] ?? '..';
+      const x = at(xy, 0);
+      const y = at(xy, 1);
+      const p = parts.slice(9).join(' ');
       const orig = tokens[i];
       i += 1;
       appendEntry(entries, { path: p, origPath: orig, state: classify(x, y), x, y });
