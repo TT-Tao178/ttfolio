@@ -64,6 +64,27 @@ describe('语言统计（按字节，GitHub 口径）', () => {
     expect(languageForFile('app.min.js')).toBeNull();
     expect(languageForFile('logo.png')).toBeNull();
   });
+  it('新增常见语言与按文件名识别', () => {
+    // 无后缀/特殊全名（GitHub 同样按文件名识别）
+    expect(languageForFile('Dockerfile')).toBe('Dockerfile');
+    expect(languageForFile('Makefile')).toBe('Makefile');
+    expect(languageForFile('CMakeLists.txt')).toBe('CMake');
+    expect(languageForFile('.env')).toBe('DotEnv');
+    expect(languageForFile('.env.local')).toBe('DotEnv');
+    expect(languageForFile('.env.example')).toBe('DotEnv');
+    // 新增扩展名
+    expect(languageForFile('main.cxx')).toBe('C++');
+    expect(languageForFile('app.ex')).toBe('Elixir');
+    expect(languageForFile('index.wxml')).toBe('WXML');
+    expect(languageForFile('style.wxss')).toBe('WXSS');
+    expect(languageForFile('data.csv')).toBe('CSV');
+    expect(languageForFile('build.gradle')).toBe('Gradle');
+    expect(languageForFile('main.zig')).toBe('Zig');
+    expect(languageForFile('x.dockerfile')).toBe('Dockerfile');
+    // 散文与未知后缀不计入
+    expect(languageForFile('notes.txt')).toBeNull();
+    expect(languageForFile('x.weirdext')).toBeNull();
+  });
   it('top8 + Other + 百分比校正 100', () => {
     const acc: LangAccum = {};
     for (let i = 0; i < 12; i++) {

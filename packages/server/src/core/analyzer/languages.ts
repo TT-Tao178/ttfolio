@@ -2,22 +2,53 @@
 export const EXT_TO_LANGUAGE: Record<string, string> = {
   ts: 'TypeScript', tsx: 'TypeScript', mts: 'TypeScript', cts: 'TypeScript',
   js: 'JavaScript', jsx: 'JavaScript', mjs: 'JavaScript', cjs: 'JavaScript',
-  vue: 'Vue', svelte: 'Svelte', astro: 'Astro',
-  py: 'Python', pyi: 'Python',
-  java: 'Java', kt: 'Kotlin', kts: 'Kotlin', go: 'Go', rs: 'Rust', cs: 'C#',
-  c: 'C', h: 'C', cpp: 'C++', hpp: 'C++', cc: 'C++', hh: 'C++', mm: 'Objective-C++', m: 'Objective-C',
-  php: 'PHP', rb: 'Ruby', swift: 'Swift', dart: 'Dart', scala: 'Scala', groovy: 'Groovy',
+  vue: 'Vue', nvue: 'Vue', svelte: 'Svelte', astro: 'Astro',
+  py: 'Python', pyi: 'Python', pyw: 'Python',
+  ipynb: 'Jupyter',
+  java: 'Java', jsp: 'JSP', kt: 'Kotlin', kts: 'Kotlin', ktm: 'Kotlin',
+  go: 'Go', rs: 'Rust', cs: 'C#', csx: 'C#',
+  c: 'C', h: 'C',
+  cpp: 'C++', hpp: 'C++', cc: 'C++', hh: 'C++', cxx: 'C++', hxx: 'C++', ino: 'C++',
+  mm: 'Objective-C++', m: 'Objective-C',
+  cshtml: 'Razor', razor: 'Razor',
+  php: 'PHP', rb: 'Ruby', swift: 'Swift', dart: 'Dart', scala: 'Scala', sbt: 'Scala', groovy: 'Groovy', gradle: 'Gradle',
   lua: 'Lua', pl: 'Perl', pm: 'Perl', r: 'R',
+  erl: 'Erlang', ex: 'Elixir', exs: 'Elixir',
+  hs: 'Haskell', ml: 'OCaml', mli: 'OCaml', fs: 'F#', fsi: 'F#', fsx: 'F#',
+  vb: 'Visual Basic .NET', clj: 'Clojure', cljs: 'Clojure', cljc: 'Clojure', edn: 'Clojure',
+  pas: 'Pascal', d: 'D', zig: 'Zig', nim: 'Nim', cr: 'Crystal', sol: 'Solidity',
+  jl: 'Julia', rkt: 'Racket', coffee: 'CoffeeScript',
+  asm: 'Assembly', s: 'Assembly',
+  tcl: 'Tcl', vim: 'Vim Script', el: 'Emacs Lisp', scm: 'Scheme',
+  nix: 'Nix', bicep: 'Bicep', prisma: 'Prisma',
   html: 'HTML', htm: 'HTML', xhtml: 'HTML',
-  css: 'CSS', scss: 'SCSS', sass: 'Sass', less: 'Less', styl: 'Stylus',
+  ejs: 'EJS', hbs: 'Handlebars', handlebars: 'Handlebars', pug: 'Pug', jade: 'Pug',
+  wxml: 'WXML',
+  css: 'CSS', wxss: 'WXSS', scss: 'SCSS', sass: 'Sass', less: 'Less', styl: 'Stylus',
   md: 'Markdown', mdx: 'MDX', rst: 'reStructuredText',
-  json: 'JSON', jsonc: 'JSON', json5: 'JSON',
+  json: 'JSON', jsonc: 'JSON', json5: 'JSON', jsonl: 'JSON', ndjson: 'JSON',
   yml: 'YAML', yaml: 'YAML', toml: 'TOML', ini: 'INI', cfg: 'INI', conf: 'INI', properties: 'INI',
-  xml: 'XML', svg: 'SVG', sql: 'SQL',
+  xml: 'XML', svg: 'SVG', sql: 'SQL', csv: 'CSV', tsv: 'CSV',
   sh: 'Shell', bash: 'Shell', zsh: 'Shell', fish: 'Shell',
-  ps1: 'PowerShell', psm1: 'PowerShell', bat: 'Batch', cmd: 'Batch',
-  ipynb: 'Jupyter', graphql: 'GraphQL', gql: 'GraphQL', proto: 'Protocol Buffers',
-  tf: 'HCL', hcl: 'HCL'
+  ps1: 'PowerShell', psm1: 'PowerShell', psd1: 'PowerShell', bat: 'Batch', cmd: 'Batch',
+  dockerfile: 'Dockerfile', cmake: 'CMake', mk: 'Makefile', mkfile: 'Makefile',
+  graphql: 'GraphQL', gql: 'GraphQL', proto: 'Protocol Buffers',
+  tf: 'HCL', hcl: 'HCL', tfvars: 'HCL',
+  diff: 'Diff', patch: 'Diff',
+  f90: 'Fortran', f95: 'Fortran', for: 'Fortran',
+  cob: 'COBOL', cbl: 'COBOL'
+};
+
+/** 无后缀（或特殊全名）文件的按文件名映射：小写全名 → 语言。 */
+export const NAME_TO_LANGUAGE: Record<string, string> = {
+  makefile: 'Makefile',
+  dockerfile: 'Dockerfile',
+  'cmakelists.txt': 'CMake',
+  rakefile: 'Ruby',
+  gemfile: 'Ruby',
+  vagrantfile: 'Ruby',
+  procfile: 'Shell',
+  '.env': 'DotEnv'
 };
 
 /** 明确不计入语言统计的文件名/后缀（锁文件、生成物、图片、音视频、字体、压缩包、可执行）。 */
@@ -40,6 +71,11 @@ const EXCLUDED_EXTS = new Set([
 export function languageForFile(fileName: string): string | null {
   const lower = fileName.toLowerCase();
   if (EXCLUDED_NAMES.has(lower)) return null;
+  // 无后缀/特殊全名优先（Makefile、Dockerfile、.env 一类，GitHub 同样按文件名识别）
+  const byName = NAME_TO_LANGUAGE[lower];
+  if (byName !== undefined) return byName;
+  const dotParts = lower.split('.');
+  if (dotParts[0] === '' && dotParts[1] === 'env') return 'DotEnv'; // .env.local 等变体
   const parts = lower.split('.');
   if (parts.length < 2) return null;
   const ext = parts[parts.length - 1] ?? '';
