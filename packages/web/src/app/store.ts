@@ -148,7 +148,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const kept = t.history.slice(0, t.historyIndex + 1);
         if (kept.length > 0) {
           const last = kept[kept.length - 1];
-          if (last !== undefined && tabKey(last) === tabKey(merged)) {
+          // 必须比较**完整位置**，不能用 tabKey：tabKey 是"标签标识"（项目标签刻意不含 subTab/targetPath，
+          // 以便复用同一标签），拿它判断"导航是否变化"会把"文件页→Git 页"当成没变化而不压栈，
+          // 结果前进/后退无法在项目内页签之间回退（实测：文件→Git 后按后退仍停在 Git）。
+          if (last !== undefined && sameLocation(last, merged)) {
             return { ...t, ...merged };
           }
         }
@@ -218,6 +221,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 const TAB_KINDS: string[] = [
   'overview', 'project', 'file', 'image', 'doc', 'archive', 'git', 'search', 'settings', 'trash'
 ];
+
+/** 两个位置是否完全相同（导航是否真的发生了）。用于"是否压入历史栈"的判断。 */
+function sameLocation(a: TabLocation, b: TabLocation): boolean {
+  return a.kind === b.kind && a.projectId === b.projectId && a.targetPath === b.targetPath && a.subTab === b.subTab;
+}
 
 function isTabLocation(v: unknown): v is TabLocation {
   if (typeof v !== 'object' || v === null) return false;
