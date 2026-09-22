@@ -149,6 +149,10 @@ export function Sidebar(): React.JSX.Element {
 
 function viewTitle(key: string): string {
   switch (key) {
+    // 缺这两个映射时标签标题会显示成字面量 "recent" / "pinned"（侧栏点「最近打开」就会出现）
+    case 'all': return '工作台总览';
+    case 'recent': return '最近打开';
+    case 'pinned': return '已固定';
     case 'my-dirty': return '有未提交改动';
     case 'my-nodocs': return '缺文档';
     case 'my-noarch': return '缺架构图';

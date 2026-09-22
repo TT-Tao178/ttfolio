@@ -1,6 +1,19 @@
 # PROGRESS
 
-## 当前阶段：P3 完成 + 第十轮 UI 回归修复完成（`npm run verify` 全绿）
+## 当前阶段：第十一轮修复已交付，等待用户手测（本轮不跑 e2e，由用户手测）
+
+## 第十一轮：用户报障 4 类（复现 → 根因 → 修复 → 实测证据）
+
+| # | 用户报障（原话） | 根因 | 修复 | 实测证据 |
+| --- | --- | --- | --- | --- |
+| 1 | 「左侧设置里面是空的，啥都没有」 | `Sidebar` 没有 settings 分支 → `domain=settings` 时 items 恒为空 | 设置章节抽到 `features/settings/sections.ts` 单一来源，侧栏 8 个分组可点并滚动定位；域条点「设置」会自动激活/打开设置页 | 侧栏菜单项 **0 → 8**，点「数据与备份」滚到 `#set-data`（top 464，视口内） |
+| 1 | 「右上设置能打开但功能不能用」 | `setSetting` 只 PATCH、不更新 react-query 缓存 → 受控控件读旧值，改完立刻弹回；另有 4 个设置键（`auto_save`/`card_sort`/`show_ignored`/`default_project_tab`）**无任何消费方** | 改乐观写缓存 + 立即生效 + 成功后按需失效 / 失败回滚提示；4 个死键接到 EditorPane 自动保存、Workbench 排序默认值、FilesTab 忽略项、打开项目落点 | 开关点击后不回弹且刷新后保持；密度 32→24→40→32 即时生效 |
+| 1 | 「界面 UI 显示不正确」 | 实测 `html/body/#root/.ant-app` 背景全为 `rgba(0,0,0,0)`：应用没有底色，深色下"面板深、底白"；标签条 1429px 内容挤在 676px 容器且 `overflow-x:hidden`，右侧标签静默消失 | tokens 引入 CSS 变量 + 深浅两套值（`SEMANTIC` 改指 `var(--tt-*)`，15 个引用点零改动），根元素切 `data-tt-dark`；标签条改横向滚动 + 激活标签滚入视野 | 浅色 `rgb(245,245,245)` ↔ 深色 `rgb(20,20,20)`；文字 `rgba(255,255,255,.85)` |
+| 3 | 「设置里更改主题有 bug」 | 除上述缓存问题外，主题 effect 让 localStorage **永久压过**服务端值 → 改主题永远无效 | 服务端值为准，localStorage 仅首帧兜底（TT-THEME-CACHE）；`system` 挂 matchMedia；首帧脚本兼容跟随系统 | 深/浅切换无需刷新即生效、分段控件不回弹、可切回、刷新后保持 |
+| 2 | 「点开项目文件夹提示文件系统错误：EISDIR」 | `onSelect` 只用 `!key.endsWith('/')` 判目录，而目录 key 是 `n.path`（不以 `/` 结尾）→ 目录被送进编辑器读文件；同时懒加载子节点只写 react-query 缓存、**从未回写 treeData**，rc-tree 拿不到 children | 按节点 kind 分流（目录只选中并作为"新建"落点）；`loadChildren` 合并子节点进 treeData；后端把目录读写映射为 `IS_DIRECTORY`（400）纵深防御 | 点目录**零次** `/api/fs/file` 调用、不进编辑器、无报错；展开后节点 1→22；后端直连目录 → `400 {"code":"IS_DIRECTORY"}` |
+| 2 | 「左上角前进/后退/刷新有问题」 | `openFile` 是死代码（`void openFile;`）→ 选文件从不写历史；`syncFromServer` 恢复会话时把 history 置空、index 置 -1（FR-1.3 未实现）；「刷新」`invalidateQueries()` 会让编辑器 `setValue(磁盘内容)` 并 `setDirty(false)`，**静默冲掉未保存内容** | 编辑器打开哪个文件由标签 `targetPath` 驱动；选中文件即写历史；服务端历史一并恢复；无历史时按钮置灰。EditorPane 改为按"版本标识 + 草稿是否已处理"守卫，有未保存改动只提示不覆盖 | 打开 `.env` 后前进/后退可用、后退回到未打开状态；草稿恢复后保留未保存圆点 |
+
+（连带修复：新建文件/文件夹原先恒落项目根 → 现在按选中目录决定；侧栏「最近打开/已固定」标签标题曾显示字面量 `recent`/`pinned`；vite dev 增加 `watch.ignored`——原子写工具的临时目录会让 Vite watcher 抛 EBUSY 并整进程退出，本轮实测打挂过一次 dev 服务。）
 
 ## 已完成（每行：FR 编号 | 一句话 | 实现文件 | 验证方式）
 
