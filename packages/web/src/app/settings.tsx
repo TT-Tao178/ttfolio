@@ -98,7 +98,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
           ...antdThemeConfig(dark)
         }}
       >
-        <AntdApp>{children}</AntdApp>
+        {/* height:100% 是必需的：AntD App 会额外渲染一层 div.ant-app，若不给高度，
+            其高度退化为内容高度，导致应用壳的 height:100% 无法撑满视口（整体只剩内容高度、
+            底部留大片空白、面板高度随内容跳动） */}
+        <AntdApp style={{ height: '100%' }}>{children}</AntdApp>
       </ConfigProvider>
     </Ctx.Provider>
   );

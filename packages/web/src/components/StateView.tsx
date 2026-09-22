@@ -9,10 +9,14 @@ interface Props {
   emptyText?: string;
   emptyAction?: { label: string; onClick: () => void };
   skeleton?: 'skeleton' | 'spin';
+  /** 重试回调：优先于默认的整页刷新（整页刷新会丢失标签/滚动等现场） */
+  onRetry?: () => void;
+  /** 错误态附加操作（如「关闭此标签」「回到工作台」） */
+  errorExtra?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function StateView({ loading, error, empty, emptyText, emptyAction, children }: Props): React.JSX.Element {
+export function StateView({ loading, error, empty, emptyText, emptyAction, onRetry, errorExtra, children }: Props): React.JSX.Element {
   if (loading) {
     return (
       <div style={{ padding: 16 }}>
@@ -26,7 +30,10 @@ export function StateView({ loading, error, empty, emptyText, emptyAction, child
         description={`加载失败：${error instanceof Error ? error.message : String(error)}`}
         image={Empty.PRESENTED_IMAGE_SIMPLE}
       >
-        <Button onClick={() => window.location.reload()}>重试</Button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          <Button onClick={onRetry ?? (() => window.location.reload())}>重试</Button>
+          {errorExtra}
+        </div>
       </Empty>
     );
   }

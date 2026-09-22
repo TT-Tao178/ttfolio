@@ -69,7 +69,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const key = tabKey(loc);
     const found = tabs.find((t) => tabKey(t) === key);
     if (found !== undefined) {
+      // 复用既有标签时必须同步位置（尤其 subTab）：否则在工作台点项目卡会停在旧页签
+      // （例如上次停在「文档」），看起来像"点了没打开文件页"。
       set({ activeTabId: found.id });
+      get().updateActiveLocation(loc, true);
+      if (title !== '') get().renameTab(found.id, title);
       return;
     }
     const tab: Tab = {

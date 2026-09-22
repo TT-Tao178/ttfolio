@@ -3,8 +3,9 @@ import { Alert, Button, Descriptions, Form, Input, Modal, Progress, Space, Tag, 
 import { ReloadOutlined, StarOutlined, StarFilled, CopyOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, ApiClientError } from '@/lib/api';
 import type { ProjectDetail } from '@ttfolio/shared';
+import { useAppStore } from '@/app/store';
 import { fmtBytes, fmtMs, relTime } from '@/lib/format';
 import { LanguageBar } from '@/components/LanguageBar';
 import { StateView } from '@/components/StateView';
@@ -17,7 +18,7 @@ import { TodoList } from '@/features/todos/TodoList';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: string | null }): React.JSX.Element {
-  const { data: p, isLoading, error } = useQuery({
+  const { data: p, isLoading, error, refetch } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`)
   });
@@ -25,6 +26,22 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
   const { message } = App.useApp();
   const active = subTab ?? 'files';
   const [aliasOpen, setAliasOpen] = useState(false);
+
+  const notFound = error instanceof ApiClientError && error.code === 'NOT_FOUND';
+  const retry = (): void => {
+    void refetch();
+  };
+  const closeThisTab = (): void => {
+    const st = useAppStore.getState();
+    const t = st.tabs.find((x) => x.kind === 'project' && x.projectId === projectId);
+    if (t !== undefined) st.closeTab(t.id);
+  };
+  const backToWorkbench = (): void => {
+    closeThisTab();
+    useAppStore
+      .getState()
+      .openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
+  };
 
   const patch = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.patch(`/api/projects/${projectId}`, { rev: p?.rev, ...body }),
@@ -34,6 +51,12 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
     }
   });
+
+  // 项目已被移除登记（会话恢复出的旧标签、或在别处删除了登记）：
+  // 必须给出明确出口，而不是让页签区域永远空白。
+  if (notFound) {
+    return <ProjectGone projectId={projectId} onClose={closeThisTab} onBack={backToWorkbench} />;
+  }
 
   if (p !== undefined && p.pathOk === false) {
     return <RelocateNotice projectId={projectId} dirPath={p.dirPath} name={p.alias ?? p.diskName} />;
@@ -60,9 +83,16 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
           <Button size="small" onClick={() => setAliasOpen(true)}>改别名（L1）</Button>
         </Space>
       </div>
-      <div style={{ flex: 1, overflow: 'hidden' }} data-testid="project-subtab" data-active={active}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} data-testid="project-subtab" data-active={active}>
         {active === 'overview' && (
-          <StateView loading={isLoading} error={error} empty={p === undefined}>
+          <StateView
+            loading={isLoading}
+            error={error}
+            empty={p === undefined}
+            emptyText="项目信息不可用"
+            emptyAction={{ label: '重试', onClick: retry }}
+            onRetry={retry}
+          >
             {p !== undefined && (
               <div style={{ overflow: 'auto', height: '100%', paddingRight: 4 }}>
                 {p.analyzePartial && p.analyzeError !== null && (
@@ -116,10 +146,30 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
             )}
           </StateView>
         )}
-        {active === 'files' && p !== undefined && <FilesTab projectId={projectId} />}
-        {active === 'git' && p !== undefined && <GitTab projectId={projectId} />}
-        {active === 'archives' && p !== undefined && <ArchivesTab projectId={projectId} />}
-        {active === 'docs' && p !== undefined && <DocsTab projectId={projectId} />}
+        {active !== 'overview' && p !== undefined && (
+          active === 'files' ? <FilesTab projectId={projectId} />
+          : active === 'git' ? <GitTab projectId={projectId} />
+          : active === 'archives' ? <ArchivesTab projectId={projectId} />
+          : active === 'docs' ? <DocsTab projectId={projectId} />
+          : (
+            <StateView loading={false} empty emptyText={`未知页签：${active}`}><div /></StateView>
+          )
+        )}
+        {/* 项目管理信息未就绪时，任何页签都必须给出加载/错误/重试三态，
+            而不是留一片空白（原先只有 files/git/archives/docs 在 p===undefined 时什么都不渲染） */}
+        {active !== 'overview' && p === undefined && (
+          <StateView
+            loading={isLoading}
+            error={error}
+            empty={!isLoading && (error === null || error === undefined)}
+            emptyText="项目信息不可用（可能已被移除登记）"
+            emptyAction={{ label: '重试', onClick: retry }}
+            onRetry={retry}
+            errorExtra={<Button size="small" onClick={backToWorkbench}>回到工作台</Button>}
+          >
+            <div />
+          </StateView>
+        )}
       </div>
       <Modal
         title="改别名（仅写索引库，不动磁盘，L1）"
@@ -137,6 +187,36 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
           </Form.Item>
         </Form>
       </Modal>
+    </div>
+  );
+}
+
+/**
+ * 项目已不在索引库中（NOT_FOUND）。
+ * 典型来源：会话恢复出的旧标签（该项目已被「移除登记」或索引库被清空）——
+ * 必须给出「关闭标签 / 回到工作台」两个出口，否则用户看到的是一个再也点不动的空页。
+ */
+function ProjectGone({ projectId, onClose, onBack }: { projectId: string; onClose: () => void; onBack: () => void }): React.JSX.Element {
+  return (
+    <div style={{ padding: 32 }}>
+      <Alert
+        type="warning"
+        showIcon
+        message="该项目已不在索引库中"
+        description={
+          <div>
+            <p style={{ marginTop: 0 }}>
+              项目 id <code className="tt-mono">{projectId}</code> 查不到登记记录：可能已被「仅从 ttFolio 移除登记」、
+              已随索引库清空而消失，或这个标签来自更早的会话。
+            </p>
+            <p style={{ marginBottom: 12 }}>项目文件不受影响；如果需要继续使用，请回到工作台重新登记。</p>
+            <Space>
+              <Button onClick={onBack} type="primary" data-testid="back-to-workbench">回到工作台</Button>
+              <Button onClick={onClose} data-testid="close-gone-tab">关闭此标签</Button>
+            </Space>
+          </div>
+        }
+      />
     </div>
   );
 }
