@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import MarkdownPreview from './MarkdownPreview';
 import { relTime } from '@/lib/format';
+import { PaneSplit } from '@/components/PaneSplit';
 
 interface DocItem {
   path: string;
@@ -60,8 +61,15 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
   });
 
   return (
-    <div style={{ display: 'flex', gap: 8, height: '100%', overflow: 'hidden' }}>
-      <div style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 6, borderRight: '1px solid rgba(128,128,128,.15)', paddingRight: 8, overflow: 'auto' }}>
+    <div style={{ height: '100%', overflow: 'hidden' }}>
+      <PaneSplit
+        sizeKey="docsListWidth"
+        defaultSize={300}
+        min={200}
+        max={640}
+        testId="split-docs-list"
+        left={
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 8, overflow: 'auto' }}>
         <Button size="small" onClick={() => setMountOpen(true)}>挂载外部文档（L1）</Button>
         {(mounts ?? []).filter((m) => !m.existsOk).length > 0 && (
           <Alert type="warning" message="有挂载路径失效，已标灰" />
@@ -97,8 +105,10 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
             </List.Item>
           )}
         />
-      </div>
-      <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          </div>
+        }
+        right={
+          <div style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {selected === null ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择左侧文档阅读" style={{ marginTop: 64 }} />
         ) : (
@@ -132,7 +142,9 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
             )}
           </>
         )}
-      </div>
+          </div>
+        }
+      />
       <Modal title="挂载外部文档（任意文件夹或单文件）" open={mountOpen} onCancel={() => setMountOpen(false)} onOk={() => {
         void api.post(`/api/projects/${projectId}/mounts`, { path: mountPath }).then(() => {
           void message.success('已挂载');

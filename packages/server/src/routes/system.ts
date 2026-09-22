@@ -52,7 +52,8 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       defaultProjectTab: all[SETTING_KEYS.defaultProjectTab] ?? 'files',
       docRootBlacklist: docBlacklist !== null && docBlacklist !== '' ? JSON.parse(docBlacklist) as string[] : [],
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
-      scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]')
+      scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
+      uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}')
     });
   });
 
@@ -72,7 +73,8 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       default_project_tab: (v) => String(v),
       doc_root_blacklist_json: (v) => JSON.stringify(v),
       keybindings_json: (v) => JSON.stringify(v),
-      scan_root_dirs_json: (v) => JSON.stringify(v)
+      scan_root_dirs_json: (v) => JSON.stringify(v),
+      ui_layout_json: (v) => JSON.stringify(v)
     };
     for (const [k, v] of Object.entries(body)) {
       const fn = allowed[k];

@@ -11,6 +11,7 @@ import { TabBar } from '@/components/TabBar';
 import { PathBar } from '@/components/PathBar';
 import { StatusBar } from '@/components/StatusBar';
 import { DomainRail } from '@/components/DomainRail';
+import { PaneSplit } from '@/components/PaneSplit';
 import { Sidebar } from '@/components/Sidebar';
 import { DetailPanel } from '@/components/DetailPanel';
 import { Workbench } from '@/features/workbench/Workbench';
@@ -29,6 +30,10 @@ function Shell(): React.JSX.Element {
   const { message } = AntdApp.useApp();
   const [sseState, setSseState] = useState<SseState>('connecting');
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
+  // 切换后不会触发重渲染（开关"没反应"）。
+  const detailVisible = useAppStore((s) => s.detailVisible);
+  const setDetail = useAppStore((s) => s.setDetail);
 
   const onSseState = useCallback((s: SseState) => setSseState(s), []);
   useSse(onSseState, (e) => {
@@ -85,6 +90,10 @@ function Shell(): React.JSX.Element {
         useAppStore.getState().navigate(-1);
       } else if (e.altKey && e.key === 'ArrowRight') {
         useAppStore.getState().navigate(1);
+      } else if (mod && e.key.toLowerCase() === 'b') {
+        // 右栏开关（与原型一致：Ctrl/⌘+B）
+        e.preventDefault();
+        setDetail(!useAppStore.getState().detailVisible);
       } else if (mod && e.key === ',') {
         e.preventDefault();
         openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
@@ -98,7 +107,7 @@ function Shell(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [paletteOpen, setPalette, tabs, activeTabId, activeTab, closeTab, updateActiveLocation, openTab, message]);
+  }, [paletteOpen, setPalette, tabs, activeTabId, activeTab, closeTab, updateActiveLocation, openTab, message, setDetail]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -127,36 +136,60 @@ function Shell(): React.JSX.Element {
 
       <PathBar />
 
-      {/* 主体四栏 */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      {/* 主体四栏：域条(固定) | 侧栏(可拖) | 内容 | 详情(可拖，可折叠) */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
         <DomainRail />
-        <div style={{ width: 220, borderRight: '1px solid rgba(128,128,128,.15)', overflow: 'auto' }}>
-          <Sidebar />
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+          <PaneSplit
+            sizeKey="sidebarWidth"
+            defaultSize={220}
+            min={160}
+            max={420}
+            testId="split-sidebar"
+            left={
+              <div style={{ height: '100%', overflow: 'auto' }}>
+                <Sidebar />
+              </div>
+            }
+            right={
+              <PaneSplit
+                sizeKey="detailWidth"
+                defaultSize={280}
+                min={220}
+                max={560}
+                measure="last"
+                collapsed={!detailVisible || activeTab === null || activeTab.projectId === null}
+                onExpand={() => setDetail(true)}
+                collapsible={false}
+                testId="split-detail"
+                left={
+                  <div style={{ height: '100%', minWidth: 0, background: dark ? 'transparent' : SEMANTIC.layoutBg, overflow: 'hidden' }}>
+                    {activeTab === null ? (
+                      <div />
+                    ) : activeTab.kind === 'overview' ? (
+                      <Workbench subTab={activeTab.subTab} />
+                    ) : activeTab.kind === 'project' && activeTab.projectId !== null ? (
+                      <ProjectPage projectId={activeTab.projectId} subTab={activeTab.subTab} />
+                    ) : activeTab.kind === 'trash' ? (
+                      <TrashPage />
+                    ) : activeTab.kind === 'settings' ? (
+                      <SettingsPage />
+                    ) : activeTab.subTab === 'git-overview' ? (
+                      <GitOverview />
+                    ) : (
+                      <div />
+                    )}
+                  </div>
+                }
+                right={
+                  <div style={{ height: '100%', overflow: 'auto' }}>
+                    {activeTab !== null && activeTab.projectId !== null && <DetailPanel projectId={activeTab.projectId} />}
+                  </div>
+                }
+              />
+            }
+          />
         </div>
-        <div style={{ flex: 1, minWidth: 0, background: dark ? 'transparent' : SEMANTIC.layoutBg, overflow: 'hidden' }}>
-          {activeTab === null ? (
-            <div />
-          ) : activeTab.kind === 'overview' ? (
-            <Workbench subTab={activeTab.subTab} />
-          ) : activeTab.kind === 'project' && activeTab.projectId !== null ? (
-            <ProjectPage projectId={activeTab.projectId} subTab={activeTab.subTab} />
-          ) : activeTab.kind === 'trash' ? (
-            <TrashPage />
-          ) : activeTab.kind === 'settings' ? (
-            <SettingsPage />
-          ) : activeTab.subTab === 'git-overview' ? (
-            <GitOverview />
-          ) : activeTab.kind === 'git' && activeTab.targetPath !== null && activeTab.projectId !== null ? (
-            <div />
-          ) : (
-            <div />
-          )}
-        </div>
-        {useAppStore.getState().detailVisible && activeTab !== null && activeTab.projectId !== null && (
-          <div style={{ width: 280, borderLeft: '1px solid rgba(128,128,128,.15)', overflow: 'auto' }}>
-            <DetailPanel projectId={activeTab.projectId} />
-          </div>
-        )}
       </div>
 
       <StatusBar sseState={sseState} />

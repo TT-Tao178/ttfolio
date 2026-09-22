@@ -6,6 +6,7 @@ import { api, ApiClientError } from '@/lib/api';
 import type { GitBranch, GitLogEntry, GitStatus } from '@ttfolio/shared';
 import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
+import { PaneSplit } from '@/components/PaneSplit';
 import { DiffView } from './DiffView';
 
 export function GitTab({ projectId }: { projectId: string }): React.JSX.Element {
@@ -93,8 +94,15 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
   ];
 
   return (
-    <div style={{ display: 'flex', gap: 12, height: '100%', overflow: 'hidden' }}>
-      <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto' }}>
+    <div style={{ height: '100%', overflow: 'hidden' }}>
+      <PaneSplit
+        sizeKey="gitListWidth"
+        defaultSize={320}
+        min={220}
+        max={640}
+        testId="split-git-list"
+        left={
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', paddingRight: 8 }}>
         <Space>
           <Select
             size="small"
@@ -136,8 +144,10 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
           titleRender={(node) => <span>{String(node.title)}</span>}
         />
         {status.truncated && <Alert type="warning" message="变更超过 5000 项，仅显示部分" />}
-      </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto' }}>
+          </div>
+        }
+        right={
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'auto', minHeight: 0 }}>
         {selectedPath !== null && (
           <div>
             <Space style={{ marginBottom: 6 }}>
@@ -213,7 +223,9 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
             footer={<Button size="small" onClick={() => setLimit(limit + 100)}>加载更多</Button>}
           />
         </div>
-      </div>
+          </div>
+        }
+      />
     </div>
   );
 }

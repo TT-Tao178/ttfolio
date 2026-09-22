@@ -12,6 +12,7 @@ import type { TreeNode } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { SEMANTIC } from '@/theme/tokens';
 import { EditorPane } from './EditorPane';
+import { PaneSplit } from '@/components/PaneSplit';
 import { ImagePreview } from './ImagePreview';
 
 const GIT_COLORS: Record<string, string> = {
@@ -71,8 +72,15 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext);
 
   return (
-    <div style={{ display: 'flex', gap: 8, height: '100%', overflow: 'hidden' }}>
-      <div style={{ width: 300, display: 'flex', flexDirection: 'column', gap: 6, borderRight: '1px solid rgba(128,128,128,.15)', paddingRight: 8 }}>
+    <div style={{ height: '100%', overflow: 'hidden' }}>
+      <PaneSplit
+        sizeKey="treeWidth"
+        defaultSize={300}
+        min={200}
+        max={640}
+        testId="split-tree"
+        left={
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 8 }}>
         <Space size={4} style={{ flexWrap: 'wrap' }}>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void refetch()} />
           <Button size="small" icon={<FileAddOutlined />} onClick={() => setNewEntry({ kind: 'file' })} title="新建文件" />
@@ -143,16 +151,20 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             />
           )}
         </div>
-      </div>
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-        {selected === null ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择左侧文件打开" style={{ marginTop: 64 }} />
-        ) : isImage ? (
-          <ImagePreview projectId={projectId} path={selected} />
-        ) : (
-          <EditorPane projectId={projectId} path={selected} />
-        )}
-      </div>
+          </div>
+        }
+        right={
+          <div style={{ height: '100%', overflow: 'auto', minHeight: 0 }}>
+            {selected === null ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择左侧文件打开" style={{ marginTop: 64 }} />
+            ) : isImage ? (
+              <ImagePreview projectId={projectId} path={selected} />
+            ) : (
+              <EditorPane projectId={projectId} path={selected} />
+            )}
+          </div>
+        }
+      />
       <NewEntryModal projectId={projectId} parent={''} kind={newEntry?.kind ?? null} onClose={() => setNewEntry(null)} />
       <RenameModal projectId={projectId} path={renameTarget} onClose={() => setRenameTarget(null)} />
     </div>

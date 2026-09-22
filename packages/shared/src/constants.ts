@@ -47,7 +47,10 @@ export const SETTING_KEYS = {
   scanRootDirs: 'scan_root_dirs_json', // FR-12.6 预留
   keybindings: 'keybindings_json', // FR-11.4
   lastBackupAt: 'last_backup_at',
-  defaultProjectTab: 'default_project_tab' // files | overview
+  defaultProjectTab: 'default_project_tab', // files | overview
+  // 可拖拽面板尺寸（纯 UI 偏好，但按 C-29 统一落服务端，不用 localStorage）：
+  // { sidebarWidth, detailWidth, treeWidth, gitListWidth, docsListWidth }
+  uiLayout: 'ui_layout_json'
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
