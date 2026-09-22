@@ -111,8 +111,8 @@ function Shell(): React.JSX.Element {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 顶栏：LOGO + 标签 + 搜索/导入/设置 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
+      {/* 顶栏：LOGO + 标签 + 搜索/导入/设置。高度对齐《界面原型-AntD.html》#top = 56px */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
         <Space size={6}>
           <Avatar shape="square" size={26} style={{ background: SEMANTIC.primary, fontWeight: 700 }}>tf</Avatar>
           <strong>ttFolio</strong>
@@ -168,7 +168,7 @@ function Shell(): React.JSX.Element {
         <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
           <PaneSplit
             sizeKey="sidebarWidth"
-            defaultSize={220}
+            defaultSize={232}
             min={160}
             max={420}
             testId="split-sidebar"
@@ -180,7 +180,7 @@ function Shell(): React.JSX.Element {
             right={
               <PaneSplit
                 sizeKey="detailWidth"
-                defaultSize={280}
+                defaultSize={320}
                 min={220}
                 max={560}
                 measure="last"

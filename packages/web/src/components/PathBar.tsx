@@ -50,7 +50,7 @@ export function PathBar(): React.JSX.Element {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
       <Space.Compact>
         <Tooltip title={nav.back ? '后退 (Alt+←)' : '没有可后退的历史'}>
           <Button size="small" type="text" icon={<ArrowLeftOutlined />} disabled={!nav.back} onClick={() => navigate(-1)} data-testid="nav-back" />

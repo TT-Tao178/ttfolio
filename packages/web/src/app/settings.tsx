@@ -205,7 +205,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
           其高度退化为内容高度，导致应用壳的 height:100% 无法撑满视口（整体只剩内容高度、
           底部留大片空白、面板高度随内容跳动）。
           background/color 走令牌：原先透明，深色模式下会露出浏览器白底。 */}
-      <AntdApp style={{ height: '100%', background: SEMANTIC.layoutBg, color: SEMANTIC.text }}>
+      <AntdApp style={{ height: '100%', background: SEMANTIC.layoutBg, color: SEMANTIC.text, fontSize: 14 }}>
         <ToastBridge>
           <Ctx.Provider value={value}>{children}</Ctx.Provider>
         </ToastBridge>

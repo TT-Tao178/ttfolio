@@ -27,6 +27,11 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       dbPath: ctx.layout.dbFile,
       dbSize: ctx.dbSize(),
       projectCount: ctx.db().prepare<[], { c: number }>('SELECT COUNT(*) AS c FROM projects WHERE deleted_at IS NULL').get()?.c ?? 0,
+      // 状态栏要显示「最近分析」（对齐界面原型）；空库时为 null
+      lastAnalyzeAt:
+        ctx.db().prepare<[], { t: string | null }>(
+          'SELECT MAX(analyzed_at) AS t FROM projects WHERE deleted_at IS NULL'
+        ).get()?.t ?? null,
       uptime: Math.floor((Date.now() - ctx.startedAt) / 1000),
       dataDir: ctx.layout.dataDir,
       trashDir: ctx.layout.trashDir,

@@ -25,7 +25,8 @@ function RailButton({ active, onClick, label, children }: {
         onClick={onClick}
         aria-label={label}
         style={{
-          width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
+          // 尺寸对齐《界面原型-AntD.html》#rail .d：40×40、圆角 8、字号 17
+          width: 40, height: 40, borderRadius: 8, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
           background: active ? SEMANTIC.primaryBg : 'transparent',
           color: active ? SEMANTIC.primary : 'inherit'
@@ -42,8 +43,10 @@ export function DomainRail(): React.JSX.Element {
   return (
     <div
       style={{
+        // 宽度/padding/gap 对齐原型 #body 第一列（56px）与 #rail（padding 12px 0, gap 4）
+        width: 56, flexShrink: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        padding: '8px 4px', borderRight: `1px solid ${SEMANTIC.split}`
+        padding: '12px 0', borderRight: `1px solid ${SEMANTIC.split}`
       }}
     >
       {DOMAINS.map((d) => (

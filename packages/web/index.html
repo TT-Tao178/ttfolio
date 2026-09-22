@@ -14,6 +14,14 @@
       // 用户内容基址（架构图/原始文件，独立端口，C-13）：'' = 由后端端口推导
       window.__TTFOLIO_CONTENT_BASE__ = '%%TTFOLIO_CONTENT_BASE%%';
     </script>
+    <style>
+      /* 正文基准字号与 AntD 令牌（fontSize: 14）及《界面原型-AntD.html》（body 14px）一致。
+         不设的话自绘文字会继承浏览器默认 16px，比 AntD 控件大一号，看起来"字号不统一"。 */
+      html,
+      body {
+        font-size: 14px;
+      }
+    </style>
     <script>
       // TT-THEME-CACHE：仅缓存主题选择用于首帧渲染，业务数据一律走 API 落库（C-29 例外，见 DECISIONS.md）
       // 首帧兜底：'system' 也要处理（原先只认 'dark'，跟随系统时首帧会闪白）；

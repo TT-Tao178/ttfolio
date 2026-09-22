@@ -314,6 +314,8 @@ export interface HealthInfo {
   dbPath: string;
   dbSize: number;
   projectCount: number;
+  /** 最近一次分析时间（ISO）；从未分析时为 null。状态栏「最近分析」用 */
+  lastAnalyzeAt: string | null;
   uptime: number;
   dataDir: string;
   trashDir: string;
