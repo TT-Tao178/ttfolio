@@ -5,10 +5,10 @@ import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
-import { assertSafeName } from '../core/pathGuard.js';
+import { assertSafeName, validateRegistrableRoot } from '../core/pathGuard.js';
 import { addProjectsSchema, projectPatchSchema, relocateSchema, renameDiskSchema, collectionCreateSchema, collectionMembersSchema } from '@ttfolio/shared';
 import {
-  listProjects, getProjectRow, getProjectSummary, getProjectByPathKey, insertProject,
+  listProjects, getProjectRow, getProjectSummary, getProjectByPathKey, getRemovedProjectByPathKey, reviveProject, insertProject,
   patchProject, softDeleteProject, markOpened, listCollections, type ListFilters
 } from '../db/repo/projectsRepo.js';
 import { logActivity, recordRecentFile, listRecentFiles } from '../db/repo/metaRepo.js';
@@ -55,16 +55,35 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       if (p.slice(0, 4) === '\\\\?\\') p = p.slice(4);
       if (p === '') continue;
       try {
-        // 登记 = 定义新的白名单根：这里只做"存在性 + 危险段"校验
+        // 登记 = 定义新的白名单根：必须与"打开"用同一套危险段规则（P0-1）。
+        // 否则会出现"能导入、却永远打不开"的项目（Windows 保留名根 / UNC 路径），
+        // 且卡片显示 pathOk=true，用户完全看不出问题。
         const abs = path.resolve(p);
-        const st = fsx.statSafe(abs);
-        if (st === null || !st.isDir) throw new AppError('NOT_FOUND', '目录不存在');
-        const absReal = await fsxPromised(abs);
+        const absReal = await validateRegistrableRoot(abs);
+        const st = fsx.statSafe(absReal);
+        if (st === null || !st.isDir) throw new AppError('NOT_FOUND', `不是目录：${p}`);
         const key = pathKey(absReal);
         const dup = getProjectByPathKey(db, key);
         if (dup !== undefined) {
           skipped[skipped.length] = { path: p, reason: `已登记为「${dup.alias ?? dup.disk_name}」` };
           continue;
+        }
+        // 之前"移除登记"过的同一目录：原地复活（保留别名/备注/清单），而不是撞 UNIQUE 约束
+        const removed = getRemovedProjectByPathKey(db, key);
+        if (removed !== undefined) {
+          const revived = reviveProject(db, removed.id, { dirPath: absReal, diskName: path.basename(absReal) });
+          if (revived !== undefined) {
+            added[added.length] = revived.id;
+            logActivity(db, {
+              kind: 'project.add',
+              level: 'L1',
+              projectId: revived.id,
+              targetPath: absReal,
+              detail: { revived: true, alias: revived.alias },
+              actor: currentActor().actor
+            });
+            continue;
+          }
         }
         const row = insertProject(db, {
           dirPath: absReal,

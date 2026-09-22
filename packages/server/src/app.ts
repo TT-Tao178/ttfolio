@@ -4,6 +4,8 @@ import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import type { AppContext } from './context.js';
 import { toApiError } from './routes/helpers.js';
+import { defaultHttpStatus, AppError } from './core/errors.js';
+import type { ErrorCode } from '@ttfolio/shared';
 import { systemRoutes } from './routes/system.js';
 import { eventsRoute } from './routes/events.js';
 import { projectsRoutes } from './routes/projects.js';
@@ -42,6 +44,22 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   });
   app.ttfolio = ctx;
 
+  // 允许"带 Content-Type: application/json 但没有 body"的请求（DELETE 常如此）。
+  // Fastify 默认 JSON 解析器遇到空体会抛 FST_ERR_CTP_EMPTY_JSON_BODY，被错误映射成 IO_ERROR/500，
+  // 对调用方是误导（这是协议层问题，不是 IO 故障）。这里显式把空体当 undefined，非法 JSON 给 400。
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = typeof body === 'string' ? body.trim() : '';
+    if (text === '') {
+      done(null, undefined);
+      return;
+    }
+    try {
+      done(null, JSON.parse(text));
+    } catch {
+      done(new AppError('BAD_REQUEST', '请求体不是合法 JSON'), undefined);
+    }
+  });
+
   // 鉴权与防 DNS rebinding（C-09）：/api/health 免 token（仅回环 + Host 校验）
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const url = req.url ?? '';
@@ -77,6 +95,21 @@ export function buildApp(ctx: AppContext): FastifyInstance {
         }
       }
     }
+  });
+
+  // 统一错误响应契约（API-2 / ERR-1，修复 P1-6）：
+  // 路由用 fail(code, msg, status) 表达状态，这里把它落到真正的 HTTP 状态码，
+  // 并把仅供内部使用的 __status 从响应体里剔除。
+  // 否则所有业务错误都以 HTTP 200 + ok:false 返回——外部监控、日志告警与 e2e 断言
+  // 只要按 status >= 400 判断就会全部漏报（实测第一版探针正因此误判为"全部正常"）。
+  app.addHook('preSerialization', async (_req, reply, payload) => {
+    if (typeof payload !== 'object' || payload === null || !('__status' in payload)) return payload;
+    const { __status, ...rest } = payload as { __status?: unknown } & Record<string, unknown>;
+    const code = (rest['error'] as { code?: ErrorCode } | undefined)?.code;
+    const status =
+      typeof __status === 'number' ? __status : code !== undefined ? defaultHttpStatus(code) : undefined;
+    if (status !== undefined) reply.code(status);
+    return rest;
   });
 
   // 统一响应体与错误映射

@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { startUserContentServer } from './static/userContent.js';
 import { listIgnoreRules } from './db/repo/rulesRepo.js';
 import { checkPathOk } from './db/repo/projectsRepo.js';
+import { hasWindowsPathHazard } from './core/pathGuard.js';
 import { compileIgnore } from './core/ignore.js';
 import { createBackup } from './core/backup.js';
 import { getSetting, setSetting } from './db/repo/metaRepo.js';
@@ -138,10 +139,16 @@ async function main(): Promise<void> {
   });
 
   // ---- 路径失效检测（启动一次） ----
+  // 判据从"existsSync"升级为"存在 + 不触发危险段规则"：根目录名是 Windows 保留名或路径为 UNC 时，
+  // 目录其实存在（existsSync 为 true），但每次打开都会被 pathGuard 拦下 —— 卡片必须标红，
+  // 否则用户面对的是"能导入、永远打不开、且毫无线索"（P1-7）。
   try {
-    const missing = checkPathOk(db, (p) => existsSync(p));
+    const missing = checkPathOk(db, (p) => {
+      if (hasWindowsPathHazard(path.resolve(p)) !== null) return false;
+      return existsSync(p);
+    });
     if (missing > 0) {
-      logger.warn({ mod: 'boot', msg: `${missing} 个项目目录缺失，卡片将标红并提供重新定位` });
+      logger.warn({ mod: 'boot', msg: `${missing} 个项目目录不可访问（缺失或路径不合规），卡片将标红并提供重新定位` });
     }
   } catch {
     /* 首次启动无项目 */

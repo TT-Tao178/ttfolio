@@ -5,7 +5,8 @@ import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
-import { assertSafeName } from '../core/pathGuard.js';
+import { assertSafeName, isInsideOrEqual } from '../core/pathGuard.js';
+import { promises as fsp } from 'node:fs';
 import { resolveInProject } from '../roots.js';
 import { buildMatcher } from '../core/search.js';
 import { draftPutSchema, fsEntryCreateSchema, fsFileSaveSchema, fsMoveSchema, fsRenameSchema } from '@ttfolio/shared';
@@ -41,12 +42,27 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       return fail(...toApiErrorTuple(err));
     }
     const nodes = [];
+    let hiddenCount = 0;
     for (const e of entries.slice(0, 2000)) {
       const rel = guarded.relToRoot === '' ? e.name : `${guarded.relToRoot}/${e.name}`;
       const hidden = matcher.isHidden(rel);
-      if (hidden && !showIgnored) continue;
+      if (hidden && !showIgnored) {
+        hiddenCount += 1;
+        continue;
+      }
       const abs = path.join(guarded.real, e.name);
       const st = e.isFile ? fsx.statSafe(abs) : null;
+      // 链接：判定目标是否在项目目录内。在外的链接仍然显示，但标记 linkOutside，
+      // 让前端灰显 + 说明原因，而不是等用户点开才报错。
+      let linkOutside: boolean | undefined;
+      if (e.isSymlink) {
+        try {
+          const targetReal = await fsp.realpath(abs);
+          linkOutside = !isInsideOrEqual(guarded.root, targetReal);
+        } catch {
+          linkOutside = true; // 断裂链接按"不可用"处理
+        }
+      }
       nodes.push({
         name: e.name,
         path: rel,
@@ -54,14 +70,18 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         size: st?.size,
         mtime: st?.mtimeIso,
         gitState: marks.get(rel.toLowerCase()),
-        ignored: hidden
+        ignored: hidden,
+        symlink: e.isSymlink ? true : undefined,
+        linkTarget: e.isSymlink ? (e.linkTarget ?? 'unknown') : undefined,
+        linkOutside
       });
     }
     nodes.sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
       return a.name.localeCompare(b.name, 'zh-CN');
     });
-    return ok({ path: guarded.relToRoot, nodes });
+    // hiddenCount 让前端区分"目录为空"与"全被忽略规则隐藏"（两者都返回 nodes: []）
+    return ok({ path: guarded.relToRoot, nodes, hiddenCount });
   });
 
   // ---- 读文件 ----

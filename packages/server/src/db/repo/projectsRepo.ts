@@ -212,6 +212,32 @@ export function getProjectByPathKey(db: Database.Database, keyArg: string): Proj
   return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NULL', [keyArg]);
 }
 
+/**
+ * 按路径键找"已被移除登记"（软删除）的行。
+ * 为什么需要：`dir_path_key` 上有 UNIQUE 约束，而移除登记走的是软删除（deleted_at 置位）。
+ * 只查未删除行的话，重新登记同一目录会撞 UNIQUE，报成 SQLITE_CONSTRAINT_UNIQUE / IO_ERROR 500
+ * ——实测"移除登记后无法再导入同一目录"。找到软删除行后可原地复活（保留原有别名/备注）。
+ */
+export function getRemovedProjectByPathKey(db: Database.Database, keyArg: string): ProjectRow | undefined {
+  return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NOT NULL', [keyArg]);
+}
+
+/** 复活一个被移除登记的项目：清空 deleted_at，刷新路径与目录名，rev +1。 */
+export function reviveProject(
+  db: Database.Database,
+  id: string,
+  data: { dirPath: string; diskName: string }
+): ProjectRow | undefined {
+  const now = new Date().toISOString();
+  run(
+    db,
+    `UPDATE projects SET deleted_at = NULL, dir_path = ?, disk_name = ?, path_ok = 1,
+       path_checked_at = ?, updated_at = ?, rev = rev + 1 WHERE id = ?`,
+    [data.dirPath, data.diskName, now, now, id]
+  );
+  return getProjectRow(db, id);
+}
+
 export function insertProject(
   db: Database.Database,
   data: { dirPath: string; dirPathKey: string; diskName: string; defaultArchDir: string }

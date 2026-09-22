@@ -7,6 +7,12 @@ import { detectProjectType } from './analyzer/typeDetect.js';
 import { extractFromManifest, mergeTechStack } from './analyzer/techStack.js';
 import { parseStatusV2 } from './git.js';
 import { detectAndDecode, detectEol, encodeByDetected, looksBinary } from './fsx.js';
+import { listEntries } from './fsx.js';
+import { hasWindowsPathHazard, validateRegistrableRoot } from './pathGuard.js';
+import os from 'node:os';
+import path from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import iconv from 'iconv-lite';
 import { matchScore, normalizeName } from '../routes/docs.js';
 
@@ -168,5 +174,69 @@ describe('文档根自动匹配打分（FR-6.2）', () => {
     expect(matchScore('ttapp', 'ttapp设计文档')).toBeGreaterThanOrEqual(70);
     expect(matchScore('web-server-app', 'web server app')).toBeGreaterThanOrEqual(40);
     expect(matchScore('alpha', 'omega')).toBe(0);
+  });
+});
+
+describe('登记可打开性（P0-1：登记与打开必须同一套规则，防"能导入却永远打不开"）', () => {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'ttfolio-reg-'));
+
+  it('正常目录可通过登记校验，返回 realpath', async () => {
+    const dir = path.join(tmp, 'ok-proj');
+    mkdirSync(dir, { recursive: true });
+    const real = await validateRegistrableRoot(dir);
+    expect(path.basename(real)).toBe('ok-proj');
+    expect(hasWindowsPathHazard(real)).toBeNull();
+  });
+
+  it('Windows 保留名根目录被拒绝，且给出可操作原因', async () => {
+    const bad = path.join(tmp, 'aux');
+    mkdirSync(bad, { recursive: true });
+    await expect(validateRegistrableRoot(bad)).rejects.toThrow(/保留名[\s\S]*改名/);
+  });
+
+  it('UNC 路径被拒绝，且提示改用映射盘符/复制到本地', async () => {
+    await expect(validateRegistrableRoot('\\\\localhost\\share\\proj')).rejects.toThrow(/UNC[\s\S]*(映射|本地)/);
+  });
+
+  it('不存在的目录给出 NOT_FOUND 而不是危险段错误', async () => {
+    await expect(validateRegistrableRoot(path.join(tmp, 'nope-not-exist'))).rejects.toThrow(/不存在或不可访问/);
+  });
+});
+
+describe('符号链接类型判定（P0-3：junction 不能被当成文件）', () => {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'ttfolio-link-'));
+  const proj = path.join(tmp, 'proj');
+  const outside = path.join(tmp, 'outside');
+  mkdirSync(path.join(proj, 'src'), { recursive: true });
+  mkdirSync(outside, { recursive: true });
+  writeFileSync(path.join(outside, 'x.txt'), 'x');
+  const canJunction = process.platform === 'win32';
+  if (canJunction) {
+    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-dir'), path.join(proj, 'src')], { stdio: 'ignore' });
+    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-broken'), path.join(outside, 'nope')], { stdio: 'ignore' });
+  }
+
+  it('目录型 junction 判为 dir 且标记 isSymlink（可展开）', () => {
+    if (!canJunction) return;
+    const e = listEntries(proj).find((n) => n.name === 'link-dir');
+    expect(e).toBeDefined();
+    expect(e?.isSymlink).toBe(true);
+    expect(e?.isDir).toBe(true);
+    expect(e?.isFile).toBe(false);
+    expect(e?.linkTarget).toBe('dir');
+  });
+
+  it('断裂链接标记为 symlink 且 linkTarget=unknown（不能当成文件）', () => {
+    if (!canJunction) return;
+    const e = listEntries(proj).find((n) => n.name === 'link-broken');
+    expect(e?.isSymlink).toBe(true);
+    expect(e?.isFile).toBe(false);
+    expect(e?.linkTarget).toBe('unknown');
+  });
+
+  it('普通目录/文件仍然正确判定', () => {
+    const entries = listEntries(proj);
+    expect(entries.find((n) => n.name === 'src')?.isDir).toBe(true);
+    expect(entries.find((n) => n.name === 'src')?.isSymlink).toBe(false);
   });
 });

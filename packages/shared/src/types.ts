@@ -107,6 +107,20 @@ export interface TreeNode {
   mtime?: string;
   gitState?: 'modified' | 'added' | 'untracked' | 'deleted' | 'conflicted' | 'renamed';
   ignored?: boolean;
+  /** 符号链接 / junction（kind 表示"链接目标的类型"） */
+  symlink?: boolean;
+  /** 链接目标：dir/file/unknown（unknown = 断裂或不可访问） */
+  linkTarget?: 'dir' | 'file' | 'unknown';
+  /** 链接指向项目目录之外：前端应灰显并给出原因，而不是让用户点了才报错 */
+  linkOutside?: boolean;
+}
+
+/** 文件树响应：nodes 为空时用 hiddenCount 区分"目录为空"与"内容被忽略规则隐藏" */
+export interface TreeResponse {
+  path: string;
+  nodes: TreeNode[];
+  /** 被忽略规则过滤掉的条目数（showIgnored=0 时统计） */
+  hiddenCount?: number;
 }
 
 export interface FileContent {

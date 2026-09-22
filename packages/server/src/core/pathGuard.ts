@@ -147,3 +147,59 @@ export function resolveWithin(root: string, rel: string): string {
   }
   return abs;
 }
+
+/** 把危险路径的报错补成"用户能照着做"的文案（普通打开路径命中时也会更清楚）。 */
+function actionable(reason: string): string {
+  if (reason.includes('UNC')) {
+    return `${reason}（本版本仅支持本地盘符路径；网络共享请先映射为盘符，或复制到本地后再登记）`;
+  }
+  if (reason.includes('保留名')) {
+    return `${reason}（Windows 下这类目录无法通过常规文件 API 访问，请改名后重新登记）`;
+  }
+  if (reason.includes('点或空格结尾')) {
+    return `${reason}（Windows 会静默截断这类名字，请改名后重新登记）`;
+  }
+  if (reason.includes('ADS')) {
+    return `${reason}（名字里不能含冒号，冒号在 Windows 上表示备用数据流）`;
+  }
+  return reason;
+}
+
+/**
+ * 登记前的"可打开性"校验（P0-1，消除不对称）：
+ * 登记与打开必须用**同一套**危险段规则，否则会出现"能导入、却永远打不开"的项目
+ * （典型：根目录名是 Windows 保留名 aux/com1，或路径是 UNC \\host\share）。
+ * 返回 realpath；失败抛 AppError（PATH_OUT_OF_SCOPE / NOT_FOUND），message 已可操作化。
+ */
+export async function validateRegistrableRoot(userPath: string): Promise<string> {
+  const abs = path.resolve(userPath);
+  try {
+    assertNoWindowsPathHazards(abs);
+  } catch (err) {
+    if (err instanceof AppError) throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
+    throw err;
+  }
+  let real: string;
+  try {
+    real = await fsp.realpath(abs);
+  } catch {
+    throw new AppError('NOT_FOUND', `目录不存在或不可访问：${userPath}（请确认路径拼写与访问权限）`);
+  }
+  try {
+    assertNoWindowsPathHazards(real);
+  } catch (err) {
+    if (err instanceof AppError) throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
+    throw err;
+  }
+  return real;
+}
+
+/** 同步版危险段检查（启动期路径失效检测用，避开异步）。 */
+export function hasWindowsPathHazard(absPath: string): string | null {
+  try {
+    assertNoWindowsPathHazards(absPath);
+    return null;
+  } catch (err) {
+    return err instanceof AppError ? err.message : '路径不合法';
+  }
+}

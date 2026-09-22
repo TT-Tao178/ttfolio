@@ -3,12 +3,12 @@ import { Alert, Button, Empty, Input, Modal, Space, Switch, Tree, App } from 'an
 import type { DataNode } from 'antd/es/tree';
 import {
   FileOutlined, FolderOutlined, ReloadOutlined, SearchOutlined,
-  FileAddOutlined, FolderAddOutlined
+  FileAddOutlined, FolderAddOutlined, LinkOutlined
 } from '@ant-design/icons';
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { TreeNode } from '@ttfolio/shared';
+import type { TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { SEMANTIC } from '@/theme/tokens';
 import { EditorPane } from './EditorPane';
@@ -30,12 +30,14 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   const [filter, setFilter] = useState('');
   const [newEntry, setNewEntry] = useState<{ kind: 'file' | 'dir' } | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  /** 展开失败的节点：懒加载失败必须可见（rc-tree 会吞掉 rejection） */
+  const [failedPaths, setFailedPaths] = useState<string[]>([]);
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
 
   const { data: rootData, isLoading, error, refetch } = useQuery({
     queryKey: ['tree', projectId, '', showIgnored],
-    queryFn: () => api.get<{ path: string; nodes: TreeNode[] }>('/api/fs/tree', { projectId, path: '', showIgnored: showIgnored ? '1' : '0' })
+    queryFn: () => api.get<TreeResponse>('/api/fs/tree', { projectId, path: '', showIgnored: showIgnored ? '1' : '0' })
   });
   const { data: searchData } = useQuery({
     queryKey: ['fssearch', projectId, filter],
@@ -43,14 +45,30 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     enabled: filter.length > 0
   });
 
-  // 展开时懒加载
+  // 展开时懒加载：失败必须留下可见痕迹（toast + 节点红字），否则用户只感到"点了没反应"
   const loadChildren = async (rel: string): Promise<void> => {
-    const r = await api.get<{ path: string; nodes: TreeNode[] }>('/api/fs/tree', { projectId, path: rel, showIgnored: showIgnored ? '1' : '0' });
-    const cacheKey = ['tree', projectId, rel, showIgnored];
-    queryClient.setQueryData(cacheKey, r);
+    try {
+      const r = await api.get<TreeResponse>('/api/fs/tree', { projectId, path: rel, showIgnored: showIgnored ? '1' : '0' });
+      queryClient.setQueryData(['tree', projectId, rel, showIgnored], r);
+      setFailedPaths((prev) => prev.filter((p) => p !== rel));
+    } catch (e) {
+      const code = e instanceof ApiClientError ? e.code : '';
+      const hint =
+        code === 'PERMISSION_DENIED'
+          ? '权限不足：请检查该文件夹的访问权限'
+          : code === 'NOT_FOUND'
+            ? '目录已不存在（可能被移动或删除）'
+            : code === 'PATH_OUT_OF_SCOPE'
+              ? '该路径不被允许访问（符号链接指向项目外部？）'
+              : e instanceof Error
+                ? e.message
+                : '加载失败';
+      setFailedPaths((prev) => (prev.includes(rel) ? prev : [...prev, rel]));
+      void message.error(`展开「${rel}」失败：${hint}`);
+    }
   };
 
-  const treeData = useMemo(() => toAntdTree(rootData?.nodes ?? [], '', (rel) => void loadChildren(rel)), [rootData, showIgnored]); // eslint-disable-line react-hooks/exhaustive-deps
+  const treeData = useMemo(() => toAntdTree(rootData?.nodes ?? [], '', (rel) => void loadChildren(rel), failedPaths), [rootData, showIgnored, failedPaths]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openFile = (rel: string): void => {
     setSelected(rel);
@@ -134,14 +152,40 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             <div style={{ padding: 12, opacity: 0.6 }}>加载中…</div>
           ) : error !== undefined && error !== null ? (
             <Alert type="error" message={error instanceof Error ? error.message : '加载失败'} />
+          ) : treeData.length === 0 ? (
+            // 空态必须区分两种情形（原先两者都只剩一片空白，用户无法判断"是空的"还是"坏了"）
+            (rootData?.hiddenCount ?? 0) > 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={`内容被忽略规则隐藏（${rootData?.hiddenCount ?? 0} 项，如 node_modules / dist）`}
+                data-testid="tree-empty-hidden"
+              >
+                <Button size="small" type="primary" onClick={() => setShowIgnored(true)}>
+                  显示忽略项
+                </Button>
+              </Empty>
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="这个目录里还没有文件"
+                data-testid="tree-empty"
+              >
+                <Button size="small" onClick={() => setNewEntry({ kind: 'file' })}>新建文件</Button>
+              </Empty>
+            )
           ) : (
             <Tree
               showIcon
               blockNode
               treeData={treeData}
               loadData={async (node) => {
-                const rel = String(node.key);
-                await loadChildren(rel);
+                // 这里必须自己 catch：rc-tree 会吞掉 loadData 的 rejection，
+                // 不接住就表现为"点了没反应"（loadChildren 内部已做提示与失败标记）。
+                try {
+                  await loadChildren(String(node.key));
+                } catch {
+                  /* loadChildren 已处理 */
+                }
               }}
               onSelect={(keys) => {
                 const key = keys[0];
@@ -171,20 +215,40 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   );
 }
 
-function toAntdTree(nodes: TreeNode[], _parent: string, _load: (rel: string) => void): DataNode[] {
+function toAntdTree(nodes: TreeNode[], _parent: string, _load: (rel: string) => void, failed: string[] = []): DataNode[] {
   return nodes.map((n) => {
     const key = n.path;
     const gitColor = n.gitState !== undefined ? GIT_COLORS[n.gitState] : undefined;
+    // 链接四态：项目内目录链接可展开；项目外/断裂链接必须灰显禁用并说明原因，
+    // 不能让用户点了才报错（实测原实现把 junction 当文件、标成叶子，完全无法展开）。
+    const linkDisabled = n.symlink === true && (n.linkOutside === true || n.linkTarget === 'unknown');
+    const linkNote =
+      n.symlink === true
+        ? n.linkTarget === 'unknown'
+          ? '符号链接：目标不可访问或已断裂'
+          : n.linkOutside === true
+            ? '符号链接：指向项目目录之外，出于安全考虑不展开'
+            : `符号链接：指向项目内的${n.linkTarget === 'dir' ? '目录' : '文件'}`
+        : '';
+    const isFailed = failed.includes(key);
+    const tip = [isFailed ? '展开失败（权限不足或路径已失效）' : '', linkNote, n.gitState !== undefined ? `Git: ${n.gitState}` : '']
+      .filter((s) => s !== '')
+      .join(' · ');
     return {
       key,
       title: (
-        <span style={{ color: gitColor }} title={`${n.name}${n.gitState !== undefined ? ` (${n.gitState})` : ''}`}>
+        <span style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
           {n.name}
+          {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
           {n.ignored === true ? '（忽略）' : ''}
+          {isFailed ? '（展开失败）' : ''}
         </span>
       ),
       icon: n.kind === 'dir' ? <FolderOutlined /> : <FileOutlined />,
-      isLeaf: n.kind !== 'dir',
+      // 未知/越界的链接当叶子且不可选：点了也读不到，不如明确禁用
+      isLeaf: linkDisabled ? true : n.kind !== 'dir',
+      disabled: linkDisabled,
+      selectable: !linkDisabled,
       path: n.path,
       kind: n.kind
     } as unknown as DataNode;

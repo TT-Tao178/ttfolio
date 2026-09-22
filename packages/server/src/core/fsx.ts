@@ -64,11 +64,35 @@ export interface FsEntry {
   name: string;
   isDir: boolean;
   isFile: boolean;
+  /** 是否为符号链接 / junction（Windows 上 readdir 对二者 isDirectory/isFile 均为 false，必须单独判定） */
+  isSymlink: boolean;
+  /** 链接目标类型：dir/file/unknown（unknown = 断裂链接或目标不可访问） */
+  linkTarget?: 'dir' | 'file' | 'unknown';
 }
 
 export function listEntries(p: string): FsEntry[] {
   const items = readdirSync(p, { withFileTypes: true });
-  return items.map((d) => ({ name: d.name, isDir: d.isDirectory(), isFile: d.isFile() }));
+  return items.map((d) => {
+    if (!d.isSymbolicLink()) {
+      return { name: d.name, isDir: d.isDirectory(), isFile: d.isFile(), isSymlink: false };
+    }
+    // 链接：跟随一次 stat 判定目标类型。失败时保持 "未知链接"，
+    // 绝不能当成文件——那会让前端标成叶子节点、不可展开，且点了才报错（实测用户体感为"点不开"）。
+    let linkTarget: 'dir' | 'file' | 'unknown' = 'unknown';
+    try {
+      const st = statSync(path.join(p, d.name));
+      linkTarget = st.isDirectory() ? 'dir' : 'file';
+    } catch {
+      linkTarget = 'unknown';
+    }
+    return {
+      name: d.name,
+      isDir: linkTarget === 'dir',
+      isFile: linkTarget === 'file',
+      isSymlink: true,
+      linkTarget
+    };
+  });
 }
 
 export function ensureDir(p: string): void {
