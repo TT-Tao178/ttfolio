@@ -31,12 +31,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：第十四轮收口的 `docs(handover)` 提交（其上依次是
-  `feat(web): 设置页五张分组卡统一尺寸，界面移除 FR 编号` →
-  `feat(web): 项目卡片与侧栏项目列表同时展示别名与原始名`；精确哈希看 `git log --oneline -4`）
-- **第十四轮（本轮）新增**：设置页五卡统一尺寸+界面去 FR 编号 / 别名与原名同显
-  （详见 `PROGRESS.md` 顶部第十四轮小节）；远程仓库已建：`https://github.com/TT-Tao178/ttfolio.git`
-  （私有；推送走用户本机加速器直连，仓库级 git 代理配置已移除）
+- 最新提交：第十五轮收口的 `docs(handover)` 提交（其上依次是
+  `fix(web): 编辑器仅在本地有未保存改动时才提示「外部修改」` →
+  `feat(web): 侧栏项目域移除 7 个「我的视图」入口` →
+  `feat(web): 挂载外部文档支持系统对话框多选文件`；精确哈希看 `git log --oneline -4`）
+- **第十五轮（本轮）新增**：编辑器外部修改提示收敛 / 侧栏 7 个视图项移除 / 挂载文档多选
+  （详见 `PROGRESS.md` 顶部第十五轮小节）；远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **60 条** ✅
 - dist 已重建并跑过 `verify-build7717.mjs`：生产入口 127.0.0.1:7717 同步带上本轮修复
 - 数据库无新迁移（仍为 user_version=2）
@@ -107,6 +107,7 @@ $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是�
 | `verify-round9.mjs` | FR-11.6「打开日志」（`page.route` 拦截，不真弹资源管理器）+ 白名单反向校验 |
 | `verify-round13.mjs` | 第十三轮：总览项目卡片分页（route 注入 25 个假项目、不写库）/ 系统对话框即时反馈 / 设置页 8 卡栅格与锚点定位 |
 | `verify-round14.mjs` | 第十四轮：设置页五卡统一 320px + 无 FR 字样 / 别名与原名同显（route 注入假项目，不写库） |
+| `verify-round15.mjs` | 第十五轮：外部修改警告收敛（route 伪造 fs/file 版本）/ 侧栏视图项移除 / 挂载多选（拦截 pick-file 与 mounts）；结尾自动清理探针草稿 |
 | `dialog-topmost.mjs` | Win32 前台焦点前后对照（按 PID 抓对话框 + 测出现耗时 + GetForegroundWindow；会在桌面短暂闪对话框） |
 | `restore-active-tab.mjs` / `check-active-tab.mjs` | 收尾把活动标签点回第一个 / 只读核对服务端会话活动标签 |
 | `diag-reopen.mjs` | 树节点“反选”诊断：后退后再点同一个文件编辑器不打开 |
