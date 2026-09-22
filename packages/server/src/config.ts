@@ -1,6 +1,7 @@
 /** 运行配置：数据目录、端口、运行模式。 */
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 export interface AppConfig {
@@ -67,4 +68,29 @@ export function readRuntime(file: string): Record<string, unknown> | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * 读取或生成持久化 token（DECISIONS.md D-TOKEN）。
+ * 为什么持久化：dev 下 `tsx watch` 每次改后端文件都重启进程，若每次重新随机，
+ * 已打开的页面、SSE 连接与 vite 代理头会立刻变成 401 —— 开发体验被破坏且极易误判为 bug。
+ * 轮换方式：删除 `<dataDir>/token` 后重启。
+ */
+export function loadOrCreateToken(dataDir: string): string {
+  const tokenFile = path.join(dataDir, 'token');
+  if (existsSync(tokenFile)) {
+    try {
+      const saved = readFileSync(tokenFile, 'utf8').trim();
+      if (/^[0-9a-f]{48}$/.test(saved)) return saved;
+    } catch {
+      /* 读取失败则重新生成 */
+    }
+  }
+  const token = randomBytes(24).toString('hex');
+  try {
+    writeFileSync(tokenFile, token, { encoding: 'utf8', mode: 0o600 });
+  } catch {
+    /* 写不了也不致命：本次进程仍可用该 token */
+  }
+  return token;
 }

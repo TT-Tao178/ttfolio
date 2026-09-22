@@ -1,8 +1,7 @@
 /** 启动：读配置 → 建/迁移库 → 校验项目路径 → 起双端口 HTTP → 起 Watcher → 每日备份。 */
-import { randomBytes } from 'node:crypto';
 import { existsSync, renameSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { loadPort, resolveDataDir, ensureDataDirs, writeRuntime } from './config.js';
+import { loadPort, resolveDataDir, ensureDataDirs, writeRuntime, loadOrCreateToken } from './config.js';
 import { createLogger } from './core/logger.js';
 import { SseHub } from './core/sse.js';
 import { TaskManager } from './core/tasks.js';
@@ -69,7 +68,10 @@ async function main(): Promise<void> {
   }
 
   // ---- 端口探测 ----
-  const token = randomBytes(24).toString('hex');
+  // token 持久化（DECISIONS.md D-TOKEN）：dev 下 tsx watch 每次改后端代码都会重启进程，
+  // 若每次重新随机则页面/N不刷新的 SSE 与 vite 代理头立刻 401；因此复用数据目录下的 token 文件，
+  // 想轮换时删除该文件即可。文件权限尽量收紧（Windows 上以目录 ACL 为准）。
+  const token = loadOrCreateToken(layout.dataDir);
   const basePort = loadPort();
   let port = basePort;
   let userContentPort = basePort + 100;

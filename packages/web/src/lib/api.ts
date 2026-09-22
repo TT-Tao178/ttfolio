@@ -5,6 +5,8 @@ declare global {
   interface Window {
     __TTFOLIO_TOKEN__?: string;
     __TTFOLIO_PORT__?: string;
+    __TTFOLIO_API_BASE__?: string;
+    __TTFOLIO_CONTENT_BASE__?: string;
   }
 }
 
@@ -33,6 +35,10 @@ function token(): string {
 }
 
 function base(): string {
+  // 显式基址优先（'' = 同源）：生产与 dev 均为同源——dev 由 vite 代理 /api，
+  // 避免"页面在 5173、API 直连 7717"造成的跨源被 CORS/Host 校验拦截。
+  const explicit = window.__TTFOLIO_API_BASE__;
+  if (explicit !== undefined) return explicit;
   const p = window.__TTFOLIO_PORT__;
   if (p !== undefined && p !== '' && window.location.port !== p) {
     return `${window.location.protocol}//${window.location.hostname}:${p}`;
@@ -76,8 +82,10 @@ export const api = {
   del: <T>(path: string, query?: Record<string, string>) => request<T>('DELETE', path, undefined, query)
 };
 
-/** 用户内容端口（架构图/原始文件），与应用同 host 不同端口。 */
+/** 用户内容端口（架构图/原始文件），与应用同 host 不同端口（C-13 跨源隔离）。 */
 export function userContentBase(): string {
+  const explicit = window.__TTFOLIO_CONTENT_BASE__;
+  if (explicit !== undefined && explicit !== '') return explicit;
   const appPort = window.__TTFOLIO_PORT__ ?? window.location.port;
   const portNum = Number.parseInt(appPort ?? '7717', 10);
   const contentPort = Number.isFinite(portNum) ? portNum + 100 : 7817;

@@ -109,7 +109,10 @@ export function buildApp(ctx: AppContext): FastifyInstance {
     }
     const html = readFileSync(path.join(ctx.webDist, 'index.html'), 'utf8')
       .replace('%%TTFOLIO_TOKEN%%', ctx.token)
-      .replace('%%TTFOLIO_PORT%%', String(ctx.port));
+      .replace('%%TTFOLIO_PORT%%', String(ctx.port))
+      // 生产为同源：API 基址留空；用户内容基址留空（前端按「后端端口 + 100」推导，保持独立端口隔离）
+      .replace('%%TTFOLIO_API_BASE%%', '')
+      .replace('%%TTFOLIO_CONTENT_BASE%%', '');
     void reply.type('text/html; charset=utf-8').send(html);
     return reply;
   });

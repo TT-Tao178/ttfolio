@@ -5,8 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ttFolio · tt项目仓库</title>
     <script>
+      // 运行时注入：生产由 server 响应时替换；dev 由 vite 插件替换（见 vite.config.ts）
       window.__TTFOLIO_TOKEN__ = '%%TTFOLIO_TOKEN%%';
+      // 后端端口：用于推导用户内容端口（= 后端端口 + 100）
       window.__TTFOLIO_PORT__ = '%%TTFOLIO_PORT%%';
+      // API 基址：'' = 同源（生产同源；dev 走 vite 代理 /api，避免跨源被 CORS/Host 校验拦下）
+      window.__TTFOLIO_API_BASE__ = '%%TTFOLIO_API_BASE%%';
+      // 用户内容基址（架构图/原始文件，独立端口，C-13）：'' = 由后端端口推导
+      window.__TTFOLIO_CONTENT_BASE__ = '%%TTFOLIO_CONTENT_BASE%%';
     </script>
     <script>
       // TT-THEME-CACHE：仅缓存主题选择用于首帧渲染，业务数据一律走 API 落库（C-29 例外，见 DECISIONS.md）

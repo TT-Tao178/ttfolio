@@ -16,3 +16,6 @@
 - 2026-09-21 | 语言占比的 GitHub 语言色表放 packages/web/src/theme/langColors.ts | 机械检查 M10 只豁免 theme 目录，语义上它也是“数据语义色” | 散落在组件内（违反 C-50）
 - 2026-09-21 | 内容索引/分析等长任务用单进程内 async 任务管理器（tasks.ts）实现 | 单用户单进程场景，无需任务队列服务 | 引入 bullmq 等外部依赖（违反 C-26）
 - 2026-09-21 | 回收站跨盘场景 = 复制+校验+删源；同盘 = rename | 同盘 rename 原子瞬时 | 直接复制（慢且不原子）
+- 2026-09-22 | **D-TOKEN：鉴权 token 持久化到 `<dataDir>/token`（0600），启动时优先复用，删除该文件即轮换** | 原实现每次启动随机生成：dev 下 `tsx watch` 改一次后端代码就重启进程并换 token，导致已打开页面、SSE 与 vite 代理头立刻 401（被测出为"界面加载失败：token 无效"）；持久化后重启不再打断会话，也让书签/架构图 URL 有效 | 每次随机（dev 不可用）；把 token 存进 DB settings（启动早期尚不可用）
+- 2026-09-22 | dev 模式 API 基址改为同源（`window.__TTFOLIO_API_BASE__ = ''`，走 vite 代理 `/api`），用户内容仍指向独立端口（`__TTFOLIO_CONTENT_BASE__ = http://localhost:<后端端口+100>`） | 原实现在 5173 页面里把 API 直连 `localhost:7717`（跨源）→ 被 CORS 与 Host 校验双重拦截；用户内容端口 5173+100 推断错误 | 给后端加 CORS 放开（削弱 C-09 的 Host/Origin 防线）；把用户内容也走代理（破坏 C-13 的跨源隔离）
+- 2026-09-22 | vite 代理 `changeOrigin: true` | 原为 false，会把 `Host: localhost:5173` 透传给服务端，被 Host 白名单拒绝（403 非法 Host 头） | 服务端放宽 Host 白名单（削弱防 DNS rebinding）
