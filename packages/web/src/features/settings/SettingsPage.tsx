@@ -9,14 +9,35 @@ import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/share
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
+import { sectionDomId, sectionTitle } from './sections';
 
-export function SettingsPage(): React.JSX.Element {
+/**
+ * 分组标题（带 DOM 锚点）：标题文案取自 sections.ts 单一来源，
+ * 侧栏「设置」域点某分组后按 id 滚动到这里。
+ * AntD 的 DividerProps 不接受 id，故用一层无语义 div 承载 id（块级、不影响 Divider 自身间距）。
+ */
+function SectionDivider({ id }: { id: string }): React.JSX.Element {
+  return (
+    <div id={sectionDomId(id)} style={{ scrollMarginTop: 8 }}>
+      <Divider orientation="left">{sectionTitle(id)}</Divider>
+    </div>
+  );
+}
+
+export function SettingsPage({ anchor = null }: { anchor?: string | null }): React.JSX.Element {
   const { settings, setSetting } = useSettings();
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [newRule, setNewRule] = useState('');
   const [newTpl, setNewTpl] = useState<{ label: string; executable: string; args: string } | null>(null);
   const [collectionName, setCollectionName] = useState('');
+
+  // 侧栏点了某个设置分组 → 滚到该分组（anchor 变化即滚动；同一分组重复点击也会重新定位）
+  React.useEffect(() => {
+    if (anchor === null || anchor === '') return;
+    const el = document.getElementById(sectionDomId(anchor));
+    if (el !== null) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [anchor]);
 
   const { data: stats } = useQuery({ queryKey: ['data-stats'], queryFn: () => api.get<{ dbPath: string; dbSize: number; trashPath: string; trashCount: number; trashBytes: number; backupDir: string; backups: Array<{ name: string; size: number }>; logDir: string; logSize: number }>('/api/data-stats') });
   const { data: rules } = useQuery({ queryKey: ['ignore-rules'], queryFn: () => api.get<IgnoreRule[]>('/api/ignore-rules') });
@@ -45,7 +66,7 @@ export function SettingsPage(): React.JSX.Element {
 
   return (
     <div style={{ padding: 16, height: '100%', overflow: 'auto', maxWidth: 860 }} data-testid="settings-page">
-      <Divider orientation="left">外观（FR-11.3）</Divider>
+      <SectionDivider id="appearance" />
       <Form layout="inline" labelWrap>
         <Form.Item label="主题">
           <Segmented
@@ -62,13 +83,13 @@ export function SettingsPage(): React.JSX.Element {
           />
         </Form.Item>
         <Form.Item label="项目页默认落点">
-          <Select value={settings.defaultProjectTab} onChange={(v) => setSetting('default_project_tab', v)} style={{ width: 120 }}
+          <Select value={settings.defaultProjectTab} onChange={(v) => setSetting('defaultProjectTab', v)} style={{ width: 120 }}
             options={[{ value: 'files', label: '文件' }, { value: 'overview', label: '概览' }]} />
         </Form.Item>
       </Form>
       <p style={{ fontSize: 12, opacity: 0.6 }}>卡片列数自适应窗口宽度；快捷键表见「?」帮助（Ctrl+, 打开本页）。</p>
 
-      <Divider orientation="left">数据源与根目录（FR-11.1 / FR-6.2）</Divider>
+      <SectionDivider id="datasource" />
       <Descriptions column={1} size="small" bordered>
         <Descriptions.Item label="文档根">
           {(docRoots ?? []).length === 0 ? '未配置' : ''}
@@ -87,16 +108,17 @@ export function SettingsPage(): React.JSX.Element {
             size="small"
             style={{ width: 160 }}
             defaultValue={settings.defaultArchDirName}
-            onPressEnter={(e) => setSetting('default_arch_dir_name', (e.target as HTMLInputElement).value)}
+            onPressEnter={(e) => setSetting('defaultArchDirName', (e.target as HTMLInputElement).value)}
           />
         </Descriptions.Item>
         <Descriptions.Item label="扫描根目录（FR-12.6 预留，不实现自动扫描）">
           <Input size="small" disabled placeholder="当前版本只支持手动添加项目" style={{ width: 300 }} />
         </Descriptions.Item>
       </Descriptions>
+      <SectionDivider id="collections" />
       <CollectionsCard collections={collections ?? []} name={collectionName} setName={setCollectionName} onChange={invalidate} />
 
-      <Divider orientation="left">忽略规则（FR-3.7）</Divider>
+      <SectionDivider id="ignore" />
       <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
         <Input value={newRule} onChange={(e) => setNewRule(e.target.value)} placeholder="新增规则，如 *.bak 或 temp-dir" />
         <Button type="primary" onClick={() => {
@@ -119,7 +141,7 @@ export function SettingsPage(): React.JSX.Element {
         ))}
       </div>
 
-      <Divider orientation="left">命令模板（FR-10.3，可扩展打开方式）</Divider>
+      <SectionDivider id="templates" />
       <List
         size="small"
         dataSource={templates ?? []}
@@ -139,18 +161,18 @@ export function SettingsPage(): React.JSX.Element {
         模板必须包含占位符 {'{path}'} / {'{file}'} / {'{project}'} / {'{paths}'} 之一；以「可执行文件 + 参数数组」执行，禁止 shell 拼接。
       </p>
 
-      <Divider orientation="left">文件监听（FR-11.2）</Divider>
+      <SectionDivider id="watch" />
       <Form layout="inline">
-        <Form.Item label="启用监听"><Switch checked={settings.watchEnabled} onChange={(v) => setSetting('watch_enabled', v)} /></Form.Item>
+        <Form.Item label="启用监听"><Switch checked={settings.watchEnabled} onChange={(v) => setSetting('watchEnabled', v)} /></Form.Item>
         <Form.Item label="写入稳定窗口 (ms)">
-          <InputNumber value={settings.watchStabilityMs} min={100} max={3000} step={100} onChange={(v) => setSetting('watch_stability_ms', v)} />
+          <InputNumber value={settings.watchStabilityMs} min={100} max={3000} step={100} onChange={(v) => setSetting('watchStabilityMs', v)} />
         </Form.Item>
         <Form.Item label="自动保存（防抖 2s，默认关）">
-          <Switch checked={settings.autoSave} onChange={(v) => setSetting('auto_save', v)} />
+          <Switch checked={settings.autoSave} onChange={(v) => setSetting('autoSave', v)} />
         </Form.Item>
       </Form>
 
-      <Divider orientation="left">数据与备份（FR-11.5）</Divider>
+      <SectionDivider id="data" />
       <Descriptions column={1} size="small" bordered>
         <Descriptions.Item label="索引库">{stats?.dbPath ?? '—'}（{fmtBytes(stats?.dbSize ?? 0)}）</Descriptions.Item>
         <Descriptions.Item label="回收站">{stats?.trashPath ?? '—'}（{stats?.trashCount ?? 0} 条 / {fmtBytes(stats?.trashBytes ?? 0)}）</Descriptions.Item>
@@ -201,7 +223,7 @@ export function SettingsPage(): React.JSX.Element {
         </div>
       )}
 
-      <Divider orientation="left">关于（FR-11.6）</Divider>
+      <SectionDivider id="about" />
       <Alert
         type="info"
         message={`ttFolio · tt项目仓库 v${health?.version ?? '0.1.0'}`}

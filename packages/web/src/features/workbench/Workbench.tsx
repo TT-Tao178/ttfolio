@@ -6,11 +6,12 @@ import {
   PlusOutlined, ReloadOutlined, FolderOpenOutlined, CopyOutlined, FileTextOutlined,
   BranchesOutlined, MoreOutlined, StarFilled, StarOutlined, WarningOutlined
 } from '@ant-design/icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+import { useSettings } from '@/app/settings';
 import { LanguageBar } from '@/components/LanguageBar';
 import { Dashboard } from './Dashboard';
 import { StateView } from '@/components/StateView';
@@ -22,9 +23,15 @@ import { SEMANTIC } from '@/theme/tokens';
 let lastAddNonce = 0;
 
 export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Element {
+  const { settings } = useSettings();
   const [view, setView] = useState<'card' | 'table'>('card');
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState('last_opened');
+  // 排序默认值来自设置（card_sort）；用户在本页改过之后不再被设置回冲
+  const [sort, setSort] = useState(settings.cardSort);
+  const sortTouched = useRef(false);
+  useEffect(() => {
+    if (!sortTouched.current) setSort(settings.cardSort);
+  }, [settings.cardSort]);
   const [addOpen, setAddOpen] = useState(false);
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -49,7 +56,9 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const projects = (allProjects ?? []).filter((p) => !pinnedOnly || p.isPinned);
 
   const openProjectTab = (p: ProjectSummary): void => {
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
+    // 默认落点跟随设置 default_project_tab（原先硬编码 files，设置里改了不生效）
+    const sub = settings.defaultProjectTab === 'overview' ? 'overview' : 'files';
+    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 }, p.alias ?? p.diskName);
     void api.post(`/api/projects/${p.id}/open`);
   };
 
@@ -94,7 +103,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <Select value={sort} onChange={setSort} style={{ width: 140 }}
+        <Select value={sort} onChange={(v) => { sortTouched.current = true; setSort(v); }} style={{ width: 140 }}
           options={[
             { value: 'last_opened', label: '最近打开' },
             { value: 'last_commit', label: '最近提交' },

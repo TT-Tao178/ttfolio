@@ -56,6 +56,14 @@ export function DomainRail(): React.JSX.Element {
             } else {
               setDomain(d.key);
               setSidebar(false);
+              // 设置域的内容就是设置页本身（不像项目域是标签驱动的），
+              // 只切域会出现"点了设置但右边没反应"；这里补上：已有设置标签就切过去，没有就开一个。
+              if (d.key === 'settings') {
+                const st = useAppStore.getState();
+                const existing = st.tabs.find((t) => t.kind === 'settings');
+                if (existing !== undefined) st.activateTab(existing.id);
+                else st.openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
+              }
             }
           }}
           label={d.label}

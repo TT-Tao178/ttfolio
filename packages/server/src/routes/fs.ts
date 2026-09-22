@@ -92,6 +92,9 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       const guarded = await resolveInProject(ctx.db(), q.projectId, q.path, { mustExist: true });
       const st = fsx.statSafe(guarded.real);
       if (st === null) return fail('NOT_FOUND', '文件不存在', 404);
+      // 目录不能当文件读：原先直接往下走 readFileSync，抛出的 EISDIR 被统一兜底成
+      // "文件系统错误：EISDIR" 抛给用户（前端把目录当文件打开时必然触发）。
+      if (st.isDir) return fail('IS_DIRECTORY', '这是一个目录，不是文件', 400);
       const ext = path.extname(guarded.real).replace(/^\./, '').toLowerCase();
       const buf = fsx.readFileSync(guarded.real);
       const isBinaryExt = BINARY_EXTS.has(ext);
@@ -145,6 +148,8 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       const guarded = await resolveInProject(ctx.db(), b.projectId, b.path, { mustExist: true });
       const st = fsx.statSafe(guarded.real);
       if (st === null) return fail('NOT_FOUND', '文件不存在', 404);
+      // 目录不能当文件写（同 GET 的守卫），否则会漏出 EISDIR/EACCES 之类的原始系统错误
+      if (st.isDir) return fail('IS_DIRECTORY', '这是一个目录，不能作为文件保存', 400);
       // 只读文件明确报错，不改权限（C-08）
       checkWritable(guarded.real);
       if (!b.force) {

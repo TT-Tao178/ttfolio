@@ -185,22 +185,69 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
 
   syncFromServer: (serverTabs, activeId) => {
-    const tabs = serverTabs.map<Tab>((t) => ({
-      id: t.id,
-      kind: t.kind,
-      projectId: t.projectId ?? null,
-      targetPath: t.targetPath ?? null,
-      subTab: t.subTab ?? null,
-      scroll: 0,
-      title: t.titleSnapshot ?? t.kind,
-      history: [],
-      historyIndex: -1,
-      isPinned: t.isPinned ?? false,
-      invalid: null
-    }));
+    const tabs = serverTabs.map<Tab>((t) => {
+      const loc: TabLocation = {
+        kind: t.kind,
+        projectId: t.projectId ?? null,
+        targetPath: t.targetPath ?? null,
+        subTab: t.subTab ?? null,
+        scroll: 0
+      };
+      // 历史栈必须随标签一起恢复：原实现把 history 置空、historyIndex 置 -1，
+      // 于是刷新/重启后「后退/前进」永远按不动（FR-1.3 要求恢复页签与浏览历史）。
+      const restored = parseNavHistory(t.navHistoryJson, loc, t.navIndex);
+      return {
+        id: t.id,
+        ...loc,
+        title: t.titleSnapshot ?? t.kind,
+        history: restored.history,
+        historyIndex: restored.index,
+        isPinned: t.isPinned ?? false,
+        invalid: null
+      };
+    });
     set({ tabs, activeTabId: activeId ?? tabs[0]?.id ?? null });
   }
 }));
+
+const TAB_KINDS: string[] = [
+  'overview', 'project', 'file', 'image', 'doc', 'archive', 'git', 'search', 'settings', 'trash'
+];
+
+function isTabLocation(v: unknown): v is TabLocation {
+  if (typeof v !== 'object' || v === null) return false;
+  const k = (v as { kind?: unknown }).kind;
+  return typeof k === 'string' && TAB_KINDS.includes(k);
+}
+
+/** 解析服务端会话里的 navHistoryJson；脏数据/空历史回落到"单点历史"，绝不留下空栈。 */
+function parseNavHistory(
+  json: string | null | undefined,
+  fallback: TabLocation,
+  navIndex: number | undefined
+): { history: TabLocation[]; index: number } {
+  try {
+    if (json !== null && json !== undefined && json !== '') {
+      const parsed = JSON.parse(json) as { history?: unknown; index?: unknown };
+      const raw = Array.isArray(parsed.history) ? parsed.history : [];
+      const history = raw.filter(isTabLocation).slice(-100);
+      if (history.length > 0) {
+        const want = typeof parsed.index === 'number' ? parsed.index : navIndex;
+        const idx = typeof want === 'number' ? want : history.length - 1;
+        return { history, index: Math.min(Math.max(idx, 0), history.length - 1) };
+      }
+    }
+  } catch {
+    /* 脏历史数据：落到单点历史 */
+  }
+  return { history: [{ ...fallback }], index: 0 };
+}
+
+/** 前进/后退可用性（供路径条按钮置灰，避免"按了没反应"却看不出原因）。 */
+export function navAvailability(tab: Tab | null): { back: boolean; forward: boolean } {
+  if (tab === null) return { back: false, forward: false };
+  return { back: tab.historyIndex > 0, forward: tab.historyIndex < tab.history.length - 1 };
+}
 
 export function serializeSession(tabs: Tab[], activeTabId: string | null) {
   return {

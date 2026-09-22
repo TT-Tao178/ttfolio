@@ -22,6 +22,7 @@ export function defaultHttpStatus(code: ErrorCode): number {  switch (code) {
     case 'PATH_OUT_OF_SCOPE':
     case 'INVALID_NAME':
     case 'CONFIRM_REQUIRED':
+    case 'IS_DIRECTORY':
     case 'BAD_REQUEST':
       return 400;
     case 'MTIME_CONFLICT':

@@ -5,7 +5,7 @@ import {
   BgColorsOutlined, ColumnWidthOutlined, BorderRightOutlined
 } from '@ant-design/icons';
 import React from 'react';
-import { useAppStore } from '@/app/store';
+import { navAvailability, useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { useQueryClient } from '@tanstack/react-query';
 import { SEMANTIC } from '@/theme/tokens';
@@ -15,6 +15,8 @@ export function PathBar(): React.JSX.Element {
   const { settings, setSetting } = useSettings();
   const queryClient = useQueryClient();
   const tab = tabs.find((t) => t.id === activeTabId) ?? null;
+  // 置灰而不是"按了没反应"：无历史可退时按钮必须是禁用态（原实现两个按钮永远可点但无效）
+  const nav = navAvailability(tab);
 
   const crumbs: Array<{ title: string }> = [];
   if (tab === null || tab.kind === 'overview') {
@@ -50,18 +52,21 @@ export function PathBar(): React.JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
       <Space.Compact>
-        <Tooltip title="后退 (Alt+←)">
-          <Button size="small" type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
+        <Tooltip title={nav.back ? '后退 (Alt+←)' : '没有可后退的历史'}>
+          <Button size="small" type="text" icon={<ArrowLeftOutlined />} disabled={!nav.back} onClick={() => navigate(-1)} data-testid="nav-back" />
         </Tooltip>
-        <Tooltip title="前进 (Alt+→)">
-          <Button size="small" type="text" icon={<ArrowRightOutlined />} onClick={() => navigate(1)} />
+        <Tooltip title={nav.forward ? '前进 (Alt+→)' : '没有可前进的历史'}>
+          <Button size="small" type="text" icon={<ArrowRightOutlined />} disabled={!nav.forward} onClick={() => navigate(1)} data-testid="nav-forward" />
         </Tooltip>
-        <Tooltip title="刷新视图（不重扫磁盘）">
+        <Tooltip title="刷新视图（重读磁盘内容，不影响未保存的编辑）">
           <Button
             size="small"
             type="text"
             icon={<ReloadOutlined />}
+            data-testid="nav-refresh"
             onClick={() => {
+              // 失效全部查询 = 重新拉取所有可见数据；编辑器由 EditorPane 自己做版本判断，
+              // 未保存内容不会被覆盖（见 EditorPane 的"版本标识"守卫）。
               void queryClient.invalidateQueries();
             }}
           />

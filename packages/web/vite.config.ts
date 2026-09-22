@@ -49,6 +49,12 @@ export default defineConfig(() => {
       // 仍只绑环回，不放 0.0.0.0，符合 C-09 的本地可达边界。
       host: '127.0.0.1',
       port: 5173,
+      watch: {
+        // 原子写工具的临时产物不能被 watch：某些编辑器/代理写文件时会先建
+        // `<file>.<pid>.<uuid>.tmpdir/<file>.tmp`，Vite 的 FSWatcher 去 watch 这个瞬时目录会抛
+        // EBUSY: resource busy or locked，**直接整进程退出**（实测把 dev 服务打挂过一次）。
+        ignored: ['**/*.tmpdir/**', '**/*.tmp', '**/.*.tmpdir/**', '**/~$*']
+      },
       proxy: {
         '/api': {
           target,

@@ -3,6 +3,8 @@ export const ERROR_CODES = [
   'PATH_OUT_OF_SCOPE',
   'INVALID_NAME',
   'NOT_FOUND',
+  /** 把目录当文件读写（原先直接漏出 Node 的 EISDIR 原始错误，用户看不懂） */
+  'IS_DIRECTORY',
   'DUPLICATE_PROJECT',
   'MTIME_CONFLICT',
   'REV_CONFLICT',

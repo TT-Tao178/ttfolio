@@ -1,15 +1,27 @@
-/** 文件页签（FR-4.1..4.10）：懒加载树 + 编辑器/预览分流 + 新建/重命名/删除 + 文件名搜索。 */
+/**
+ * 文件页签（FR-4.1..4.10）：懒加载树 + 编辑器/预览分流 + 新建/重命名/删除 + 文件名搜索。
+ *
+ * 本次修复（用户报障 2）：
+ * 1) 「点文件夹报文件系统错误：EISDIR」——原实现在 onSelect 里只用 `!key.endsWith('/')` 判断，
+ *    而目录 key 是 n.path（不以 / 结尾），于是目录被当成文件交给编辑器去读 → 后端 EISDIR。
+ *    现在按节点自身 kind 分流：目录只选中（并作为"新建"的落点），只有文件才进编辑器。
+ * 2) 懒加载的子节点原先只写进 react-query 缓存、没有回写 treeData，rc-tree 的展开因此拿不到子节点
+ *    （表现为"点了文件夹没展开"）。现在 loadChildren 把子节点合并进 treeData（rc-tree 的标准用法）。
+ * 3) 「前进/后退」原先无历史可退：openFile 是死代码（`void openFile;`），选择文件从不写标签历史。
+ *    现在编辑器打开哪个文件由标签的 targetPath 驱动，选中文件即写入历史，前进/后退可直接回放。
+ */
 import { Alert, Button, Empty, Input, Modal, Space, Switch, Tree, App } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
   FileOutlined, FolderOutlined, ReloadOutlined, SearchOutlined,
   FileAddOutlined, FolderAddOutlined, LinkOutlined
 } from '@ant-design/icons';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 import { EditorPane } from './EditorPane';
 import { PaneSplit } from '@/components/PaneSplit';
@@ -24,16 +36,75 @@ const GIT_COLORS: Record<string, string> = {
   conflicted: SEMANTIC.error
 };
 
+const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
+
+function extOf(p: string): string {
+  return (p.split('.').pop() ?? '').toLowerCase();
+}
+
+/** 当前标签正在编辑的文件（后退/前进也走这里，编辑器随之切换）。 */
+function useOpenPath(): string | null {
+  return useAppStore((s) => {
+    const t = s.tabs.find((x) => x.id === s.activeTabId);
+    return t?.targetPath ?? null;
+  });
+}
+
+function dirnameOf(p: string): string {
+  const i = p.lastIndexOf('/');
+  return i <= 0 ? '' : p.slice(0, i);
+}
+
+/** 在已加载的树里找节点类型（只对已渲染的节点调用，必然命中）。 */
+function findKind(nodes: DataNode[], key: string): 'dir' | 'file' | null {
+  for (const n of nodes) {
+    if (String(n.key) === key) {
+      const k = (n as unknown as { kind?: string }).kind;
+      return k === 'dir' ? 'dir' : 'file';
+    }
+    const kids = n.children;
+    if (kids !== undefined && kids.length > 0) {
+      const hit = findKind(kids, key);
+      if (hit !== null) return hit;
+    }
+  }
+  return null;
+}
+
+/** 把某目录的子节点挂到树上（保留其余分支的已加载内容）。 */
+function attachChildren(nodes: DataNode[], parentKey: string, children: DataNode[]): DataNode[] {
+  return nodes.map((n) => {
+    if (String(n.key) === parentKey) return { ...n, children };
+    if (n.children === undefined || n.children.length === 0) return n;
+    return { ...n, children: attachChildren(n.children, parentKey, children) };
+  });
+}
+
+/** 根列表刷新时保留已展开分支的 children，避免每次 refetch 都把树"合上"。 */
+function mergeRoots(prev: DataNode[], next: DataNode[]): DataNode[] {
+  const byKey = new Map(prev.map((p) => [String(p.key), p]));
+  return next.map((n) => {
+    const old = byKey.get(String(n.key));
+    if (old === undefined || old.children === undefined) return n;
+    return { ...n, children: old.children };
+  });
+}
+
 export function FilesTab({ projectId }: { projectId: string }): React.JSX.Element {
-  const [showIgnored, setShowIgnored] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
+  const { settings, setSetting } = useSettings();
+  const showIgnored = settings.showIgnored;
+  const openPath = useOpenPath();
+  /** 树上选中的节点（可能是目录）：作为"删除/新建"的作用对象，与"编辑器打开的文件"分开 */
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [treeData, setTreeData] = useState<DataNode[]>([]);
   const [filter, setFilter] = useState('');
   const [newEntry, setNewEntry] = useState<{ kind: 'file' | 'dir' } | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   /** 展开失败的节点：懒加载失败必须可见（rc-tree 会吞掉 rejection） */
   const [failedPaths, setFailedPaths] = useState<string[]>([]);
+  const failedRef = useRef<string[]>([]);
+  failedRef.current = failedPaths;
   const { message, modal } = App.useApp();
-  const queryClient = useQueryClient();
 
   const { data: rootData, isLoading, error, refetch } = useQuery({
     queryKey: ['tree', projectId, '', showIgnored],
@@ -45,49 +116,60 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     enabled: filter.length > 0
   });
 
-  // 展开时懒加载：失败必须留下可见痕迹（toast + 节点红字），否则用户只感到"点了没反应"
-  const loadChildren = async (rel: string): Promise<void> => {
-    try {
-      const r = await api.get<TreeResponse>('/api/fs/tree', { projectId, path: rel, showIgnored: showIgnored ? '1' : '0' });
-      queryClient.setQueryData(['tree', projectId, rel, showIgnored], r);
-      setFailedPaths((prev) => prev.filter((p) => p !== rel));
-    } catch (e) {
-      const code = e instanceof ApiClientError ? e.code : '';
-      const hint =
-        code === 'PERMISSION_DENIED'
-          ? '权限不足：请检查该文件夹的访问权限'
-          : code === 'NOT_FOUND'
-            ? '目录已不存在（可能被移动或删除）'
-            : code === 'PATH_OUT_OF_SCOPE'
-              ? '该路径不被允许访问（符号链接指向项目外部？）'
-              : e instanceof Error
-                ? e.message
-                : '加载失败';
-      setFailedPaths((prev) => (prev.includes(rel) ? prev : [...prev, rel]));
-      void message.error(`展开「${rel}」失败：${hint}`);
-    }
-  };
+  // 根节点 → 树（合并而非重建：保住已展开分支）
+  useEffect(() => {
+    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current)));
+  }, [rootData]);
 
-  const treeData = useMemo(() => toAntdTree(rootData?.nodes ?? [], '', (rel) => void loadChildren(rel), failedPaths), [rootData, showIgnored, failedPaths]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 标签里的目标路径变化（含前进/后退）时，让树上的选中态跟随
+  useEffect(() => {
+    if (openPath !== null) setSelectedPath(openPath);
+  }, [openPath]);
 
-  const openFile = (rel: string): void => {
-    setSelected(rel);
-    useAppStore.getState().updateActiveLocation({ targetPath: rel }, true);
-  };
-  void openFile;
+  // 展开时懒加载：必须把子节点写回 treeData，否则 rc-tree 拿不到 children（点了不展开）
+  const loadChildren = useCallback(
+    async (rel: string): Promise<void> => {
+      try {
+        const r = await api.get<TreeResponse>('/api/fs/tree', {
+          projectId,
+          path: rel,
+          showIgnored: showIgnored ? '1' : '0'
+        });
+        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current)));
+        setFailedPaths((prev) => prev.filter((p) => p !== rel));
+      } catch (e) {
+        const code = e instanceof ApiClientError ? e.code : '';
+        const hint =
+          code === 'PERMISSION_DENIED'
+            ? '权限不足：请检查该文件夹的访问权限'
+            : code === 'NOT_FOUND'
+              ? '目录已不存在（可能被移动或删除）'
+              : code === 'PATH_OUT_OF_SCOPE'
+                ? '该路径不被允许访问（符号链接指向项目外部？）'
+                : e instanceof Error
+                  ? e.message
+                  : '加载失败';
+        setFailedPaths((prev) => (prev.includes(rel) ? prev : [...prev, rel]));
+        void message.error(`展开「${rel}」失败：${hint}`);
+      }
+    },
+    [projectId, showIgnored, message]
+  );
 
   const del = useMutation({
     mutationFn: (paths: string[]) => api.post('/api/fs/delete', { projectId, paths, confirm: true }),
     onSuccess: () => {
       void message.success('已移入回收站（可在回收站恢复）');
-      setSelected(null);
+      setSelectedPath(null);
       void refetch();
     },
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '删除失败')
   });
 
-  const ext = selected !== null ? (selected.split('.').pop() ?? '').toLowerCase() : '';
-  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext);
+  const selKind = selectedPath === null ? null : findKind(treeData, selectedPath);
+  /** 「新建」落点：选中目录→该目录；选中文件→其所在目录；未选→项目根 */
+  const newParent = selectedPath === null ? '' : selKind === 'dir' ? selectedPath : dirnameOf(selectedPath);
+  const isImage = openPath !== null && IMAGE_EXT.includes(extOf(openPath));
 
   return (
     <div style={{ height: '100%', overflow: 'hidden' }}>
@@ -100,22 +182,22 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         left={
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 8 }}>
         <Space size={4} style={{ flexWrap: 'wrap' }}>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => void refetch()} />
-          <Button size="small" icon={<FileAddOutlined />} onClick={() => setNewEntry({ kind: 'file' })} title="新建文件" />
-          <Button size="small" icon={<FolderAddOutlined />} onClick={() => setNewEntry({ kind: 'dir' })} title="新建文件夹" />
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => void refetch()} title="重新读取目录" />
+          <Button size="small" icon={<FileAddOutlined />} onClick={() => setNewEntry({ kind: 'file' })} title={newParent === '' ? '在项目根新建文件' : `在 ${newParent}/ 新建文件`} />
+          <Button size="small" icon={<FolderAddOutlined />} onClick={() => setNewEntry({ kind: 'dir' })} title={newParent === '' ? '在项目根新建文件夹' : `在 ${newParent}/ 新建文件夹`} />
           <Button
             size="small"
             danger
-            disabled={selected === null}
+            disabled={selectedPath === null}
             onClick={() => {
-              if (selected !== null) {
+              if (selectedPath !== null) {
                 modal.confirm({
-                  title: `删除 ${selected}？`,
+                  title: `删除 ${selectedPath}？`,
                   content: '将移入回收站，可在回收站恢复。',
                   okText: '删除',
                   okButtonProps: { danger: true },
                   cancelText: '取消',
-                  onOk: () => del.mutate([selected])
+                  onOk: () => del.mutate([selectedPath])
                 });
               }
             }}
@@ -123,7 +205,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             删除
           </Button>
           <span style={{ fontSize: 12 }}>忽略项</span>
-          <Switch size="small" checked={showIgnored} onChange={setShowIgnored} />
+          {/* 忽略项开关走全局设置（原先只有本地 state，设置页里的 show_ignored 是死键） */}
+          <Switch size="small" checked={showIgnored} onChange={(v) => setSetting('showIgnored', v)} />
         </Space>
         <Input
           size="small"
@@ -142,7 +225,11 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                 <div
                   key={r.path}
                   style={{ padding: '2px 4px', cursor: 'pointer', borderRadius: 4 }}
-                  onClick={() => r.kind === 'file' && setSelected(r.path)}
+                  onClick={() => {
+                    if (r.kind !== 'file') return;
+                    setSelectedPath(r.path);
+                    useAppStore.getState().updateActiveLocation({ targetPath: r.path }, true);
+                  }}
                 >
                   <FileOutlined /> {r.path}
                 </div>
@@ -160,7 +247,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                 description={`内容被忽略规则隐藏（${rootData?.hiddenCount ?? 0} 项，如 node_modules / dist）`}
                 data-testid="tree-empty-hidden"
               >
-                <Button size="small" type="primary" onClick={() => setShowIgnored(true)}>
+                <Button size="small" type="primary" onClick={() => setSetting('showIgnored', true)}>
                   显示忽略项
                 </Button>
               </Empty>
@@ -178,20 +265,23 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               showIcon
               blockNode
               treeData={treeData}
+              selectedKeys={selectedPath === null ? [] : [selectedPath]}
               loadData={async (node) => {
-                // 这里必须自己 catch：rc-tree 会吞掉 loadData 的 rejection，
-                // 不接住就表现为"点了没反应"（loadChildren 内部已做提示与失败标记）。
+                // 自己 catch：rc-tree 会吞掉 loadData 的 rejection，不接住就表现为"点了没反应"
                 try {
                   await loadChildren(String(node.key));
                 } catch {
-                  /* loadChildren 已处理 */
+                  /* loadChildren 已处理提示与失败标记 */
                 }
               }}
               onSelect={(keys) => {
                 const key = keys[0];
-                if (typeof key === 'string' && !key.endsWith('/')) setSelected(key);
+                if (typeof key !== 'string') return;
+                const kind = findKind(treeData, key);
+                setSelectedPath(key);
+                // 只有文件才进编辑器；目录只选中（否则编辑器会去读目录 → EISDIR）
+                if (kind === 'file') useAppStore.getState().updateActiveLocation({ targetPath: key }, true);
               }}
-              titleRender={(node) => <span>{typeof node.title === 'function' ? '' : node.title}</span>}
             />
           )}
         </div>
@@ -199,23 +289,27 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         }
         right={
           <div style={{ height: '100%', overflow: 'auto', minHeight: 0 }}>
-            {selected === null ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择左侧文件打开" style={{ marginTop: 64 }} />
+            {openPath === null ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={selKind === 'dir' ? `已选中目录 ${selectedPath ?? ''}（点左侧箭头展开，或用上方按钮在其中新建）` : '选择左侧文件打开'}
+                style={{ marginTop: 64 }}
+              />
             ) : isImage ? (
-              <ImagePreview projectId={projectId} path={selected} />
+              <ImagePreview projectId={projectId} path={openPath} />
             ) : (
-              <EditorPane projectId={projectId} path={selected} />
+              <EditorPane projectId={projectId} path={openPath} />
             )}
           </div>
         }
       />
-      <NewEntryModal projectId={projectId} parent={''} kind={newEntry?.kind ?? null} onClose={() => setNewEntry(null)} />
+      <NewEntryModal projectId={projectId} parent={newParent} kind={newEntry?.kind ?? null} onClose={() => setNewEntry(null)} />
       <RenameModal projectId={projectId} path={renameTarget} onClose={() => setRenameTarget(null)} />
     </div>
   );
 }
 
-function toAntdTree(nodes: TreeNode[], _parent: string, _load: (rel: string) => void, failed: string[] = []): DataNode[] {
+function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
   return nodes.map((n) => {
     const key = n.path;
     const gitColor = n.gitState !== undefined ? GIT_COLORS[n.gitState] : undefined;
@@ -258,14 +352,13 @@ function toAntdTree(nodes: TreeNode[], _parent: string, _load: (rel: string) => 
 export function NewEntryModal({ projectId, parent, kind, onClose }: {
   projectId: string; parent: string; kind: 'file' | 'dir' | null; onClose: () => void;
 }): React.JSX.Element | null {
-  void parent;
   const [name, setName] = useState('');
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const create = useMutation({
     mutationFn: () => api.post('/api/fs/entry', { projectId, parentPath: parent, name, kind: kind ?? 'file' }),
     onSuccess: () => {
-      void message.success('已创建');
+      void message.success(parent === '' ? '已创建' : `已在 ${parent}/ 创建`);
       void queryClient.invalidateQueries({ queryKey: ['tree', projectId] });
       onClose();
       setName('');
@@ -275,7 +368,7 @@ export function NewEntryModal({ projectId, parent, kind, onClose }: {
   if (kind === null) return null;
   return (
     <Modal
-      title={kind === 'file' ? '新建文件' : '新建文件夹'}
+      title={`${kind === 'file' ? '新建文件' : '新建文件夹'}${parent === '' ? '（项目根）' : `（${parent}/）`}`}
       open
       onCancel={onClose}
       onOk={() => create.mutate()}
@@ -295,8 +388,6 @@ export function RenameModal({ projectId, path, onClose }: {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   if (path === null) return null;
-  const isDir = path.includes('/') || true;
-  void isDir;
   const doRename = (): void => {
     void api
       .post('/api/fs/rename', { projectId, path, newName: name, confirm: confirmDir })

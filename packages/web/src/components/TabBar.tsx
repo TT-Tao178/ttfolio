@@ -7,7 +7,7 @@ import {
   CloseOutlined, PushpinOutlined, FileTextOutlined, FolderOutlined, SearchOutlined,
   SettingOutlined, DeleteOutlined, PictureOutlined, BookOutlined, AppstoreOutlined, BranchesOutlined
 } from '@ant-design/icons';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAppStore, type Tab } from '@/app/store';
 import { SEMANTIC } from '@/theme/tokens';
 
@@ -33,6 +33,7 @@ function SortableTab({ tab, active, onActivate, onClose }: {
   return (
     <div
       ref={setNodeRef}
+      data-active={active ? '1' : '0'}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -101,10 +102,24 @@ export function TabBar(): React.JSX.Element {
     moveTab(from, to);
   };
 
+  // 标签多到超出宽度时会被静默裁掉（实测 6 个标签 1429px 内容塞在 676px 容器里、
+  // overflow-x:hidden，右侧标签既看不见也点不到）。改成可横向滚动 + 激活标签自动滚入视野。
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const bar = barRef.current;
+    if (bar === null) return;
+    const active = bar.querySelector<HTMLElement>('[data-active="1"]');
+    if (active !== null) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeTabId, tabs.length]);
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, overflow: 'hidden' }} data-testid="tab-bar">
+        <div
+          ref={barRef}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}
+          data-testid="tab-bar"
+        >
           {tabs.map((tab) => (
             <Dropdown
               key={tab.id}

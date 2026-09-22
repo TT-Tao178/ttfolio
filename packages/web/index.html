@@ -16,9 +16,15 @@
     </script>
     <script>
       // TT-THEME-CACHE：仅缓存主题选择用于首帧渲染，业务数据一律走 API 落库（C-29 例外，见 DECISIONS.md）
+      // 首帧兜底：'system' 也要处理（原先只认 'dark'，跟随系统时首帧会闪白）；
+      // 真正的深浅变量由 app/settings.tsx 调用 applyThemeVars 写入，这里只保证底色不闪。
       try {
         var t = localStorage.getItem('ttfolio-theme');
-        if (t === 'dark') document.documentElement.style.background = '#141414';
+        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-tt-dark', dark ? '1' : '0');
+        document.documentElement.style.background = dark ? '#141414' : '#f5f5f5';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document.body.style.background = dark ? '#141414' : '#f5f5f5';
       } catch (e) {}
     </script>
   </head>

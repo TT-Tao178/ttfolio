@@ -5,6 +5,7 @@ import { useAppStore, type TabLocation } from '@/app/store';
 import { api } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
+import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 
 
 type MenuKey = string;
@@ -59,6 +60,12 @@ export function Sidebar(): React.JSX.Element {
     items.push({ key: 'search-all', label: '全局搜索（Ctrl+K）' });
     items.push({ key: 'search-current', label: '在当前项目内搜索' });
     selected = '';
+  } else if (domain === 'settings') {
+    // 设置域原先没有任何分支 → items 恒为空菜单（用户报障："左侧设置里面是空的，啥都没有"）。
+    // 这里按 sections.ts 的单一来源列分组，点击后打开设置标签并滚动到对应分组。
+    for (const s of SETTINGS_SECTIONS) items.push({ key: `set:${s.key}`, label: s.label });
+    const cur = activeTabId !== null ? useAppStore.getState().tabs.find((t) => t.id === activeTabId) : undefined;
+    selected = cur !== undefined && cur.kind === 'settings' && cur.subTab !== null ? `set:${cur.subTab}` : '';
   }
 
   const projectItems = (projects ?? []).slice(0, 30).map((p) => ({
@@ -85,6 +92,11 @@ export function Sidebar(): React.JSX.Element {
 
   const onClick = (e: { key: string }): void => {
     const key = e.key;
+    if (key.startsWith('set:')) {
+      // 设置分组：kind=settings 的标签 key 不含 subTab，所以会复用同一个设置标签并同步定位
+      openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: key.slice(4), scroll: 0 }, '设置');
+      return;
+    }
     if (key.startsWith('view:')) {
       // 工作台总览（Dashboard）与卡片墙是两个屏：只有 view:all 落到总览，
       // 最近打开/已固定以及"我的视图"都落到各自的卡片墙标签（各自独立，可并存）。

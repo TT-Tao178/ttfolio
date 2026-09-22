@@ -189,7 +189,7 @@ function Shell(): React.JSX.Element {
                 collapsible={false}
                 testId="split-detail"
                 left={
-                  <div style={{ height: '100%', minWidth: 0, background: dark ? 'transparent' : SEMANTIC.layoutBg, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', minWidth: 0, background: SEMANTIC.layoutBg, overflow: 'hidden' }}>
                     {activeTab === null ? (
                       <div />
                     ) : activeTab.kind === 'overview' ? (
@@ -199,7 +199,7 @@ function Shell(): React.JSX.Element {
                     ) : activeTab.kind === 'trash' ? (
                       <TrashPage />
                     ) : activeTab.kind === 'settings' ? (
-                      <SettingsPage />
+                      <SettingsPage anchor={activeTab.subTab} />
                     ) : activeTab.subTab === 'git-overview' ? (
                       <GitOverview />
                     ) : (

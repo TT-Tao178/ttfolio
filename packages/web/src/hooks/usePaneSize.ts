@@ -60,7 +60,7 @@ export function usePaneSize(key: keyof UiLayout, def: number): PaneSize {
           ...(typeof old === 'object' && old !== null ? old : {}),
           uiLayout: merged
         }));
-        setSetting('ui_layout_json', merged);
+        setSetting('uiLayout', merged);
       }, 400);
     },
     [key, setSetting, queryClient]
