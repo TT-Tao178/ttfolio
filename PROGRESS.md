@@ -1,20 +1,31 @@
 # PROGRESS
 
-## 当前阶段：P3 完成（全量实现，待最终 verify）
+## 当前阶段：P3 完成 + 第十轮 UI 回归修复完成（`npm run verify` 全绿）
 
 ## 已完成（每行：FR 编号 | 一句话 | 实现文件 | 验证方式）
 
 （随实现逐条更新）
 
+## 第十轮：用户报障 4 项（复现 → 根因 → 修复 → 证据）
+
+| # | 用户报障（原话） | 根因 | 修复 | 证据 |
+| --- | --- | --- | --- | --- |
+| 1 | 「进入 ui 下面那个什么框占的内容太多了，界面不好看」 | AntD `<App>` 容器没有高度，应用只占视口 596/900px，内容被压缩后底部留白 | `settings.tsx` 给 `<App>` 加 `height:100%`；各页 flex 链补 `minHeight:0` | 探针量测 app 高度 900/900，工作台/项目页无溢出 |
+| 2 | 「页面做的太僵硬了，好多东西的窗口大小没办法拖动」 | 侧栏/文件树/Git 变更列表/文档列表/右栏全部为固定宽度，无双栏拖拽 | 新增 `PaneSplit.tsx`（AntD `Splitter` 封装）+ `usePaneSize`（尺寸持久化） | 拖拽实测：侧栏 220→320→420、文件树 300→390、右栏 286→539；重载后持久化 `{"sidebarWidth":420,"detailWidth":537}` |
+| 3 | 「有的文件夹项目导入后根本点不开」 | 四类根因：登记与打开校验不对称（保留名/UNC 被拒但未提示）、junction 被当普通文件、文件树懒加载错误被吞、无空态；另所有业务错误 HTTP 200 且闸门字段泄漏 | `pathGuard.validateRegistrableRoot` 给出可操作提示、`fsx.listEntries` 识别符号链接/junction、`FilesTab` 错误提示 + `failedPaths` 标红 + 空态、`app.ts` preSerialization 把闸门字段映射为真实 HTTP 状态并剥离 | 服务端 16 条断言 + 前端 4 态 + 单测 7 条（总 27）全过；软删除行可复活重新登记，不再 UNIQUE 冲突 |
+| 4 | 「界面跟你给的静态页面不太一样」 | 实现与《界面原型-AntD.html》在信息架构与观感上有差距：缺工作台总览屏、缺项目页五页签、搜索为普通输入框、裸色值散落 | 新增 `Dashboard.tsx`（6 KPI + 最近打开 + 需要处理 + 跨项目清单）、项目页五页签、搜索 pill（300px/等价 Ctrl+K）、`SEMANTIC` 令牌扩展并去硬编码（15 个文件） | 探针：搜索 pill 300px、导入弹窗可开、6 个 KPI、5 个页签可点、app 高度 900/900、控制台 0 报错 |
+
+遗留（未做，均中低优先级）：卡片悬浮快捷操作、右键仅"…"图标可用、状态栏缺"最近分析/文件监听"、正文 16px 与透明底未令牌化。
+
 ## 进行中
 
-- P0 地基脚手架
+（无。第十轮已收口：verify 全绿、修复已提交 `ccaaeb9`。）
 
 ## 下一步（3 条以内）
 
-1. 安装依赖并验证 better-sqlite3
-2. packages/shared 类型与 schema
-3. server core + db + 路由
+1. 按《界面原型-AntD.html》补齐上表"遗留"4 项观感差异（中低优先级，需用户确认是否要做）
+2. 主人自测：真实项目登记 → 五页签 → Git 提交 → 回收站往返
+3. 视需要把 PaneSplit 的宽度上限/最小值暴露到设置页（当前为固定 160–420 / 220–560）
 
 ## 阻塞与已知缺口（同步 KNOWN-GAPS.md）
 
@@ -22,21 +33,26 @@
 
 ## 最近一次 verify 结果（时间 + 通过/失败项）
 
+- 2026-09-22 13:5x —— npm run verify：通过 6 / 失败 0 / 跳过 0
+  - typecheck PASS(5.6s) / lint PASS(2.4s) / vitest PASS(2.8s) / build PASS(10.4s) / e2e 4 条 PASS(27.3s) / 机械检查 11 条 0 命中 PASS
+  - e2e 明细：main-flow 7.0s ・ session-recovery 草稿 7.2s ・ 会话恢复 5.6s ・ trash-restore 4.1s
+  - 说明：`npm run test:e2e` 现在会先自动构建（pretest:e2e），避免测到旧 dist
 - 2026-09-22 02:45 —— npm run verify：通过 6 / 失败 0
   - typecheck PASS(4.1s) / lint PASS(1.7s) / vitest 48 条 PASS(2.0s) / build PASS(7.9s) / e2e 4 条 PASS(25.2s) / 机械检查 11 条 0 命中 PASS
 
 ## 最近提交（git log --oneline -10 的输出）
 
 ```
+ccaaeb9 fix(web): 总览屏补添加项目入口与登记后跳转；e2e 强制先构建
+bb0d7f5 feat(web): 对齐 AntD 原型（搜索 pill / 项目页五页签 / 工作台 KPI 看板）+ 裸色值令牌化
+7239692 fix(server,web): 修复"导入后点不开"的 4 类根因 + 错误响应契约 + 移除登记后无法重新登记
+b045ce6 feat(web): 可拖拽分栏（侧栏 / 文件树 / Git 变更列表 / 文档列表 / 右栏详情）
+8a06c47 fix(web): 修复设置项从未被服务端拉取（initialData + staleTime 跳过首次请求）
 01d48d7 test(e2e): Playwright 四条主流程全绿；关闭 antd 按钮两字自动空格
 d96c857 chore(repo): 强化 .gitignore——分组注释明确上传边界
 2fc9871 fix(git): 修正 porcelain=v2 解析——XY 为单字段、2 行路径索引为 9
 700fa58 fix(web): 修复 URL 构造缺 origin、无 body POST 的 Content-Type 与 token 注入占位符
 417c5c6 feat(web): 实现完整前端——应用壳/标签会话/工作台/项目页五页签/回收站/设置/命令面板
-e55b6cd fix(server): 修复分析器 taskId TDZ、integrity_check 解析与 sqlite 泛型绑定
-797e674 feat(server): 实现完整后端——PathGuard/原子写/回收站/Git/分析器/内容索引/SSE/双端口
-a571c7d chore(repo): 搭建 npm workspaces 脚手架、质量门禁 verify.mjs 与进度台账
-195a0c3 chore(repo): 初始化 ttfolio 工作区（.gitignore 与 .gitattributes）
 ```
 
 ## 已打标签（git tag -n 的输出）

@@ -19,3 +19,7 @@
 - 2026-09-22 | **D-TOKEN：鉴权 token 持久化到 `<dataDir>/token`（0600），启动时优先复用，删除该文件即轮换** | 原实现每次启动随机生成：dev 下 `tsx watch` 改一次后端代码就重启进程并换 token，导致已打开页面、SSE 与 vite 代理头立刻 401（被测出为"界面加载失败：token 无效"）；持久化后重启不再打断会话，也让书签/架构图 URL 有效 | 每次随机（dev 不可用）；把 token 存进 DB settings（启动早期尚不可用）
 - 2026-09-22 | dev 模式 API 基址改为同源（`window.__TTFOLIO_API_BASE__ = ''`，走 vite 代理 `/api`），用户内容仍指向独立端口（`__TTFOLIO_CONTENT_BASE__ = http://localhost:<后端端口+100>`） | 原实现在 5173 页面里把 API 直连 `localhost:7717`（跨源）→ 被 CORS 与 Host 校验双重拦截；用户内容端口 5173+100 推断错误 | 给后端加 CORS 放开（削弱 C-09 的 Host/Origin 防线）；把用户内容也走代理（破坏 C-13 的跨源隔离）
 - 2026-09-22 | vite 代理 `changeOrigin: true` | 原为 false，会把 `Host: localhost:5173` 透传给服务端，被 Host 白名单拒绝（403 非法 Host 头） | 服务端放宽 Host 白名单（削弱防 DNS rebinding）
+- 2026-09-22 | 工作台拆成两屏：`subTab=null` 为总览看板（Dashboard），`view:*`/`col:*` 为卡片墙；overview 的 `subTab` 纳入标签标识（`tabKey`），项目页不纳入 | 原先一个屏既当看板又当卡片墙，点侧栏「最近打开」会复用「工作台总览」标签并停在原屏（表现为"点了没反应"）；拆开后总览回答"哪里需要我"，卡片墙用于筛选浏览 | 单屏加条件渲染（状态耦合、无法并存两个标签）
+- 2026-09-22 | 分栏宽度持久化到服务端设置 `ui_layout_json`（非 localStorage） | 遵循 C-29（业务数据一律走 API，仅主题缓存例外）；换浏览器/清缓存后布局仍在 | localStorage（违反 C-29）；不持久化（每次重开都要重拖）
+- 2026-09-22 | 面板拖拽统一走 `PaneSplit`（AntD `Splitter` 封装）并规定 `measure='first'\|'last'`：受控 `size` 必须配 `onResize`，容器需有确定宽度，`collapsed` 必须把"持有尺寸的那一侧"归零 | 直接用 Splitter 时会踩四个坑（受控尺寸不更新、内容宽度 0、拖动改错面板、折叠无效），封装后四个页面的拖拽行为一致 | 每个页面各写一遍（重复踩坑）
+- 2026-09-22 | `npm run test:e2e` 增加 `pretest:e2e = npm run build` | e2e 服务端静态托管 `packages/web/dist`，单独跑 `test:e2e` 会静默测上一次构建的旧产物——本轮因此误判两轮（同一份用例，旧包全红、新包全绿）；前置构建让"测的必须是当前代码"成为默认行为 | 只写文档提醒（仍会忘）；e2e 改用 vite dev server（与生产静态托管路径不一致，丢失对 dist 的覆盖）
