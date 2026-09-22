@@ -150,10 +150,13 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
             placeholder="目录绝对路径（默认项目内 架构图/ 会自动登记）"
             style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: `1px solid ${SEMANTIC.border}` }}
           />
-          <Button onClick={() => void api.post('/api/dialogs/pick-folder').then((r) => {
-            const p = (r as { paths: string[] }).paths[0];
-            if (p !== undefined) setRegPath(p);
-          })}>选择…</Button>
+          <Button onClick={() => {
+            void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
+            void api.post('/api/dialogs/pick-folder').then((r) => {
+              const p = (r as { paths: string[] }).paths[0];
+              if (p !== undefined) setRegPath(p);
+            }).catch(() => { void message.error('打开系统对话框失败，请手动粘贴路径'); });
+          }}>选择…</Button>
         </Space.Compact>
       </Modal>
       <Modal

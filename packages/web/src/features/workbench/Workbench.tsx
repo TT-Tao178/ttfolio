@@ -141,6 +141,8 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   const [text, setText] = useState('');
   const [parentPath, setParentPath] = useState('');
   const [children, setChildren] = useState<Array<{ name: string; path: string; registered: boolean; checked: boolean }>>([]);
+  const [picking, setPicking] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   const { message } = App.useApp();
   const queryClient = useQueryClient();
 
@@ -164,20 +166,32 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   });
 
   const pickFolder = async (): Promise<void> => {
+    setPicking(true);
     try {
+      // 对话框由服务端弹出（可能有几百毫秒延迟），必须立刻给提示，否则像"点了没反应"；
+      // 后台进程弹的系统对话框可能被浏览器压在后面（Win11 前台锁定），提示里带 Alt+Tab 指引
+      void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
       const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
       if (r.paths.length > 0) setText(r.paths.join('\n'));
+      else void message.info('未选择目录');
     } catch {
       void message.error('打开系统对话框失败，请粘贴路径');
+    } finally {
+      setPicking(false);
     }
   };
 
   const browseParent = async (): Promise<void> => {
+    setBrowsing(true);
     try {
+      void message.info('正在弹出系统对话框选择父目录；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
       const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
       if (r.paths.length > 0) setParentPath(r.paths[0] ?? '');
+      else void message.info('未选择目录');
     } catch {
       void message.error('打开系统对话框失败');
+    } finally {
+      setBrowsing(false);
     }
   };
 
@@ -211,7 +225,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
             data-testid="paste-paths"
           />
           <Space style={{ marginTop: 8 }}>
-            <Button onClick={() => void pickFolder()}>系统对话框选择…</Button>
+            <Button loading={picking} onClick={() => void pickFolder()}>系统对话框选择…</Button>
             <Button type="primary" disabled={text.trim() === ''} data-testid="paste-add-btn" onClick={() => add.mutate({ paths: text.split(/\r?\n/) })}>
               登记以上目录
             </Button>
@@ -221,7 +235,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
           <div style={{ marginBottom: 6 }}>② 从父目录批量登记</div>
           <Space.Compact style={{ width: '100%' }}>
             <Input value={parentPath} onChange={(e) => setParentPath(e.target.value)} placeholder="父目录路径" />
-            <Button onClick={() => void browseParent()}>选择…</Button>
+            <Button loading={browsing} onClick={() => void browseParent()}>选择…</Button>
             <Button onClick={() => void loadChildren()}>载入子目录</Button>
           </Space.Compact>
           {children.length > 0 && (
