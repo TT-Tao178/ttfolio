@@ -1,17 +1,91 @@
 # PROGRESS
 
-## 🔻 会话收口（本轮会话已停止，交接入口：`HANDOVER.md`）
+## 第十二轮：面包屑文件名 + 会话活动标签 + FR-11.6 打开日志（已修，待用户手测）
 
-- 最新提交：`900303d`；工作树干净；所有后台任务已停止（端口 5173/7717/7817 全空）
+> 本轮接手自 `HANDOVER.md` 的"未完成 / 待确认"清单。用户明确要求：改动前先定计划与影响面；
+> 非必要不开子代理；不跑 e2e（由用户手测）；跑 typecheck / lint / test + 探针实测。
+
+### ① 路径条面包屑不显示当前打开的文件（已修）
+
+- **根因**：`PathBar` 只在 `tab.kind === 'file'` 时补文件名，而项目页打开的文件挂的是
+  **项目标签**（`kind === 'project'` + `targetPath`）→ 条件永远不成立，面包屑只到「文件」。
+- **修法**：`buildCrumbs()` 只要 `targetPath` 非空就按 `/ \` 拆成多段追加（相对项目根，比只显示
+  basename 更可定位）；顺带补上 FR-1.5 要求的「可逐级点击」——「工作台」与「项目名」可点，
+  点项目名 = 回到项目概览并清掉 `targetPath`（关闭右侧编辑器）。
+- **影响面**：仅 `components/PathBar.tsx`。`openAt` 走 `openTab`（带标签复用规则）所以不会多开
+  同名标签；点错层级可用后退还原（历史栈照常压栈）。
+
+| 探针断言 | 修复前 | 修复后（实测） |
+| --- | --- | --- |
+| 打开 `package.json` 后的面包屑 | `工作台 / bili-hot-radar / 文件` | `工作台 / bili-hot-radar / 文件 / package.json` ✓ |
+| 点项目名 | —（不可点） | 回到概览、`editor-pane` 消失、**标签数不变（12）** ✓ |
+| 再按后退 | — | 回到该文件，面包屑与编辑器一起还原 ✓ |
+| 点「工作台」 | — | 活动标签是「工作台」且**没有被改名成项目名**（12 个标签标题逐一核对）✓ |
+
+### ② 刷新后活动标签从「项目页」变成「工作台」（已查清并修）
+
+- **根因（服务端）**：`sessions` 表**根本没有 active_tab_id 列**，`getSession()` 恒
+  `activeTabId: tabs[0]?.id ?? null`。前端 PUT 体里一直带着 activeTabId，服务端**收下即丢**。
+  实测：活动标签 `tab-…79UK`（项目页）→ PUT 体 `activeTabId: tab-…79UK` → GET 回来
+  `activeTabId: tab-…T9ET1F`（第一个标签「工作台」）→ 刷新后落在工作台。
+- **修法**：新增迁移 `0002_session_active_tab.sql`（`ALTER TABLE sessions ADD COLUMN active_tab_id TEXT`，
+  只增不改、老库 NULL）+ `sessionRepo` 读写（写入前校验该 id 在本次保存的标签集合里，避免存悬空 id）+
+  `store.syncFromServer` 兜底（id 不存在时回落第一个标签，绝不把 `activeTabId` 设成悬空值）。
+- **影响面**：DB 迁移（升 version 1→2）+ 会话仓储 + 恢复逻辑。已确认启动自动迁移成功、
+  升级前快照已生成（`pre-migration-v1-*.db`）；旧库因为该列为 NULL 仍回落第一个标签，行为不变。
+
+| 断言 | 修复前 | 修复后（实测） |
+| --- | --- | --- |
+| PUT 体 activeTabId vs 当时活动标签 | 一致 | 一致 ✓ |
+| GET 回来的 activeTabId | 恒 = 第一个标签 | = 上次活动标签（`tab-…79UK`）✓ |
+| 刷新后活动标签 / 编辑器 | 工作台 / 无 | **项目页 / 仍是 package.json** ✓ |
+| 刷新后面包屑 + 后退 | 只剩「工作台」 | 含文件名；后退回到"未打开文件"✓ |
+
+### ③ 顺带修掉回归中新发现的一个"点了没反应"（`FilesTab`）
+
+- **现象**：后退回到"未打开文件"后，再点**同一个文件**没有任何反应（编辑器不再打开），
+  必须改点别的文件才能恢复。
+- **根因**：antd `Tree` 对已选中节点会"反选"，`onSelect` 收到空数组 → 原实现 `if (typeof key !== 'string') return` 直接吞掉。
+- **修法**：反选时读当前 `selectedPath` 作为目标；文件仍照常打开，目录才真正清掉选中高亮。
+
+### ④ FR-11.6「打开日志」按钮（按用户选择补上）
+
+- 新增 `openLogsSchema`（字面量 `{ target: 'logs' }` + `.strict()`）与 `/api/open` 的**独立分支**：
+  路径由服务端 `ctx.layout.logDir` 决定，客户端无法指定任意路径；**放在项目白名单分支之前**
+  （否则 `target:'logs'` 会掉进 template 分支去要 templateId）。设置页「日志目录」旁加按钮。
+- 实测：`page.route` 拦截 → 请求体恰为 `{"target":"logs"}`、成功提示出现；反向校验
+  `{target:'explorer', projectId:'nope', path:'../../'}` 仍返回 404「项目不存在」（白名单未放松）。
+
+### 门禁与验证
+
+- `npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **60 条** ✅（新增 5 条：
+  会话 activeTabId 往返 / 悬空 id / null / 空标签集合 + 打开日志入参白名单）
+- 探针：`verify-round6.mjs`（①②）、`verify-round7.mjs`（面包屑逐级点击）、
+  `verify-round8.mjs`（刷新还原 + 未保存关标签拦截 + 草稿清理）、`verify-round9.mjs`（打开日志）、
+  `diag-reopen.mjs`（反选诊断）；回归 `verify-round4.mjs`（6 域侧栏/主题/忽略项/跨页签前进后退）全通过
+- **按用户要求未跑 e2e**，交给用户手测。
+
+### 数据零残留复核（只读巡检 `.tmp-test/probe/inspect-data.mjs`）
+
+- 草稿表 **0 条**；`settings` 全部为默认值（theme=light / density=middle / auto_save=0 /
+  show_ignored=0 / default_project_tab=files / default_arch_dir_name=架构图）；忽略规则**无被禁用项**；
+  回收站 DB **0 条**；会话 12 个标签（探针未新增标签）。
+- 说明：`%APPDATA%\ttFolio\trash\` 下有 6 个**空目录**（DB 行数为 0，界面显示 0 条），
+  时间戳为上一轮会话，非本轮产生；本轮未动。
+
+## 🔻 上一轮会话收口（交接入口：`HANDOVER.md`）
+
+- 上一轮最新提交：`900303d`；本轮在其上追加三个提交（`fix(web,server): 面包屑补当前文件名、会话记住活动标签` →
+  `feat(web,server): 补 FR-11.6「打开日志」按钮` → `docs(handover): 收口第十二轮台账`，用 `git log --oneline` 看当前值）
 - 已修且已实测：用户报障 4 类（设置域空 / 设置功能不可用含导出 401 / 界面观感与原型对齐 /
   文件夹 EISDIR / 前进后退刷新 / 主题 / 实时生效）+ 自查发现的草稿恢复、标签爆炸等回归
-- 未完成：① 面包屑不显示当前打开文件（已确认，未修）② 刷新后恢复的活动标签可疑（未查清）
-  ③ FR-11.6「打开日志」按钮缺失 ④ 原型剩余中低优先级观感差异 ⑤ KNOWN-GAPS 7 项
+- 当时未完成：① 面包屑（**本轮已修**）② 刷新后活动标签（**本轮已查清并修**）
+  ③ FR-11.6「打开日志」（**本轮已补**）④ 原型剩余中低优先级观感差异 ⑤ KNOWN-GAPS 7 项
 - 环境陷阱：编辑工具 ReplaceFile 落盘对读方非原子 → Vite 可能缓存**半截模块**（表现为"代码改了不生效"）
   → **重启 dev server**（判断脚本见 `HANDOVER.md` 第 6 节）
 - 重启服务：`cd D:\Workspace-1\code\ttfolio; npm run dev`（开发入口 http://localhost:5173）
 
-## 当前阶段：第十一轮修复已交付，等待用户手测（本轮不跑 e2e，由用户手测）
+## 当前阶段：第十二轮修复已交付，等待用户手测（本轮不跑 e2e，由用户手测）
 
 ## 第十一轮补充 4：前进/后退跨页签 + 6 域侧栏 + 跟随系统主题 + 忽略项跨页实时生效
 

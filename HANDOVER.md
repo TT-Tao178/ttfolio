@@ -31,8 +31,13 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：`900303d fix(web): 修复前进/后退无法在项目内页签之间回退`（工作树干净）
-- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` 55 条 ✅
+- 最新提交：第十二轮收口的 `docs(handover)` 提交（其上有 `fix(web,server): 面包屑补当前文件名、会话记住活动标签`
+  与 `feat(web,server): 补 FR-11.6「打开日志」按钮` 两个提交）；精确哈希看 `git log --oneline -3`
+- **第十二轮（本轮）新增**：面包屑显示当前文件 + 会话活动标签落库 + FR-11.6「打开日志」按钮
+  （详见 `PROGRESS.md` 顶部第十二轮小节，含逐项实测证据）
+- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **60 条** ✅
+- 数据库：迁移已升到 `user_version=2`（`0002_session_active_tab.sql`），启动时自动迁移，
+  升级前快照在 `%APPDATA%\ttFolio\backups\pre-migration-v1-*.db`
 - e2e：**按用户要求未跑**；本轮早期曾用旧 dist 误判过两轮，已加 `pretest:e2e`（先构建再跑）防复发。
 
 ## 4. 用户报障 4 类：已修且已实测（证据摘要）
@@ -55,15 +60,21 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 5. 未完成 / 待确认（下一步候选）
 
-1. **面包屑不显示当前打开的文件**（已确认，未修）：`PathBar` 只在 `tab.kind === 'file'` 时加文件名，
-   而文件是在"项目标签"里打开的（`targetPath` 挂在项目标签上）→ 永远不显示。
-   修法：`targetPath !== null` 就显示其 basename（改动仅 `PathBar.tsx`）。
-2. **刷新后恢复的活动标签可疑**（未查清）：刷新前活动标签是项目页，刷新后落到「工作台」。
-   已确认 `PUT /api/session` 返回 200（不是保存失败），需要抓"PUT 请求体里的 activeTabId vs 当时活动标签"。
-   若成立则属 FR-1.4 缺陷。
-3. **FR-11.6「打开日志」按钮缺失**（功能缺口，未擅自加）：设置页「关于」只显示日志目录文本。
+> 原第 1/2/3 项**已在第十二轮修完**（面包屑文件名 / 刷新后活动标签 / FR-11.6 打开日志），
+> 剩下的按用户指示**先等用户手测 ①②，再定优先级**。
+
+1. ~~面包屑不显示当前打开的文件~~ ✅ 已修（`PathBar.buildCrumbs`：有 `targetPath` 就按 `/` 拆段展示，
+   并补上 FR-1.5「可逐级点击」——点项目名回项目概览并关闭编辑器）
+2. ~~刷新后恢复的活动标签可疑~~ ✅ 已查清并修：`sessions` 表原先**没有 active_tab_id 列**、
+   `getSession()` 恒返回 `tabs[0].id`，前端 PUT 带的 activeTabId 被静默丢弃 →
+   迁移 `0002` 补列 + 仓储读写（拒绝存悬空 id）+ 前端兜底回落
+3. ~~FR-11.6「打开日志」按钮缺失~~ ✅ 已补（用户选择"加"）：`/api/open {target:'logs'}` 独立分支，
+   路径由服务端给（**不要**为它放宽 `/api/open` 的项目白名单）；设置页「日志目录」旁按钮
 4. 原型剩余观感差异（中低优先级）：卡片悬浮快捷操作、右键仅"…"图标可用。
 5. `KNOWN-GAPS.md` 里的 7 项体验打折项。
+6. 本轮回归中新发现并已修：`FilesTab` 树节点"反选"导致「后退回到未打开文件后再点同一个文件没反应」。
+7. 待用户决定：`%APPDATA%\ttFolio\trash\` 下有 6 个**空目录**（DB 0 行、界面 0 条，来自更早会话），
+   是否要清掉（清空回收站只删 `trash/` 内容，不碰项目文件）。
 
 ## 6. 环境陷阱（本轮排查最耗时，务必记住）
 
@@ -88,21 +99,32 @@ $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是�
 | `verify-settings-io.mjs` | 导出下载（download 事件）+ 架构图目录名跟随服务端 |
 | `verify-round4.mjs` | 6 域侧栏、跟随系统主题、忽略项跨页实时、跨页签前进后退 |
 | `verify-round5.mjs` | 重载后历史栈、面包屑内容、未保存关闭标签拦截 |
+| `verify-round6.mjs` | 面包屑文件名 + 会话 activeTabId（抓 PUT 体 vs GET 值 vs 刷新后活动标签） |
+| `verify-round7.mjs` | 面包屑逐级点击（点项目名回概览并关编辑器、后退还原、点工作台不改标签名） |
+| `verify-round8.mjs` | 刷新还原（活动标签/面包屑/编辑器）+ 未保存关标签拦截 + 草稿清理 |
+| `verify-round9.mjs` | FR-11.6「打开日志」（`page.route` 拦截，不真弹资源管理器）+ 白名单反向校验 |
+| `diag-reopen.mjs` | 树节点“反选”诊断：后退后再点同一个文件编辑器不打开 |
+| `inspect-data.mjs` | **只读**巡检数据残留（草稿/设置/忽略规则/回收站/会话标签），复核用 |
 | `audit-ui.mjs` | 深浅两色 × 7 屏巡检（溢出/压扁/漏令牌/控制台） |
 | `compare-shell*.mjs` | 与 AntD 原型逐项度量对比 |
 | `REPORT-*.md` | 早期子代理的探查报告（打开项目排查 / UI 差异） |
 
 跑法：`node .tmp-test/probe/<脚本>.mjs`（需先 `npm run dev`）。探针读文本一律用 `evaluate`
 （CodeMirror 的 `.cm-content` 用 `innerText` 会超时）。
+**注意**：探针会真的调 `/api/open`，要验证"打开日志/打开方式"类动作时请像 `verify-round9.mjs`
+那样用 `page.route` 拦掉，否则会在用户桌面弹出资源管理器窗口。
 
-## 8. 用户数据边界（收口时已核对）
+## 8. 用户数据边界（第十二轮收口时已用 `inspect-data.mjs` 只读复核）
 
 - 设置：`theme=light / density=middle / showIgnored=关 / autoSave=关 / watch=开 / archDir=架构图 / defaultProjectTab=files`
-- 回收站 **0 条**；项目目录无探针文件；相关 pathKey 草稿已删除；内置忽略规则全部启用（曾被探针误关 `*.keystore`，已复原）
-- 用户会话标签：34 → 12（清理了探针造成的 21 个重复标签，只去重、不删原有不同标签）
+- 草稿表 **0 条**；回收站 DB **0 条**；项目目录无探针文件；忽略规则**无被禁用项**（曾被探针误关 `*.keystore`，已复原）
+- 用户会话标签：34 → 12（清理了探针造成的 21 个重复标签，只去重、不删原有不同标签）；第十二轮探针未新增标签
+- `%APPDATA%\ttFolio\trash\` 下有 **6 个空目录**（DB 0 行 → 界面显示 0 条），来自更早会话，等用户决定是否清
 
 ## 9. 关键决策索引（详见 `DECISIONS.md`）
 
 工作台分屏（总览 vs 卡片墙）/ 面板尺寸持久化到 `ui_layout_json`（不走 localStorage，C-29）/
 `PaneSplit` 封装 Splitter 的四个坑 / `pretest:e2e` 强制先构建 / vite 显式绑 127.0.0.1 /
-颜色令牌走 CSS 变量（`SEMANTIC` 改指 `var(--tt-*)`，15 个引用点零改动）/ token 持久化到 `<dataDir>/token`。
+颜色令牌走 CSS 变量（`SEMANTIC` 改指 `var(--tt-*)`，15 个引用点零改动）/ token 持久化到 `<dataDir>/token` /
+会话活动标签落 `sessions.active_tab_id`（迁移 0002 补列，不用 settings 旁的旁路存储）/
+「打开日志」走 `/api/open {target:'logs'}` 的**独立分支**而非放宽项目白名单。
