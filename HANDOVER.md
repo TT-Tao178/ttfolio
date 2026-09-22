@@ -31,12 +31,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：第十六轮收口的 `docs(handover)` 提交（其上依次是
-  `feat(web): 文档大纲支持点击跳转到对应标题` →
-  `feat(web): 设置页所有分组卡占满内容区（单列布局）`；精确哈希看 `git log --oneline -3`）
-- **第十六轮（本轮）新增**：文档大纲点击定位 / 设置页全部卡片占满内容区
-  （详见 `PROGRESS.md` 顶部第十六轮小节）；远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
-- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **60 条** ✅
+- 最新提交：第十八轮的 docs 提交（其上是
+  `feat(analyzer,web): 语言识别扩展至 GitHub Linguist 口径`；精确哈希看 `git log --oneline -2`）
+- **第十八轮（本轮）新增**：语言识别 ~50 → ~90 扩展名 + 按文件名识别（Makefile/Dockerfile/
+  .env* 等）+ 语言色表补全至 90 个 GitHub 官方色；已对全部 11 个登记项目重分析
+  （详见 `PROGRESS.md` 顶部第十八轮小节）；远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
+- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **61 条** ✅
 - dist 已重建并跑过 `verify-build7717.mjs`：生产入口 127.0.0.1:7717 同步带上本轮修复
 - 数据库无新迁移（仍为 user_version=2）
 - e2e：**按用户要求未跑**，交给用户手测
@@ -108,6 +108,7 @@ $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是�
 | `verify-round14.mjs` | 第十四轮：设置页五卡统一 320px + 无 FR 字样 / 别名与原名同显（route 注入假项目，不写库） |
 | `verify-round15.mjs` | 第十五轮：外部修改警告收敛（route 伪造 fs/file 版本）/ 侧栏视图项移除 / 挂载多选（拦截 pick-file 与 mounts）；结尾自动清理探针草稿 |
 | `verify-round16.mjs` | 第十六轮：文档大纲点击定位（route 合成 md）/ 设置页全宽卡片核对 |
+| `verify-round17.mjs` | 第十八轮：全量重分析前后语言占比对比（只读扫描） |
 | `dialog-topmost.mjs` | Win32 前台焦点前后对照（按 PID 抓对话框 + 测出现耗时 + GetForegroundWindow；会在桌面短暂闪对话框） |
 | `restore-active-tab.mjs` / `check-active-tab.mjs` | 收尾把活动标签点回第一个 / 只读核对服务端会话活动标签 |
 | `diag-reopen.mjs` | 树节点“反选”诊断：后退后再点同一个文件编辑器不打开 |

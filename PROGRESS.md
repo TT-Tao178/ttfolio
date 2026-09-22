@@ -1,5 +1,17 @@
 # PROGRESS
 
+## 第十八轮：语言识别扩展至 GitHub Linguist 口径（已修）
+
+- **用户问题**：项目上的「素材仓库/未识别/纯前端」怎么判定的？语言占比为什么比 GitHub 单薄？
+- **判定口径（typeDetect，未改）**：微服务 → 前后端分离 → 单体 → 纯前端（前端框架依赖或
+  index.html+package.json）→ 后端 → 脚本（脚本字节≥40%）→ 素材仓库（媒体字节≥80%）→ 未识别；
+  手动改类型优先。
+- **本轮改动（c2f0571）**：语言映射 ~50 → ~90 扩展名 + **按文件名识别**（Makefile/Dockerfile/
+  CMakeLists.txt/Rakefile/Gemfile/Vagrantfile/Procfile/.env*）；前端色表补全至 90 个 GitHub
+  官方语言色；新增单测（61 条全绿）。
+- **实测**：对 11 个已登记项目全量重分析（只读扫描），3 个项目新识别出 Dockerfile 占比，
+  其余按新口径重算；verify-round17.mjs 前后对比留档。
+
 ## 第十七轮：顶栏品牌文案调整（已修）
 
 - 左上角 logo 字样 `tf` → **TT**；副标题 `tt项目仓库 · a local project workbench` →
