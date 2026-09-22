@@ -1,5 +1,11 @@
 # PROGRESS
 
+## 第十七轮：顶栏品牌文案调整（已修）
+
+- 左上角 logo 字样 `tf` → **TT**；副标题 `tt项目仓库 · a local project workbench` →
+  **TT项目管理工作台 · a local project workbench**（仅 App.tsx 两行文案）。
+- 实测：探针读顶栏 logo="TT"、tagline 全文正确；r17-logo.png 目视核对；门禁三绿；dist 已重建。
+
 ## 第十六轮：文档大纲点击跳转 + 设置页全部卡片占满（已修，待用户手测）
 
 ### ① 文档大纲支持点击定位（feat 067d3ff）
