@@ -56,6 +56,15 @@ export const openExternalSchema = z.object({
   templateId: z.string().optional()
 });
 
+/**
+ * FR-11.6「打开日志」：目标是**应用自己的数据目录**（<dataDir>/logs），不属于任何被登记项目，
+ * 因此不能复用 openExternalSchema（那个 schema 强制 projectId + 项目内白名单校验）。
+ * 这里只接受一个字面量开关，路径由服务端从 ctx.layout 取；`.strict()` 让"多带一个 path 字段"
+ * 直接判为参数不合法（zod v3 的 object 默认是**剥掉**未知键而不是报错，不 strict 就变成静默忽略——
+ * 可读性上很容易被误读成"客户端能指定路径"）。
+ */
+export const openLogsSchema = z.object({ target: z.literal('logs') }).strict();
+
 // ---------- 项目 ----------
 export const addProjectsSchema = z.union([
   z.object({ paths: z.array(z.string().min(1)).min(1) }),

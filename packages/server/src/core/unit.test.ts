@@ -15,10 +15,20 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import iconv from 'iconv-lite';
 import { matchScore, normalizeName } from '../routes/docs.js';
+import { openLogsSchema } from '@ttfolio/shared';
 
 function rule(pattern: string, mode: 'hide' | 'analyze_only' = 'hide'): IgnoreRule {
   return { id: pattern, scope: 'global', projectId: null, pattern, mode, isBuiltin: true, enabled: true };
 }
+
+describe('打开日志的入参白名单（FR-11.6 / C-22）', () => {
+  it('只接受 { target: "logs" }：路径由服务端决定，客户端无法指定目录', () => {
+    expect(openLogsSchema.safeParse({ target: 'logs' }).success).toBe(true);
+    expect(openLogsSchema.safeParse({ target: 'explorer' }).success).toBe(false);
+    expect(openLogsSchema.safeParse({ target: 'logs', path: 'C:/Windows' }).success).toBe(false);
+    expect(openLogsSchema.safeParse({}).success).toBe(false);
+  });
+});
 
 describe('忽略规则', () => {
   const compiled = compileIgnore([rule('node_modules'), rule('*.log'), rule('dist'), rule('.env*', 'analyze_only')]);

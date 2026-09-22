@@ -207,7 +207,25 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         <Descriptions.Item label="索引库">{stats?.dbPath ?? '—'}（{fmtBytes(stats?.dbSize ?? 0)}）</Descriptions.Item>
         <Descriptions.Item label="回收站">{stats?.trashPath ?? '—'}（{stats?.trashCount ?? 0} 条 / {fmtBytes(stats?.trashBytes ?? 0)}）</Descriptions.Item>
         <Descriptions.Item label="备份目录">{stats?.backupDir ?? '—'}</Descriptions.Item>
-        <Descriptions.Item label="日志目录">{stats?.logDir ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="日志目录">
+          <Space wrap>
+            <span className="tt-ellipsis" style={{ maxWidth: 380 }}>{stats?.logDir ?? '—'}</span>
+            {/* FR-11.6：打开日志目录。路径由服务端决定（应用数据目录下的 logs/），前端只发一个开关值，
+                客户端无法借这个入口打开任意路径（C-22/C-23 的白名单边界不放松）。 */}
+            <Button
+              size="small"
+              data-testid="open-logs"
+              onClick={() => {
+                void api
+                  .post('/api/open', { target: 'logs' })
+                  .then(() => void message.success('已用资源管理器打开日志目录'))
+                  .catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '打开日志目录失败'));
+              }}
+            >
+              打开日志
+            </Button>
+          </Space>
+        </Descriptions.Item>
         <Descriptions.Item label="导出清单">
           <Space>
             <Button size="small" data-testid="export-json" onClick={() => { void downloadWithToken('/api/export/projects.json', 'ttfolio-projects.json').then(() => message.success('已导出 JSON')).catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '导出失败')); }}>JSON</Button>

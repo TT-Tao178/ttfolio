@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import type { SessionTab } from '@ttfolio/shared';
-import { todosCreateSchema, todoPatchSchema, sessionPutSchema, openExternalSchema } from '@ttfolio/shared';
+import { todosCreateSchema, todoPatchSchema, sessionPutSchema, openExternalSchema, openLogsSchema } from '@ttfolio/shared';
 import { listTodos, createTodo, patchTodo, deleteTodo, getSession, putSession } from '../db/repo/sessionRepo.js';
 import { logActivity } from '../db/repo/metaRepo.js';
 import { pickFolder, pickFile } from '../core/dialogs.js';
@@ -137,7 +137,20 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ---- 外部打开（C-22/23：路径必须先过白名单） ----
+  // FR-11.6「打开日志」：日志目录在应用数据目录下（不在任何被登记项目里），走单独分支，
+  // 路径由服务端决定（ctx.layout.logDir）→ 客户端仍然无法让它打开任意路径。
+  // 必须放在项目白名单分支之前：否则 target:'logs' 会掉进 template 分支去要 templateId。
   app.post('/api/open', async (req) => {
+    const logs = openLogsSchema.safeParse(req.body);
+    if (logs.success) {
+      try {
+        await openExplorer(ctx.layout.logDir);
+        logActivity(ctx.db(), { kind: 'open.external', level: 'L1', targetPath: ctx.layout.logDir, detail: { target: 'logs' }, actor: currentActor().actor });
+        return ok({ opened: true });
+      } catch (err) {
+        return fail(...toApiErrorTuple(err));
+      }
+    }
     const parsed = openExternalSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const b = parsed.data;
