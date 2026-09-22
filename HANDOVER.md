@@ -31,12 +31,17 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：第十九轮的提交（`feat(web): 面包屑子页签（文件/Git/架构图/文档）可点击跳转`，
-  精确哈希看 `git log --oneline -2`）+ 台账 docs 提交
-- **第十九轮（本轮）新增**：面包屑子页签可点击跳转（详见 `PROGRESS.md` 顶部第十九轮小节）；
-  远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
+- 最新提交：第二十轮的 docs 提交（其上依次是 总览收敛 / 提交详情视图 / 历史下拉 /
+  自动打开首文件 / **Electron 桌面版** 五个提交；精确哈希看 `git log --oneline -7`）
+- **第二十轮（本轮）新增**：总览移除三张卡 / 提交详情视图 / 前进后退历史下拉 /
+  项目自动打开首文件 / **Electron 打包（dist-electron/TT项目管理工作台-Setup-0.1.0.exe）**
+  （详见 `PROGRESS.md` 顶部第二十轮小节）；远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **61 条** ✅
 - dist 已重建并跑过 `verify-build7717.mjs`：生产入口 127.0.0.1:7717 同步带上本轮修复
+- **桌面版注意**：打包用 `npm run dist:win`（先 electron-rebuild better-sqlite3 到
+  electron ABI）；之后本机跑 `npm run dev` 前要 `npm rebuild better-sqlite3` 切回 node ABI——
+  两个 ABI 不能共用同一个 node_modules（index.ts 已加预检，跑错运行时会干净退出
+  且绝不触碰库文件）
 - 数据库无新迁移（仍为 user_version=2）
 - e2e：**按用户要求未跑**，交给用户手测
 

@@ -1,5 +1,38 @@
 # PROGRESS
 
+## 第二十轮：总览收敛 + 提交详情 + 历史下拉 + 自动打开首文件 + Electron 桌面版（已修，待用户手测）
+
+### ① 总览移除三张卡（4b90276）② 提交详情视图（07b2a4b）③ 历史下拉（cf40b5d）④ 自动打开首文件（162a179）
+
+| # | 用户反馈 | 根因 | 改动 | 探针实测（verify-round20，合成数据） |
+| --- | --- | --- | --- | --- |
+| 1 | 总览三张卡莫名其妙、跳转乱 | 需要处理/跨项目清单跳的是已删的侧栏视图；最近打开与项目卡片重复 | 总览收敛为「KPI + 项目卡片分页」，三卡与相关死代码移除 | 总览无三卡文案，KPI/卡片正常 |
+| 2 | 提交历史点开是空的 | 点提交 openTab 出 kind:'git' 标签，App 壳没有该标签的渲染分支 → 空 div | 新增 CommitView（元信息+文件列表+patch，接口本就有）；App 壳补渲染分支；加 PaneErrorBoundary（视图崩溃只降级本面板） | 点提交 → commit-view 含文件列表与 patch |
+| 3 | 前进/后退莫名其妙 | 纯按钮，不知道会去哪 | 按钮包历史下拉（最近 15 条，「● 当前」置灰，可读位置摘要），点条目直达；单击/快捷键/置灰不变 | 下拉出现「● 当前：nav-demo · 文件 · README.md」+ 目标条目 |
+| 4 | 项目点进去默认是空的 | 打开项目只落「文件」页签不打开文件 | 三个打开入口设置 pendingAutoOpenProject 标记，FilesTab 消费：自动选中第一个文本文件；面包屑「文件」回列表不触发（保持第十九轮行为） | 打开项目 → 编辑器自动打开 README.md；回列表后不回弹 |
+
+### ⑤ Electron 桌面版（f2b3cff，产物 dist-electron/TT项目管理工作台-Setup-0.1.0.exe）
+
+- **先想清楚的问题**（用户点名要求）：
+  1. **spawn PowerShell 弹窗 = 杀软误报高危** → 换成原生对话框桥：主进程起 127.0.0.1+随机
+     token 的 HTTP 桥，server /api/dialogs/* 检测 `TTFOLIO_DIALOG_BRIDGE_*` 即转发给
+     `dialog.showOpenDialog`；Web 模式不设桥变量、仍走 PowerShell，双模式并存。
+  2. **本地端口 + 子进程会被部分企业策略拦** → 服务端改为**进程内**运行（esbuild 打成
+     main.cjs 被 Electron 主进程 require），不再 spawn node 子进程；只监听 127.0.0.1、
+     端口运行时探测。git/资源管理器/终端的 spawn 是本地工作台本质功能，保留（有策略的
+     环境下这些仍可能被拦，文档已注明）。
+  3. **中文路径**：NSIS Unicode 安装器 + 可改安装目录；数据目录 %APPDATA%（中文用户名 OK）；
+     spawn 参数一律数组不受中文空格影响；删掉 PowerShell 后连带消掉 GBK 编码坑。
+  4. **卸载**：NSIS per-user 免管理员；卸载只删程序目录，**不删 %APPDATA%\ttFolio 数据**。
+  5. **better-sqlite3 ABI**：electron-builder 前先 electron-rebuild（本机 MSVC 可用，已实测
+     Electron 下读写正常）；产物 asarUnpack 分发。
+  6. **未签名**：首次运行有 SmartScreen 提示，「更多信息→仍要运行」即可。
+- **冒烟实测**：Electron 启动 → health 200（port 探测、projectCount=13 真实数据）→
+  窗口加载页面标题正确；对话框桥链路待用户手测（点「选择文件…」应弹原生对话框）。
+- **本轮教训（已修）**：electron ABI 与 node ABI 切换后跑错运行时，曾触发"库损坏自愈"
+  把真实 library.db 改名走——已恢复数据，并把自愈条件收窄为"SQLite 真损坏"，
+  native 模块加载失败现在干净退出且不触碰库文件（index.ts）。
+
 ## 第十九轮：面包屑子页签可点击（已修，待用户手测）
 
 - **用户反馈**：在工作台/项目/文件/子路径 下点「文件」回不去文件列表页。
