@@ -100,7 +100,12 @@ function buildCrumbs(tab: Tab | null): Crumb[] {
   if (tab.kind === 'project' && tab.projectId !== null) {
     const projectId = tab.projectId;
     crumbs.push({ title: tab.title === '' ? '项目' : tab.title, onClick: () => openAt({ kind: 'project', projectId, targetPath: null, subTab: 'overview' }) });
-    if (tab.subTab !== null) crumbs.push({ title: subTabLabel(tab.subTab) });
+    // 子页签（文件/Git/架构图/文档）可点：跳回该子页签并清 targetPath（关闭右侧编辑器）。
+    // 用户报障：打开文件后点「文件」没有反应、回不去文件列表页——原来这段是纯文本。
+    if (tab.subTab !== null) {
+      const subTab = tab.subTab;
+      crumbs.push({ title: subTabLabel(subTab), onClick: () => openAt({ kind: 'project', projectId, targetPath: null, subTab }) });
+    }
   } else {
     if (tab.title !== '') crumbs.push({ title: tab.title });
     if (tab.subTab !== null) crumbs.push({ title: subTabLabel(tab.subTab) });
