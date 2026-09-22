@@ -4,12 +4,41 @@ import {
 } from 'antd';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiClientError } from '@/lib/api';
+import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/shared';
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
+
+/**
+ * 默认架构图目录名输入：改为**受控 + 跟服务端值同步**。
+ * 原先用 defaultValue：只在挂载时读一次，而设置是异步到达的（先给 DEFAULT_SETTINGS 占位），
+ * 于是显示的是占位默认值、服务端值到了也不更新；且只在按回车时保存，失焦即丢。
+ */
+function ArchDirInput({ value, onCommit }: { value: string; onCommit: (v: string) => void }): React.JSX.Element {
+  const [text, setText] = useState(value);
+  React.useEffect(() => {
+    setText(value);
+  }, [value]);
+  const commit = (): void => {
+    const next = text.trim();
+    if (next !== '' && next !== value) onCommit(next);
+  };
+  return (
+    // AntD 的 Input 与 Switch/InputNumber 一样不透传 data-testid，故用一层 span 承载
+    <span data-testid="set-arch-dir">
+      <Input
+        size="small"
+        style={{ width: 160 }}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onPressEnter={commit}
+      />
+    </span>
+  );
+}
 
 /**
  * 分组标题（带 DOM 锚点）：标题文案取自 sections.ts 单一来源，
@@ -106,12 +135,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
           </Button>
         </Descriptions.Item>
         <Descriptions.Item label="默认架构图目录名">
-          <Input
-            size="small"
-            style={{ width: 160 }}
-            defaultValue={settings.defaultArchDirName}
-            onPressEnter={(e) => setSetting('defaultArchDirName', (e.target as HTMLInputElement).value)}
-          />
+          <ArchDirInput value={settings.defaultArchDirName} onCommit={(v) => setSetting('defaultArchDirName', v)} />
         </Descriptions.Item>
         <Descriptions.Item label="扫描根目录（FR-12.6 预留，不实现自动扫描）">
           <Input size="small" disabled placeholder="当前版本只支持手动添加项目" style={{ width: 300 }} />
@@ -186,8 +210,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         <Descriptions.Item label="日志目录">{stats?.logDir ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="导出清单">
           <Space>
-            <Button size="small" onClick={() => window.open(`/api/export/projects.json`, '_blank')}>JSON</Button>
-            <Button size="small" onClick={() => window.open(`/api/export/projects.csv`, '_blank')}>CSV</Button>
+            <Button size="small" data-testid="export-json" onClick={() => { void downloadWithToken('/api/export/projects.json', 'ttfolio-projects.json').then(() => message.success('已导出 JSON')).catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '导出失败')); }}>JSON</Button>
+            <Button size="small" data-testid="export-csv" onClick={() => { void downloadWithToken('/api/export/projects.csv', 'ttfolio-projects.csv').then(() => message.success('已导出 CSV')).catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '导出失败')); }}>CSV</Button>
           </Space>
         </Descriptions.Item>
       </Descriptions>

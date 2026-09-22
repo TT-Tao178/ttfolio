@@ -2,6 +2,21 @@
 
 ## 当前阶段：第十一轮修复已交付，等待用户手测（本轮不跑 e2e，由用户手测）
 
+## 第十一轮补充 3：把设置页每个控件过一遍（"里面功能不能用"的系统排查）
+
+不再抽查，而是逐控件核对"是否显示服务端值 / 是否能写回服务端"，查出两处确凿不可用：
+
+| 控件 | 问题 | 实测证据 | 修复 |
+| --- | --- | --- | --- |
+| 导出 JSON / CSV | 必然 401：`window.open('/api/export/...')` **带不了 x-ttfolio-token 头**，而 query token 只对 SSE 放行 | 不带 token → 401；`?token=` → 401；带请求头 → 200 | 新增 `lib/api.ts: downloadWithToken()`（带 token 取内容 → blob → 本地保存，文件名取 content-disposition）；**不动服务端鉴权闸门**以免扩大安全面 | 
+| 默认架构图目录名 | 显示与保存都不对：`defaultValue` 只在挂载时读一次（设置是异步到达的），且仅 onPressEnter 保存，失焦即丢 | 外部改服务端值 + 刷新后输入框仍显示占位值 | 抽成受控组件 `ArchDirInput`，跟服务端值同步，onBlur / Enter 均提交 |
+
+实测通过：导出 JSON → `ttfolio-projects.json`（1439 字节）；导出 CSV → `ttfolio-projects.csv`（244 字节，BOM+中文表头）；
+架构图目录名外部改值刷新后显示新值（`架构图-external`），键入+失焦写回（`架构图-typed`），已复原为 `架构图`。
+
+顺带确认：`Input` 与 `Switch`/`InputNumber` 一样不透传 `data-testid`（故用 span 承载）；
+用户内容端口（7817）接受 query token，所以文档图片与架构图 iframe 正常（主端口的 `/raw` 只认请求头，但代码统一走内容端口）。
+
 ## 第十一轮补充 2：与静态原型逐项对齐 + 自动保存实测（含我自己踩的 3 个坑）
 
 ### 对齐《ttFolio界面原型-AntD.html》（把"界面不一样"变成可测量）

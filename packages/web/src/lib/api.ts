@@ -103,3 +103,39 @@ export function rawUrl(projectId: string, rel: string): string {
 export function sseUrl(): string {
   return `${base()}/api/events?token=${encodeURIComponent(token())}`;
 }
+
+/**
+ * 带鉴权的下载（导出清单等）。
+ *
+ * 为什么不能用 `window.open('/api/export/...')`：浏览器原生跳转（window.open / <a download> / <img>）
+ * **无法携带 x-ttfolio-token 请求头**，而服务端的 query token 只对 SSE 放行 —— 实测直接打开
+ * 返回 401，表现为"设置页里点导出没反应/报错"。
+ * 这里改为：带 token 取回内容 → 生成 blob → 触发本地保存。
+ * 刻意不改服务端鉴权闸门（为两个按钮放宽鉴权会扩大安全面）。
+ */
+export async function downloadWithToken(path: string, fallbackName: string): Promise<void> {
+  const url = new URL(base() + path, window.location.origin);
+  const res = await fetch(url.toString(), { headers: { 'x-ttfolio-token': token() } });
+  if (!res.ok) {
+    let message = `导出失败（HTTP ${res.status}）`;
+    try {
+      const payload = (await res.json()) as ApiResponse<unknown>;
+      if (payload.ok === false) message = payload.error.message;
+    } catch {
+      /* 错误体不是 JSON：保留 HTTP 状态提示 */
+    }
+    throw new ApiClientError(`HTTP_${res.status}`, message, undefined, res.status);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const matched = /filename="?([^";]+)"?/.exec(disposition);
+  const name = matched?.[1] ?? fallbackName;
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+}
