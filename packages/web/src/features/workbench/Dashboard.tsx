@@ -1,14 +1,14 @@
 /**
- * 工作台总览（对齐原型 3.1：6 个 KPI + 项目卡片 + 最近打开 + 需要处理 + 跨项目清单汇总）。
- * 与「项目卡片墙」是两个屏：卡片墙是筛选/浏览项目，本屏回答"哪里需要我"。
+ * 工作台总览：6 个 KPI + 项目卡片（分页）。
+ * 用户反馈原来的「最近打开/需要处理/跨项目清单」三张卡跳转逻辑乱 → 移除，
+ * 总览收敛为「KPI 一眼看全局 + 项目卡片直达」。
  */
-import { App, Button, Card, Empty, List, Pagination, Statistic, Tag, Typography } from 'antd';
+import { App, Button, Card, Empty, Pagination, Statistic, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
-import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { ProjectCard } from './ProjectCard';
@@ -17,12 +17,6 @@ import { SEMANTIC } from '@/theme/tokens';
 /** 总览项目卡片的每页数量：1440 宽下约 3 列，12 个 = 4 屏内可翻完 */
 const PAGE_SIZE = 12;
 
-interface TodoRow {
-  id: string;
-  title: string;
-  done: boolean;
-  projectId: string | null;
-}
 
 export function Dashboard(): React.JSX.Element {
   const { settings } = useSettings();
@@ -33,41 +27,16 @@ export function Dashboard(): React.JSX.Element {
     queryKey: ['projects', 'dashboard', settings.cardSort],
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort })
   });
-  const { data: todos } = useQuery({
-    queryKey: ['todos', 'dashboard'],
-    queryFn: () => api.get<TodoRow[]>('/api/todos', { scope: 'all' }),
-    retry: 0
-  });
 
   const list = projects ?? [];
-  const today = new Date().toDateString();
-  const isToday = (iso: string | null): boolean => iso !== null && new Date(iso).toDateString() === today;
   const dirty = list.filter((p) => p.gitIsRepo && p.gitDirty).length;
   const noDocs = list.filter((p) => !p.hasDocs).length;
   const noArch = list.filter((p) => !p.hasArch).length;
-  const openedToday = list.filter((p) => isToday(p.lastOpenedAt)).length;
+  const openedToday = list.filter((p) => p.lastOpenedAt !== null && String(p.lastOpenedAt).slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
   const avgMs = (() => {
     const vals = list.map((p) => p.analyzeMs ?? 0).filter((v) => v > 0);
     return vals.length === 0 ? 0 : Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
   })();
-
-  const goView = (subTab: string): void => {
-    useAppStore.getState().updateActiveLocation({ subTab }, true);
-  };
-
-  const recent = [...list]
-    .filter((p) => p.lastOpenedAt !== null)
-    .sort((a, b) => String(b.lastOpenedAt).localeCompare(String(a.lastOpenedAt)))
-    .slice(0, 5);
-
-  const need: Array<{ title: string; desc: string; subTab: string; count: number }> = [
-    { title: '有未提交改动', desc: '工作区脏的项目', subTab: 'view:my-dirty', count: dirty },
-    { title: '缺设计文档', desc: '没有关联任何设计文档', subTab: 'view:my-nodocs', count: noDocs },
-    { title: '缺架构图', desc: '没有登记架构图目录', subTab: 'view:my-noarch', count: noArch },
-    { title: '未分析', desc: '尚未完成分析', subTab: 'view:my-unanalyzed', count: list.filter((p) => p.analyzedAt === null).length }
-  ];
-
-  const openTodos = (todos ?? []).filter((t) => !t.done);
 
   // ---- 项目卡片分页（总览新增）：数据已在内存，翻页纯客户端切片，不重复请求 ----
   const total = list.length;
@@ -163,71 +132,6 @@ export function Dashboard(): React.JSX.Element {
           </div>
         </>
       )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 12, marginTop: 12 }}>
-        <Card size="small" title="最近打开" extra={<a onClick={() => goView('view:recent')}>查看全部</a>}>
-          {recent.length === 0 ? (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有打开过项目" />
-          ) : (
-            <List
-              size="small"
-              dataSource={recent}
-              renderItem={(p) => (
-                <List.Item
-                  style={{ cursor: 'pointer' }}
-                  onClick={() =>
-                    useAppStore
-                      .getState()
-                      .openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName)
-                  }
-                >
-                  <span style={{ flex: 1 }} className="tt-ellipsis">{p.alias ?? p.diskName}</span>
-                  <span style={{ color: SEMANTIC.textTertiary, fontSize: 12 }}>{relTime(p.lastOpenedAt)} · {p.openCount} 次</span>
-                </List.Item>
-              )}
-            />
-          )}
-        </Card>
-
-        <Card size="small" title="需要处理">
-          <List
-            size="small"
-            dataSource={need}
-            renderItem={(n) => (
-              <List.Item
-                style={{ cursor: 'pointer' }}
-                onClick={() => goView(n.subTab)}
-                actions={[<Tag key="c" color={n.count > 0 ? 'orange' : 'default'}>{n.count}</Tag>]}
-              >
-                <span style={{ flex: 1 }}>
-                  {n.title}
-                  <div style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>{n.desc}</div>
-                </span>
-              </List.Item>
-            )}
-          />
-        </Card>
-      </div>
-
-      <Card
-        size="small"
-        title="跨项目清单（未完成）"
-        style={{ marginTop: 12 }}
-        extra={<span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>共 {openTodos.length} 项</span>}
-      >
-        {openTodos.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有未完成的清单项" />
-        ) : (
-          <List
-            size="small"
-            dataSource={openTodos.slice(0, 10)}
-            renderItem={(t) => <List.Item>• {t.title}</List.Item>}
-          />
-        )}
-        <Button size="small" style={{ marginTop: 8 }} onClick={() => goView('view:my-dirty')}>
-          去按项目处理
-        </Button>
-      </Card>
     </div>
   );
 }
