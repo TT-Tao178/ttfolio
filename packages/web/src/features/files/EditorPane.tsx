@@ -204,7 +204,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           }
         />
       )}
-      <div style={{ flex: 1, overflow: 'auto', border: '1px solid rgba(128,128,128,.15)', borderRadius: 6 }}>
+      <div style={{ flex: 1, overflow: 'auto', border: `1px solid ${SEMANTIC.split}`, borderRadius: 6 }}>
         <CodeMirror
           value={value}
           height="100%"

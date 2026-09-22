@@ -8,6 +8,7 @@ import { api, ApiClientError } from '@/lib/api';
 import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/shared';
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function SettingsPage(): React.JSX.Element {
   const { settings, setSetting } = useSettings();
@@ -106,7 +107,7 @@ export function SettingsPage(): React.JSX.Element {
           });
         }}>添加</Button>
       </Space.Compact>
-      <div style={{ maxHeight: 220, overflow: 'auto', border: '1px solid rgba(128,128,128,.15)', borderRadius: 6, padding: 8 }}>
+      <div style={{ maxHeight: 220, overflow: 'auto', border: `1px solid ${SEMANTIC.split}`, borderRadius: 6, padding: 8 }}>
         {(rules ?? []).map((r) => (
           <div key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '1px 0' }}>
             <span className="tt-mono" style={{ flex: 1, fontSize: 12 }}>{r.pattern}</span>

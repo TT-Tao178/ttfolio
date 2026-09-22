@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { SearchResults } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+import { SEMANTIC } from '@/theme/tokens';
 
 interface CommandItem {
   id: string;
@@ -182,7 +183,7 @@ export function CommandPalette(): React.JSX.Element {
                   padding: '6px 10px',
                   borderRadius: 6,
                   cursor: 'pointer',
-                  background: i === cursor ? 'rgba(22,119,255,0.1)' : 'transparent'
+                  background: i === cursor ? SEMANTIC.primaryBg : 'transparent'
                 }}
                 onMouseEnter={() => setCursor(i)}
               >

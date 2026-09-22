@@ -35,10 +35,20 @@ export const GITHUB_LANG_COLORS: Record<string, string> = {
 /** 语义色常量（组件内唯一允许的取色来源；hex 本体只活在本文件，见约束 C-50 / 机械检查 M10）。 */
 export const SEMANTIC = {
   primary: '#1677ff',
+  primaryBg: '#e6f4ff',
+  primaryBorder: '#91caff',
   success: '#52c41a',
   warning: '#faad14',
   error: '#ff4d4f',
-  layoutBg: '#f5f5f5'
+  layoutBg: '#f5f5f5',
+  /** 容器底色（卡片/侧栏/弹层） */
+  containerBg: '#ffffff',
+  /** 分割线与卡片描边（对应 AntD token.colorSplit / colorBorderSecondary） */
+  split: '#f0f0f0',
+  /** 控件描边（对应 token.colorBorder） */
+  border: '#d9d9d9',
+  textSecondary: 'rgba(0,0,0,.65)',
+  textTertiary: 'rgba(0,0,0,.45)'
 } as const;
 
 export function langColor(language: string): string {

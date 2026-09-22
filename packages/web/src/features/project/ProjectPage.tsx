@@ -1,5 +1,5 @@
 /** 项目页（3.3）：页签固定 概览→文件→Git→架构图→文档，快捷键 1–5，默认落「文件」。 */
-import { Alert, Button, Descriptions, Form, Input, Modal, Progress, Space, Tag, App } from 'antd';
+import { Alert, Button, Descriptions, Form, Input, Modal, Progress, Space, Tabs, Tag, App } from 'antd';
 import { ReloadOutlined, StarOutlined, StarFilled, CopyOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -83,6 +83,29 @@ export function ProjectPage({ projectId, subTab }: { projectId: string; subTab: 
           <Button size="small" onClick={() => setAliasOpen(true)}>改别名（L1）</Button>
         </Space>
       </div>
+      {/* 项目页五页签（对齐原型 3.3）：鼠标可达；快捷键 1–5 走同一套 updateActiveLocation */}
+      <Tabs
+        size="small"
+        activeKey={active}
+        onChange={(k) => useAppStore.getState().updateActiveLocation({ subTab: k }, true)}
+        data-testid="project-tabs"
+        style={{ marginBottom: 4 }}
+        items={[
+          { key: 'overview', label: '概览' },
+          { key: 'files', label: '文件' },
+          {
+            key: 'git',
+            label:
+              p?.gitIsRepo === false
+                ? 'Git'
+                : p?.gitDirty === true
+                  ? 'Git ●'
+                  : 'Git'
+          },
+          { key: 'archives', label: p?.hasArch === true ? '架构图 ✓' : '架构图' },
+          { key: 'docs', label: p?.hasDocs === true ? '文档 ✓' : '文档' }
+        ]}
+      />
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} data-testid="project-subtab" data-active={active}>
         {active === 'overview' && (
           <StateView

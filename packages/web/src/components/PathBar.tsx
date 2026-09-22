@@ -8,6 +8,7 @@ import React from 'react';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { useQueryClient } from '@tanstack/react-query';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function PathBar(): React.JSX.Element {
   const { activeTabId, navigate, tabs } = useAppStore();
@@ -47,7 +48,7 @@ export function PathBar(): React.JSX.Element {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid rgba(128,128,128,.15)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
       <Space.Compact>
         <Tooltip title="后退 (Alt+←)">
           <Button size="small" type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />

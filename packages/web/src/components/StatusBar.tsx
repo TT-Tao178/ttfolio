@@ -23,7 +23,7 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
       style={{
         display: 'flex', alignItems: 'center', gap: 16,
         padding: '3px 12px', fontSize: 12,
-        borderTop: '1px solid rgba(128,128,128,.15)',
+        borderTop: `1px solid ${SEMANTIC.split}`,
         opacity: 0.85
       }}
     >

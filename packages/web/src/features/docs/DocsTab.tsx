@@ -6,6 +6,7 @@ import { api, ApiClientError } from '@/lib/api';
 import MarkdownPreview from './MarkdownPreview';
 import { relTime } from '@/lib/format';
 import { PaneSplit } from '@/components/PaneSplit';
+import { SEMANTIC } from '@/theme/tokens';
 
 interface DocItem {
   path: string;
@@ -134,7 +135,7 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
             {content.isLoading ? (
               <Spin style={{ margin: '48px auto', display: 'block' }} />
             ) : mode === 'read' ? (
-              <div style={{ flex: 1, overflow: 'auto', background: 'rgba(128,128,128,.03)', borderRadius: 8, padding: 16 }}>
+              <div style={{ flex: 1, overflow: 'auto', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 16 }}>
                 <MarkdownPreview content={content.data?.content ?? ''} projectId={projectId} mountId={selected.mountId} basePath={selected.path} />
               </div>
             ) : (

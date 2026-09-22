@@ -40,8 +40,8 @@ function SortableTab({ tab, active, onActivate, onClose }: {
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '0 8px 0 12px', height: 34, borderRadius: 8, cursor: 'pointer',
         userSelect: 'none', whiteSpace: 'nowrap',
-        background: active ? 'rgba(22,119,255,0.1)' : 'transparent',
-        border: active ? '1px solid rgba(22,119,255,0.35)' : '1px solid transparent',
+        background: active ? SEMANTIC.primaryBg : 'transparent',
+        border: active ? `1px solid ${SEMANTIC.primaryBorder}` : '1px solid transparent',
         color: tab.invalid !== null ? SEMANTIC.error : 'inherit',
         maxWidth: 200
       }}

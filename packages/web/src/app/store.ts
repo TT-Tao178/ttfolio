@@ -47,11 +47,18 @@ interface AppState {
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
   setPalette: (v: boolean) => void;
+  /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
+  addProjectNonce: number;
+  requestAddProject: () => void;
   syncFromServer: (tabs: Array<{ id: string; kind: TabKind; projectId?: string | null; targetPath?: string | null; subTab?: string | null; titleSnapshot?: string | null; scrollJson?: string | null; navHistoryJson?: string | null; navIndex?: number; isPinned?: boolean }>, activeId: string | null) => void;
 }
 
 function tabKey(loc: TabLocation): string {
-  return `${loc.kind}|${loc.projectId ?? ''}|${loc.targetPath ?? ''}`;
+  const base = `${loc.kind}|${loc.projectId ?? ''}|${loc.targetPath ?? ''}`;
+  // 工作台总览 / 卡片墙 / 我的视图 属于同一个 kind 的不同屏，必须把 subTab 纳入标识：
+  // 否则点侧栏「最近打开」会复用「工作台总览」标签并停在总览屏（表现为"点了没反应"）。
+  // 项目标签不纳入 subTab —— 项目页内切页签必须复用同一标签。
+  return loc.kind === 'overview' ? `${base}|${loc.subTab ?? 'home'}` : base;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -174,6 +181,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ dirty: m });
   },
   setPalette: (v) => set({ paletteOpen: v }),
+  addProjectNonce: 0,
+  requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
 
   syncFromServer: (serverTabs, activeId) => {
     const tabs = serverTabs.map<Tab>((t) => ({

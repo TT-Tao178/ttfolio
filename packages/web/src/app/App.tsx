@@ -112,7 +112,7 @@ function Shell(): React.JSX.Element {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 顶栏：LOGO + 标签 + 搜索/导入/设置 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderBottom: '1px solid rgba(128,128,128,.15)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
         <Space size={6}>
           <Avatar shape="square" size={26} style={{ background: SEMANTIC.primary, fontWeight: 700 }}>tf</Avatar>
           <strong>ttFolio</strong>
@@ -121,15 +121,41 @@ function Shell(): React.JSX.Element {
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
           <TabBar />
         </div>
-        <Space size={2}>
-          <Tooltip title="搜索与命令面板 (Ctrl+K)">
-            <Button type="text" icon={<SearchOutlined />} onClick={() => setPalette(true)} data-testid="palette-btn" />
-          </Tooltip>
-          <Tooltip title="添加项目">
-            <Button type="text" icon={<PlusOutlined />} onClick={() => openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台')} />
+        <Space size={8}>
+          {/* 搜索 pill（对齐原型 3.1）：点击等价 Ctrl+K */}
+          <Button
+            onClick={() => setPalette(true)}
+            data-testid="palette-btn"
+            icon={<SearchOutlined />}
+            style={{
+              width: 300,
+              justifyContent: 'flex-start',
+              color: SEMANTIC.textTertiary,
+              background: SEMANTIC.layoutBg,
+              borderColor: SEMANTIC.split
+            }}
+          >
+            <span style={{ flex: 1, textAlign: 'left', fontSize: 13 }}>搜索项目 / 文件名 / 文件内容</span>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>Ctrl K</span>
+          </Button>
+          <Tooltip title="添加项目（粘贴路径 / 系统对话框 / 父目录批量登记）">
+            <Button
+              icon={<PlusOutlined />}
+              data-testid="top-add-btn"
+              onClick={() => {
+                openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
+                useAppStore.getState().requestAddProject();
+              }}
+            >
+              导入
+            </Button>
           </Tooltip>
           <Tooltip title="设置 (Ctrl+,)">
-            <Button type="text" icon={<SettingOutlined />} onClick={() => openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置')} />
+            <Button
+              type="text"
+              icon={<SettingOutlined />}
+              onClick={() => openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置')}
+            />
           </Tooltip>
         </Space>
       </div>

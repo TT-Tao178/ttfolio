@@ -7,6 +7,7 @@ import { api, ApiClientError, archUrl } from '@/lib/api';
 import type { ArchiveInfo } from '@ttfolio/shared';
 import { fmtBytes, relTime } from '@/lib/format';
 import { StateView } from '@/components/StateView';
+import { SEMANTIC } from '@/theme/tokens';
 
 export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Element {
   const { message } = App.useApp();
@@ -50,7 +51,7 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
           {(archives ?? []).map((a) => {
             const entry = entryOf(a);
             return (
-              <div key={a.id} style={{ border: '1px solid rgba(128,128,128,.2)', borderRadius: 8, padding: 12 }}>
+              <div key={a.id} style={{ border: `1px solid ${SEMANTIC.split}`, borderRadius: 8, padding: 12 }}>
                 {a.changed && (
                   <Alert type="info" showIcon message="架构图已更新（文件数或入口内容有变化）" style={{ marginBottom: 8 }} />
                 )}
@@ -147,7 +148,7 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
             value={regPath}
             onChange={(e) => setRegPath(e.target.value)}
             placeholder="目录绝对路径（默认项目内 架构图/ 会自动登记）"
-            style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(128,128,128,.3)' }}
+            style={{ flex: 1, padding: '4px 8px', borderRadius: 6, border: `1px solid ${SEMANTIC.border}` }}
           />
           <Button onClick={() => void api.post('/api/dialogs/pick-folder').then((r) => {
             const p = (r as { paths: string[] }).paths[0];

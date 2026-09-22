@@ -6,12 +6,13 @@ import {
   PlusOutlined, ReloadOutlined, FolderOpenOutlined, CopyOutlined, FileTextOutlined,
   BranchesOutlined, MoreOutlined, StarFilled, StarOutlined, WarningOutlined
 } from '@ant-design/icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { LanguageBar } from '@/components/LanguageBar';
+import { Dashboard } from './Dashboard';
 import { StateView } from '@/components/StateView';
 import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
@@ -25,11 +26,20 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const queryClient = useQueryClient();
   const { message } = App.useApp();
 
+  // 顶栏「＋导入」信号：nonce 变化即打开添加项目弹窗（顶栏与工作台解耦）
+  const addProjectNonce = useAppStore((s) => s.addProjectNonce);
+  useEffect(() => {
+    if (addProjectNonce > 0) setAddOpen(true);
+  }, [addProjectNonce]);
+
+  const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab);
-  const { data: projects, isLoading, error } = useQuery({
+  const { data: allProjects, isLoading, error } = useQuery({
     queryKey: ['projects', filters, q, sort],
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { ...filters, q, sort })
   });
+
+  const projects = (allProjects ?? []).filter((p) => !pinnedOnly || p.isPinned);
 
   const openProjectTab = (p: ProjectSummary): void => {
     useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
@@ -61,6 +71,14 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 
   return (
     <div style={{ padding: 16, height: '100%', overflow: 'auto' }} data-testid="workbench">
+      {/* 工作台总览（subTab=null）与卡片墙是两个屏：前者回答"哪里需要我"，后者用于筛选/浏览项目 */}
+      {subTab === null ? (
+        <>
+          <Dashboard />
+          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+        </>
+      ) : (
+        <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
         <Input.Search
           placeholder="搜索项目名 / 别名 / 路径 / 技术栈"
@@ -98,6 +116,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         )}
       </StateView>
       <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+        </>
+      )}
     </div>
   );
 }
@@ -271,7 +291,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
             <Button onClick={() => void loadChildren()}>载入子目录</Button>
           </Space.Compact>
           {children.length > 0 && (
-            <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', border: '1px solid rgba(128,128,128,.2)', borderRadius: 6, padding: 8 }}>
+            <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', border: `1px solid ${SEMANTIC.split}`, borderRadius: 6, padding: 8 }}>
               {children.map((c, i) => (
                 <label key={c.path} style={{ display: 'block' }}>
                   <input
@@ -315,6 +335,8 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
 
 export function parseSubTab(subTab: string | null): Record<string, string> {
   if (subTab === null) return { status: 'active' };
+  if (subTab === 'view:recent') return { status: 'active', sort: 'last_opened' };
+  if (subTab === 'view:pinned') return { status: 'active' };
   if (subTab.startsWith('view:my-')) {
     const key = subTab.slice(8);
     switch (key) {

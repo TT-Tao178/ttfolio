@@ -86,7 +86,9 @@ export function Sidebar(): React.JSX.Element {
   const onClick = (e: { key: string }): void => {
     const key = e.key;
     if (key.startsWith('view:')) {
-      if (key === 'view:all' || key === 'view:recent' || key === 'view:pinned') openWorkbench();
+      // 工作台总览（Dashboard）与卡片墙是两个屏：只有 view:all 落到总览，
+      // 最近打开/已固定以及"我的视图"都落到各自的卡片墙标签（各自独立，可并存）。
+      if (key === 'view:all') openWorkbench();
       else openView(key.slice(5));
       return;
     }

@@ -27,7 +27,7 @@ function RailButton({ active, onClick, label, children }: {
         style={{
           width: 36, height: 36, borderRadius: 8, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
-          background: active ? 'rgba(22,119,255,0.12)' : 'transparent',
+          background: active ? SEMANTIC.primaryBg : 'transparent',
           color: active ? SEMANTIC.primary : 'inherit'
         }}
       >
@@ -43,7 +43,7 @@ export function DomainRail(): React.JSX.Element {
     <div
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        padding: '8px 4px', borderRight: '1px solid rgba(128,128,128,.15)'
+        padding: '8px 4px', borderRight: `1px solid ${SEMANTIC.split}`
       }}
     >
       {DOMAINS.map((d) => (
