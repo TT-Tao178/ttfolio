@@ -121,6 +121,24 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current)));
   }, [rootData]);
 
+  // 「打开项目默认展开第一个文件」：打开项目落「文件」页签时入口会设置 pendingAutoOpenProject，
+  // 这里消费一次——自动选中第一个文本文件（没有文本文件就选第一个文件）；用户主动回到
+  // 文件列表（点面包屑「文件」/清空 targetPath）不会触发，保持上一轮"回列表"的行为。
+  const pendingAuto = useAppStore((s) => s.pendingAutoOpenProject);
+  useEffect(() => {
+    if (pendingAuto !== projectId) return;
+    if (openPath !== null) {
+      useAppStore.setState({ pendingAutoOpenProject: null });
+      return;
+    }
+    const nodes = rootData?.nodes ?? [];
+    if (nodes.length === 0) return; // 树未就绪，等下一轮
+    const textRe = /\.(md|markdown|txt|json|ya?ml|toml|ini|cfg|conf|xml|html?|css|scss|less|styl|vue|svelte|astro|jsx?|tsx?|[cm]js|py|java|kt|go|rs|cs|c|cpp|hpp|php|rb|swift|dart|scala|groovy|sh|bash|ps1|bat|cmd|sql|graphql|gql|proto)$/i;
+    const pick = nodes.find((n) => n.kind === 'file' && textRe.test(n.name)) ?? nodes.find((n) => n.kind === 'file');
+    useAppStore.setState({ pendingAutoOpenProject: null });
+    if (pick !== undefined) useAppStore.getState().updateActiveLocation({ targetPath: pick.path }, true);
+  }, [pendingAuto, projectId, openPath, rootData]);
+
   // 标签里的目标路径变化（含前进/后退）时，让树上的选中态跟随
   useEffect(() => {
     if (openPath !== null) setSelectedPath(openPath);

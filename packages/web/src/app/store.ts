@@ -50,6 +50,9 @@ interface AppState {
   /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
   addProjectNonce: number;
   requestAddProject: () => void;
+  /** 待自动打开第一个文件的项目 id（打开项目落「文件」页签时设置，FilesTab 消费后清空） */
+  pendingAutoOpenProject: string | null;
+  requestAutoOpenProject: (projectId: string) => void;
   syncFromServer: (tabs: Array<{ id: string; kind: TabKind; projectId?: string | null; targetPath?: string | null; subTab?: string | null; titleSnapshot?: string | null; scrollJson?: string | null; navHistoryJson?: string | null; navIndex?: number; isPinned?: boolean }>, activeId: string | null) => void;
 }
 
@@ -191,6 +194,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPalette: (v) => set({ paletteOpen: v }),
   addProjectNonce: 0,
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
+  pendingAutoOpenProject: null,
+  requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
 
   syncFromServer: (serverTabs, activeId) => {
     const tabs = serverTabs.map<Tab>((t) => {

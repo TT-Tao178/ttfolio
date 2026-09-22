@@ -30,6 +30,7 @@ export function Sidebar(): React.JSX.Element {
   };
 
   const openProject = (p: ProjectSummary, subTab: string): void => {
+    if (subTab === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
     const loc: TabLocation = { kind: 'project', projectId: p.id, targetPath: null, subTab, scroll: 0 };
     openTab(loc, p.alias ?? p.diskName);
   };

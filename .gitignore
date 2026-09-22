@@ -56,3 +56,7 @@ desktop.ini
 .idea/
 .vs/
 *.swp
+
+# ---- 桌面版打包产物 ----
+/app/
+/dist-electron/

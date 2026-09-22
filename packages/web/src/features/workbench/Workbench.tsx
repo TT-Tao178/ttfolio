@@ -57,6 +57,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const openProjectTab = (p: ProjectSummary): void => {
     // 默认落点跟随设置 default_project_tab（原先硬编码 files，设置里改了不生效）
     const sub = settings.defaultProjectTab === 'overview' ? 'overview' : 'files';
+    if (sub === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
     useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 }, p.alias ?? p.diskName);
     void api.post(`/api/projects/${p.id}/open`);
   };

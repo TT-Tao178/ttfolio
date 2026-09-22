@@ -50,6 +50,7 @@ export function Dashboard(): React.JSX.Element {
   // 与卡片墙一致的动作（Workbench 同款实现，保持两处行为相同）：
   const openProject = (p: ProjectSummary): void => {
     const sub = settings.defaultProjectTab === 'overview' ? 'overview' : 'files';
+    if (sub === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
     useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 }, p.alias ?? p.diskName);
     void api.post(`/api/projects/${p.id}/open`);
   };
