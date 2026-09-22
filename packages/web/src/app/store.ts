@@ -58,7 +58,12 @@ function tabKey(loc: TabLocation): string {
   // 工作台总览 / 卡片墙 / 我的视图 属于同一个 kind 的不同屏，必须把 subTab 纳入标识：
   // 否则点侧栏「最近打开」会复用「工作台总览」标签并停在总览屏（表现为"点了没反应"）。
   // 项目标签不纳入 subTab —— 项目页内切页签必须复用同一标签。
-  return loc.kind === 'overview' ? `${base}|${loc.subTab ?? 'home'}` : base;
+  if (loc.kind === 'overview') return `${base}|${loc.subTab ?? 'home'}`;
+  // 项目标签也**不能**纳入 targetPath：项目标签内部"当前打开哪个文件"由 targetPath + 历史栈表示，
+  // 一旦它进了标识，打开过文件后再点项目卡就会开出第二个同名标签（实测会滚出十几个同名标签）。
+  // 而 kind='file'（搜索面板打开文件）与 kind='git'（提交详情）本身就是"一个路径一个标签"，保留 targetPath。
+  if (loc.kind === 'project') return `${loc.kind}|${loc.projectId ?? ''}`;
+  return base;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({

@@ -57,45 +57,65 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
     queryFn: () => api.get<FileContent>('/api/fs/file', { projectId, path })
   });
 
-  const { data: draft } = useQuery({
+  const { data: draft, isFetchedAfterMount: draftFetchedAfterMount } = useQuery({
     queryKey: ['draft', pathKey],
     queryFn: () =>
       api.get<{ content: string; updatedAt: string } | null>('/api/drafts', { scope: 'project_file', pathKey }),
-    enabled: file !== undefined
+    enabled: file !== undefined,
+    // 必须每次挂载都重取：全局 staleTime=15s 会让"刚打开过、当时没有草稿"的 null 结果被缓存住，
+    // 于是后退/前进或切标签回来时（组件重新挂载）拿到陈旧的 null → 有草稿却不恢复。
+    staleTime: 0,
+    refetchOnMount: 'always'
   });
 
   // 载入/重载：只在"换了文件"或"磁盘版本真的变了"时重置缓冲区
   useEffect(() => {
     if (file === undefined) return;
     const version = `${path}|${file.mtime}|${file.size}|${file.hash}`;
-    const draftReady = draft !== undefined;
+    // draftReady 必须是"本次挂载后真的取过草稿"，不能只看 draft !== undefined：
+    // 重新挂载时 draft 会先是**缓存的旧值**（常见是 null），那时若判为就绪，
+    // 第一轮就会把 draftApplied 标 true，真正取回草稿的那一轮被 early-return 跳过 →
+    // 编辑器停在磁盘内容、未保存圆点熄灭（实测：后退→前进后草稿内容消失）。
+    const draftReady = draft !== undefined && draftFetchedAfterMount;
     const applied = loadedRef.current;
     const sameVersion = applied !== null && applied.version === version;
-    // 同一版本、且该版本的草稿已经处理过（或草稿还没到位需再等一次）→ 不动缓冲区
-    if (sameVersion && (applied.draftApplied || !draftReady)) return;
+    // 同一版本、草稿还没到位 → 等草稿那一轮再决定
+    if (sameVersion && !draftReady) return;
+    // 同一版本、草稿已处理过 → 完全不动缓冲区（刷新/失效/SSE 重取都走这里）
+    if (sameVersion && applied.draftApplied) return;
     const sameFile = applied !== null && applied.version.slice(0, applied.version.indexOf('|')) === path;
     // 同一文件、磁盘版本变了、且本地有未保存改动 → 只提示，绝不覆盖
     if (sameFile && dirtyRef.current && !forceReload) {
       setExternalChanged(true);
       return;
     }
-    let content = file.content;
-    let restoredDraft = false;
-    if (!forceReload && draft !== null && draft !== undefined && draft.content !== '' && draft.content !== file.content) {
-      content = draft.content;
-      restoredDraft = true;
-      void message.info('已恢复未保存的草稿');
+    const hasDraft =
+      !forceReload && draft !== null && draft !== undefined && draft.content !== '' && draft.content !== file.content;
+    if (sameVersion) {
+      // 磁盘内容已经在编辑器里了，这一轮只为"草稿是否要填进去"服务，不动其它状态
+      if (hasDraft && draft !== null && draft !== undefined) {
+        setValue(draft.content);
+        setDirty(true);
+        setBase({ mtime: file.mtime, size: file.size, hash: file.hash, encoding: file.encoding, eol: file.eol });
+        void message.info('已恢复未保存的草稿');
+      }
+      // draftApplied 如实反映"这一次是否处理过草稿结果"：文件查询通常先于草稿查询返回，
+      // 若第一轮就标 true，草稿到达时会被 early-return 跳过 → "有草稿却不恢复"（违反红线 4）。
+      loadedRef.current = { version, draftApplied: draftReady };
+      return;
     }
-    setValue(content);
+    // 版本变化（换文件 / 磁盘变更且无本地改动）：整块重置
+    setValue(hasDraft && draft !== null && draft !== undefined ? draft.content : file.content);
     setBase({ mtime: file.mtime, size: file.size, hash: file.hash, encoding: file.encoding, eol: file.eol });
-    // 草稿恢复后必须保持"未保存"：原实现无条件 setDirty(false)，把上面 setDirty(true) 盖掉，
-    // 于是恢复了草稿却没有未保存圆点，用户以为已保存。
-    setDirty(restoredDraft);
+    // 草稿恢复后必须保持"未保存"：原实现无条件 setDirty(false)，把草稿的未保存状态盖掉，
+    // 用户会以为已保存（也就不会再按 Ctrl+S）。
+    setDirty(hasDraft);
     setConflict(null);
     setExternalChanged(false);
     setForceReload(false);
-    loadedRef.current = { version, draftApplied: true };
-  }, [file, draft, path, message, forceReload]);
+    if (hasDraft) void message.info('已恢复未保存的草稿');
+    loadedRef.current = { version, draftApplied: draftReady };
+  }, [file, draft, draftFetchedAfterMount, path, message, forceReload]);
 
   // 外部修改检测（fs.changed 已被 SSE 失效 file 缓存 → mtime 变了且本地 clean → 提示）
   useEffect(() => {
