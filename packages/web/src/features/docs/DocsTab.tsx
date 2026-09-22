@@ -24,6 +24,7 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
   const [mode, setMode] = useState<'read' | 'edit'>('read');
   const [mountOpen, setMountOpen] = useState(false);
   const [mountPath, setMountPath] = useState('');
+  const [pickingFile, setPickingFile] = useState(false);
 
   const { data } = useQuery({
     queryKey: ['docs', projectId],
@@ -147,15 +148,65 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
         }
       />
       <Modal title="挂载外部文档（任意文件夹或单文件）" open={mountOpen} onCancel={() => setMountOpen(false)} onOk={() => {
-        void api.post(`/api/projects/${projectId}/mounts`, { path: mountPath }).then(() => {
-          void message.success('已挂载');
-          setMountOpen(false);
-          setMountPath('');
-          void queryClient.invalidateQueries({ queryKey: ['mounts', projectId] });
-          void queryClient.invalidateQueries({ queryKey: ['docs', projectId] });
-        }).catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '挂载失败'));
+        // 支持一次挂载多个路径（每行一个）：系统对话框可多选文件
+        const paths = mountPath.split(/\r?\n/).map((s) => s.trim().replace(/^"|"$/g, '')).filter((s) => s !== '');
+        if (paths.length === 0) {
+          void message.warning('请先填写或选择要挂载的路径');
+          return;
+        }
+        void (async () => {
+          let ok = 0;
+          const failed: string[] = [];
+          for (const p of paths) {
+            try {
+              await api.post(`/api/projects/${projectId}/mounts`, { path: p });
+              ok += 1;
+            } catch (e) {
+              failed.push(`${p}：${e instanceof ApiClientError ? e.message : '挂载失败'}`);
+            }
+          }
+          if (ok > 0) {
+            void message.success(`已挂载 ${ok} 个路径`);
+            setMountOpen(false);
+            setMountPath('');
+            void queryClient.invalidateQueries({ queryKey: ['mounts', projectId] });
+            void queryClient.invalidateQueries({ queryKey: ['docs', projectId] });
+          }
+          for (const f of failed) void message.error(f, 6);
+        })();
       }}>
-        <Input value={mountPath} onChange={(e) => setMountPath(e.target.value)} placeholder="文件夹或 md 文件的绝对路径" />
+        <Space.Compact style={{ width: '100%', marginBottom: 8, display: 'flex' }}>
+          <Input.TextArea
+            rows={2}
+            value={mountPath}
+            onChange={(e) => setMountPath(e.target.value)}
+            placeholder="文件夹或 md 文件的绝对路径（可多行，每行一个）"
+          />
+          <Button
+            loading={pickingFile}
+            onClick={() => {
+              void (async () => {
+                setPickingFile(true);
+                try {
+                  // 对话框由服务端弹出，必须立刻给提示（后台进程弹窗可能被浏览器窗口挡住，Alt+Tab 可找到）
+                  void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
+                  const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-file');
+                  if (r.paths.length > 0) setMountPath((prev) => (prev === '' ? r.paths.join('\n') : `${prev}\n${r.paths.join('\n')}`));
+                  else void message.info('未选择文件');
+                } catch {
+                  void message.error('打开系统对话框失败，请手动粘贴路径');
+                } finally {
+                  setPickingFile(false);
+                }
+              })();
+            }}
+          >
+            选择文件…
+          </Button>
+        </Space.Compact>
+        <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
+          「选择文件…」支持一次多选；选中的会追加到输入框，确认后逐个挂载。也可以直接粘贴路径，每行一个。
+        </p>
       </Modal>
     </div>
   );
