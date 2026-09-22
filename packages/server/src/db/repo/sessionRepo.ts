@@ -102,7 +102,13 @@ function activeSessionId(db: Database.Database): string {
 export function getSession(db: Database.Database): SessionData {
   const sid = activeSessionId(db);
   const tabs = getAll<SessionTabRow>(db, 'SELECT * FROM session_tabs WHERE session_id = ? ORDER BY sort_order', [sid]).map(mapTab);
-  return { tabs, activeTabId: tabs[0]?.id ?? null };
+  // FR-1.4：恢复"上次活动的是哪个标签"。原实现恒取 tabs[0].id，于是刷新后活动标签永远落到
+  // 第一个标签（实测停在项目页刷新 → 跳到「工作台」）。active_tab_id 为 NULL（老库）或指向
+  // 已不存在的标签（该标签在保存前被关掉）时，才回落到第一个标签。
+  const row = getOne<SessionRow>(db, 'SELECT active_tab_id FROM sessions WHERE id = ?', [sid]);
+  const remembered = row?.active_tab_id ?? null;
+  const activeTabId = remembered !== null && tabs.some((t) => t.id === remembered) ? remembered : (tabs[0]?.id ?? null);
+  return { tabs, activeTabId };
 }
 
 export function putSession(db: Database.Database, data: SessionData): void {
@@ -130,7 +136,12 @@ export function putSession(db: Database.Database, data: SessionData): void {
       ]
       );
     }
-    run(db, 'UPDATE sessions SET updated_at = ? WHERE id = ?', [new Date().toISOString(), sid]);
+    run(db, 'UPDATE sessions SET updated_at = ?, active_tab_id = ? WHERE id = ?', [
+      new Date().toISOString(),
+      // 只在"确实指向本次保存的某个标签"时写库，避免存进一个悬空 id
+      data.activeTabId !== null && data.tabs.some((t) => t.id === data.activeTabId) ? data.activeTabId : null,
+      sid
+    ]);
   });
   tx();
 }

@@ -162,6 +162,8 @@ export interface SessionRow {
   is_active: number;
   created_at: string;
   updated_at: string;
+  /** 0002 迁移新增：上次关闭/刷新时处于活动状态的标签 id（老库为 NULL）。 */
+  active_tab_id: string | null;
 }
 
 export interface IgnoreRuleRow {

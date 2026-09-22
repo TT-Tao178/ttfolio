@@ -214,7 +214,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         invalid: null
       };
     });
-    set({ tabs, activeTabId: activeId ?? tabs[0]?.id ?? null });
+    // FR-1.4：恢复"上次活动的标签"。服务端 activeTabId 可能为 null（老库）或指向一个已不存在的
+    // 标签（异常中断保存）——两种都必须回落到第一个标签，绝不能把 activeTabId 设成悬空 id，
+    // 否则恢复后没有任何标签匹配到 → 内容区整片空白。
+    const restoredActive = activeId !== null && tabs.some((t) => t.id === activeId) ? activeId : (tabs[0]?.id ?? null);
+    set({ tabs, activeTabId: restoredActive });
   }
 }));
 

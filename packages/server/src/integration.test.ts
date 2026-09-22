@@ -7,6 +7,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { runMigrations } from './db/migrate.js';
 import { insertProject, getProjectByPathKey, patchProject, softDeleteProject, listProjects } from './db/repo/projectsRepo.js';
+import { getSession, putSession } from './db/repo/sessionRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
@@ -191,6 +192,41 @@ describe('软删除与 rev 乐观锁', () => {
     softDeleteProject(db, row.id);
     expect(getProjectByPathKey(db, pathKey(projDir))).toBeUndefined();
     expect(listProjects(db, { status: 'all' }).find((p) => p.id === row.id)).toBeUndefined();
+  });
+});
+
+describe('会话恢复：活动标签（FR-1.4）', () => {
+  it('PUT 的 activeTabId 被记住，GET 原样返回（不再恒等于第一个标签）', () => {
+    const tabs = [
+      { id: 'tab-a', sortOrder: 0, kind: 'overview', projectId: null, targetPath: null, subTab: null, titleSnapshot: '工作台', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false },
+      { id: 'tab-b', sortOrder: 1, kind: 'project', projectId: 'p1', targetPath: 'src/app/store.ts', subTab: 'files', titleSnapshot: 'demo', scrollJson: null, navHistoryJson: null, navIndex: 1, isPinned: false }
+    ] as never;
+    putSession(db, { tabs, activeTabId: 'tab-b' });
+    const back = getSession(db);
+    expect(back.activeTabId).toBe('tab-b');
+    expect(back.tabs.map((t) => t.id)).toEqual(['tab-a', 'tab-b']);
+    expect(back.tabs[1]?.targetPath).toBe('src/app/store.ts');
+  });
+
+  it('activeTabId 悬空（指向已关闭的标签）时回落到第一个标签而不是返回悬空 id', () => {
+    const tabs = [
+      { id: 'tab-x', sortOrder: 0, kind: 'overview', projectId: null, targetPath: null, subTab: null, titleSnapshot: '工作台', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false }
+    ] as never;
+    putSession(db, { tabs, activeTabId: 'tab-gone' });
+    expect(getSession(db).activeTabId).toBe('tab-x');
+  });
+
+  it('activeTabId 为 null（老库补列后的情形）时回落到第一个标签', () => {
+    const tabs = [
+      { id: 'tab-y', sortOrder: 0, kind: 'settings', projectId: null, targetPath: null, subTab: null, titleSnapshot: '设置', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false }
+    ] as never;
+    putSession(db, { tabs, activeTabId: null });
+    expect(getSession(db).activeTabId).toBe('tab-y');
+  });
+
+  it('保存空标签集合后 GET 返回空会话（activeTabId 为 null，不抛错）', () => {
+    putSession(db, { tabs: [], activeTabId: null });
+    expect(getSession(db)).toEqual({ tabs: [], activeTabId: null });
   });
 });
 

@@ -276,11 +276,15 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               }}
               onSelect={(keys) => {
                 const key = keys[0];
-                if (typeof key !== 'string') return;
-                const kind = findKind(treeData, key);
-                setSelectedPath(key);
-                // 只有文件才进编辑器；目录只选中（否则编辑器会去读目录 → EISDIR）
-                if (kind === 'file') useAppStore.getState().updateActiveLocation({ targetPath: key }, true);
+                // 点已选中的节点时 rc-tree 会"反选"，keys 为空数组 → key 不是 string。
+                // 原实现在这里直接 return，于是"后退回到未打开文件 → 再点同一个文件"没有任何反应
+                // （选中态还在、编辑器却不再打开），必须改点别的文件才能恢复。
+                // 现在改为读当前选中态：反选语义只作用于目录（清掉选中高亮），文件仍然照常打开。
+                const resolved = typeof key === 'string' ? key : selectedPath;
+                if (resolved === null) return;
+                const kind = findKind(treeData, resolved);
+                if (kind === 'file') useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
+                setSelectedPath(kind === 'file' ? resolved : (typeof key === 'string' ? key : null));
               }}
             />
           )}
