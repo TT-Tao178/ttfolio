@@ -11,9 +11,6 @@ import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
 
-/** 前五张分组卡（外观/数据源/集合/忽略规则/命令模板）统一卡体高度：
- *  内容少的不显松散、内容多的内部滚动，五张卡视觉上完全等大。 */
-const UNIFORM_BODY = { height: 320, overflowY: 'auto' } as const;
 
 /**
  * 默认架构图目录名输入：改为**受控 + 跟服务端值同步**。
@@ -48,9 +45,9 @@ function ArchDirInput({ value, onCommit }: { value: string; onCommit: (v: string
  * 分组锚点：侧栏「设置」域点某分组后按 id 滚动到对应卡片。
  * 锚点 div 必须是栅格的直接子元素（包裹卡片），否则滚动定位会落到栅格外。
  */
-function SectionAnchor({ id, full = false, children }: { id: string; full?: boolean; children: React.ReactNode }): React.JSX.Element {
+function SectionAnchor({ id, children }: { id: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <div id={sectionDomId(id)} style={{ scrollMarginTop: 8, minWidth: 0, ...(full ? { gridColumn: '1 / -1' } : {}) }}>
+    <div id={sectionDomId(id)} style={{ scrollMarginTop: 8, minWidth: 0 }}>
       {children}
     </div>
   );
@@ -106,15 +103,15 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
 
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+          display: 'flex',
+          flexDirection: 'column',
           gap: 12,
-          alignItems: 'start',
+          alignItems: 'stretch',
           marginTop: 12
         }}
       >
         <SectionAnchor id="appearance">
-          <Card size="small" title={sectionTitle('appearance')} styles={{ body: UNIFORM_BODY }}>
+          <Card size="small" title={sectionTitle('appearance')}>
             <Form layout="inline" labelWrap>
               <Form.Item label="主题">
                 <Segmented
@@ -142,7 +139,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="datasource">
-          <Card size="small" title={sectionTitle('datasource')} styles={{ body: UNIFORM_BODY }}>
+          <Card size="small" title={sectionTitle('datasource')}>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="文档根">
                 {(docRoots ?? []).length === 0 ? '未配置' : ''}
@@ -170,13 +167,13 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="collections">
-          <Card size="small" title={sectionTitle('collections')} styles={{ body: UNIFORM_BODY }}>
+          <Card size="small" title={sectionTitle('collections')}>
             <CollectionsCard collections={collections ?? []} name={collectionName} setName={setCollectionName} onChange={invalidate} />
           </Card>
         </SectionAnchor>
 
         <SectionAnchor id="ignore">
-          <Card size="small" title={sectionTitle('ignore')} styles={{ body: UNIFORM_BODY }}>
+          <Card size="small" title={sectionTitle('ignore')}>
             <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
               <Input value={newRule} onChange={(e) => setNewRule(e.target.value)} placeholder="新增规则，如 *.bak 或 temp-dir" />
               <Button type="primary" onClick={() => {
@@ -202,7 +199,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="templates">
-          <Card size="small" title={sectionTitle('templates')} styles={{ body: UNIFORM_BODY }}>
+          <Card size="small" title={sectionTitle('templates')}>
             <List
               size="small"
               dataSource={templates ?? []}
@@ -242,7 +239,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
           </Card>
         </SectionAnchor>
 
-        <SectionAnchor id="data" full>
+        <SectionAnchor id="data">
           <Card size="small" title={sectionTitle('data')}>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="索引库">{stats?.dbPath ?? '—'}（{fmtBytes(stats?.dbSize ?? 0)}）</Descriptions.Item>
@@ -314,7 +311,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
           </Card>
         </SectionAnchor>
 
-        <SectionAnchor id="about" full>
+        <SectionAnchor id="about">
           <Card size="small" title={sectionTitle('about')}>
             <Alert
               type="info"
