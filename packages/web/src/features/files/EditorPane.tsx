@@ -117,13 +117,9 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
     loadedRef.current = { version, draftApplied: draftReady };
   }, [file, draft, draftFetchedAfterMount, path, message, forceReload]);
 
-  // 外部修改检测（fs.changed 已被 SSE 失效 file 缓存 → mtime 变了且本地 clean → 提示）
-  useEffect(() => {
-    if (file === undefined || base === null) return;
-    if (file.mtime !== base.mtime && !dirty && !saving) {
-      setExternalChanged(true);
-    }
-  }, [file, base, dirty, saving]);
+  // 「外部修改」警告只在本地有未保存改动时出现（上面载入 effect 的 sameFile && dirty 分支）：
+  // 干净状态下磁盘变了会由载入 effect 静默整块重载（无内容可丢），不再弹警告——
+  // 用户反馈"打开文件就提示被外部修改"造成困扰；保存冲突仍由后端 409 → 三选一弹窗兜底。
 
   const save = useCallback(
     async (force: boolean): Promise<void> => {
