@@ -11,6 +11,10 @@ import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
 
+/** 前五张分组卡（外观/数据源/集合/忽略规则/命令模板）统一卡体高度：
+ *  内容少的不显松散、内容多的内部滚动，五张卡视觉上完全等大。 */
+const UNIFORM_BODY = { height: 320, overflowY: 'auto' } as const;
+
 /**
  * 默认架构图目录名输入：改为**受控 + 跟服务端值同步**。
  * 原先用 defaultValue：只在挂载时读一次，而设置是异步到达的（先给 DEFAULT_SETTINGS 占位），
@@ -110,7 +114,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         }}
       >
         <SectionAnchor id="appearance">
-          <Card size="small" title={sectionTitle('appearance')}>
+          <Card size="small" title={sectionTitle('appearance')} styles={{ body: UNIFORM_BODY }}>
             <Form layout="inline" labelWrap>
               <Form.Item label="主题">
                 <Segmented
@@ -138,7 +142,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="datasource">
-          <Card size="small" title={sectionTitle('datasource')}>
+          <Card size="small" title={sectionTitle('datasource')} styles={{ body: UNIFORM_BODY }}>
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="文档根">
                 {(docRoots ?? []).length === 0 ? '未配置' : ''}
@@ -158,7 +162,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
               <Descriptions.Item label="默认架构图目录名">
                 <ArchDirInput value={settings.defaultArchDirName} onCommit={(v) => setSetting('defaultArchDirName', v)} />
               </Descriptions.Item>
-              <Descriptions.Item label="扫描根目录（FR-12.6 预留，不实现自动扫描）">
+              <Descriptions.Item label="扫描根目录（预留，不实现自动扫描）">
                 <Input size="small" disabled placeholder="当前版本只支持手动添加项目" style={{ width: 300 }} />
               </Descriptions.Item>
             </Descriptions>
@@ -166,13 +170,13 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="collections">
-          <Card size="small" title={sectionTitle('collections')}>
+          <Card size="small" title={sectionTitle('collections')} styles={{ body: UNIFORM_BODY }}>
             <CollectionsCard collections={collections ?? []} name={collectionName} setName={setCollectionName} onChange={invalidate} />
           </Card>
         </SectionAnchor>
 
         <SectionAnchor id="ignore">
-          <Card size="small" title={sectionTitle('ignore')}>
+          <Card size="small" title={sectionTitle('ignore')} styles={{ body: UNIFORM_BODY }}>
             <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
               <Input value={newRule} onChange={(e) => setNewRule(e.target.value)} placeholder="新增规则，如 *.bak 或 temp-dir" />
               <Button type="primary" onClick={() => {
@@ -198,7 +202,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </SectionAnchor>
 
         <SectionAnchor id="templates">
-          <Card size="small" title={sectionTitle('templates')}>
+          <Card size="small" title={sectionTitle('templates')} styles={{ body: UNIFORM_BODY }}>
             <List
               size="small"
               dataSource={templates ?? []}
@@ -352,7 +356,7 @@ function CollectionsCard({ collections, name, setName, onChange }: {
           {c.name}（{c.memberCount}）
         </Tag>
       ))}
-      <p style={{ fontSize: 12, opacity: 0.6 }}>集合预留「多根打开」能力（FR-12.3），当前仅作分组。</p>
+      <p style={{ fontSize: 12, opacity: 0.6 }}>集合预留「多根打开」能力，当前仅作分组。</p>
     </div>
   );
 }
