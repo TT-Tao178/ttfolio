@@ -76,6 +76,12 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* 起了别名时同时展示原名（用户要求：别名与原始名都要能看到）；无别名时不重复显示 */}
+        {p.alias !== null && (
+          <div className="tt-ellipsis" style={{ fontSize: 12, opacity: 0.75 }}>
+            原名 <span className="tt-mono">{p.diskName}</span>
+          </div>
+        )}
         <LanguageBar languages={p.languages} />
         <div style={{ fontSize: 12, opacity: 0.75 }}>
           {p.primaryLanguage ?? '未分析'}

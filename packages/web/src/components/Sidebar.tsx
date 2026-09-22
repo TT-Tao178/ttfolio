@@ -70,9 +70,17 @@ export function Sidebar(): React.JSX.Element {
 
   const projectItems = (projects ?? []).slice(0, 30).map((p) => ({
     key: `proj:${p.id}:files`,
+    // 用户要求：起了别名时别名与原始名都要看到 → 两行展示（上=别名，下=原名）；无别名只显示原名
     label: (
-      <span className="tt-ellipsis" style={{ display: 'inline-block', maxWidth: 180 }}>
-        {p.alias !== null ? `${p.alias}（别名）` : p.diskName}
+      <span style={{ display: 'inline-block', maxWidth: 190, lineHeight: 1.3, verticalAlign: 'middle' }}>
+        {p.alias !== null ? (
+          <>
+            <span className="tt-ellipsis" style={{ display: 'block' }}>{p.alias}</span>
+            <span className="tt-ellipsis tt-mono" style={{ display: 'block', fontSize: 11, opacity: 0.6 }}>{p.diskName}</span>
+          </>
+        ) : (
+          <span className="tt-ellipsis" style={{ display: 'block' }}>{p.diskName}</span>
+        )}
       </span>
     )
   }));
