@@ -53,6 +53,14 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
       .map(({ l, i }) => ({ level: (l.match(/^#+/) ?? ['#'])[0].length, text: l.replace(/^#+\s*/, ''), line: i }));
   }, [content.data]);
 
+  // 大纲跳转：大纲条目按内容顺序生成，与渲染出的 h1-h4 的 DOM 顺序一一对应，
+  // 按索引取标题元素 scrollIntoView（由预览滚动容器承接）
+  const previewRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollToHeading = (index: number): void => {
+    const headings = previewRef.current?.querySelectorAll('.tt-md h1, .tt-md h2, .tt-md h3, .tt-md h4');
+    headings?.[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const saveDoc = useMutation({
     mutationFn: (body: unknown) => api.put('/api/docs/content', body),
     onSuccess: () => {
@@ -128,7 +136,14 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
             {outline.length > 0 && (
               <Tree
                 style={{ marginBottom: 6, maxHeight: 140, overflow: 'auto' }}
-                treeData={outline.map((o) => ({ key: o.line, title: `${'　'.repeat(o.level - 1)}${o.text}` }))}
+                treeData={outline.map((o, i) => ({
+                  key: `${o.line}`,
+                  title: (
+                    <span style={{ cursor: 'pointer' }} onClick={() => scrollToHeading(i)}>
+                      {'　'.repeat(o.level - 1)}{o.text}
+                    </span>
+                  )
+                }))}
                 defaultExpandedKeys={[]}
                 selectable={false}
               />
@@ -136,7 +151,7 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
             {content.isLoading ? (
               <Spin style={{ margin: '48px auto', display: 'block' }} />
             ) : mode === 'read' ? (
-              <div style={{ flex: 1, overflow: 'auto', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 16 }}>
+              <div ref={previewRef} style={{ flex: 1, overflow: 'auto', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 16 }}>
                 <MarkdownPreview content={content.data?.content ?? ''} projectId={projectId} mountId={selected.mountId} basePath={selected.path} />
               </div>
             ) : (
