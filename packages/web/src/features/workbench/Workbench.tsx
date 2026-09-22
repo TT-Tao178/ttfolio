@@ -18,6 +18,9 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { SEMANTIC } from '@/theme/tokens';
 
+/** 已消费过的「添加项目」信号值：跨挂载保留，避免重新挂载时重复弹窗。 */
+let lastAddNonce = 0;
+
 export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Element {
   const [view, setView] = useState<'card' | 'table'>('card');
   const [q, setQ] = useState('');
@@ -26,10 +29,14 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const queryClient = useQueryClient();
   const { message } = App.useApp();
 
-  // 顶栏「＋导入」信号：nonce 变化即打开添加项目弹窗（顶栏与工作台解耦）
+  // 顶栏/总览「添加项目」信号：nonce 变化即打开弹窗（模块级 lastAddNonce 保证"只消费一次"——
+  // 若用组件内 ref，切到项目页再回总览会因 nonce 仍 >0 而弹出上次的弹窗）。
   const addProjectNonce = useAppStore((s) => s.addProjectNonce);
   useEffect(() => {
-    if (addProjectNonce > 0) setAddOpen(true);
+    if (addProjectNonce > lastAddNonce) {
+      lastAddNonce = addProjectNonce;
+      setAddOpen(true);
+    }
   }, [addProjectNonce]);
 
   const pinnedOnly = subTab === 'view:pinned';
@@ -220,7 +227,14 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   const add = useMutation({
     mutationFn: (body: unknown) => api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>('/api/projects', body),
     onSuccess: (r) => {
-      if (r.added.length > 0) void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
+      if (r.added.length > 0) {
+        void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
+        // 登记成功后切到卡片墙：否则停在总览屏看不到刚登记的项目（"添加了但没反应"）。
+        const st = useAppStore.getState();
+        const cur = st.tabs.find((t) => t.id === st.activeTabId);
+        if (cur?.kind === 'overview') st.updateActiveLocation({ subTab: 'view:all' }, true);
+        else st.openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 }, '工作台');
+      }
       for (const s of r.skipped) void message.warning(`跳过 ${s.path}：${s.reason}`);
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
       onClose();

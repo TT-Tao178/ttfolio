@@ -2,7 +2,8 @@
  * 工作台总览（对齐原型 3.1：6 个 KPI + 最近打开 + 需要处理 + 跨项目清单汇总）。
  * 与「项目卡片墙」是两个屏：卡片墙是筛选/浏览项目，本屏回答"哪里需要我"。
  */
-import { Button, Card, Empty, List, Statistic, Tag } from 'antd';
+import { Button, Card, Empty, List, Statistic, Tag, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { api } from '@/lib/api';
@@ -61,6 +62,21 @@ export function Dashboard(): React.JSX.Element {
 
   return (
     <div style={{ overflow: 'auto', height: '100%', paddingRight: 4 }} data-testid="dashboard">
+      {/* 总览屏也必须能直接添加项目：原先入口只在卡片墙分支里，默认落总览时"找不到添加入口" */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <Typography.Title level={4} style={{ margin: 0 }}>
+          工作台总览
+        </Typography.Title>
+        <div style={{ flex: 1 }} />
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          data-testid="add-project-btn"
+          onClick={() => useAppStore.getState().requestAddProject()}
+        >
+          添加项目
+        </Button>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         <Card size="small">
           <Statistic title="项目总数" value={list.length} loading={isLoading} />
