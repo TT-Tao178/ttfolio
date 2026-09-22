@@ -44,6 +44,10 @@ export default defineConfig(() => {
       alias: { '@': path.resolve(__dirname, 'src') }
     },
     server: {
+      // 显式绑 IPv4 环回：Vite 默认 host='localhost' 在本机只监听 ::1，
+      // 用户手输 http://127.0.0.1:5173 会"连不上"（localhost 与 127.0.0.1 两种写法都要能用）。
+      // 仍只绑环回，不放 0.0.0.0，符合 C-09 的本地可达边界。
+      host: '127.0.0.1',
       port: 5173,
       proxy: {
         '/api': {

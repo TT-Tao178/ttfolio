@@ -43,6 +43,7 @@
 ## 最近提交（git log --oneline -10 的输出）
 
 ```
+f33a8a1 docs(progress): 补齐第十轮修复台账、决策与变更记录
 ccaaeb9 fix(web): 总览屏补添加项目入口与登记后跳转；e2e 强制先构建
 bb0d7f5 feat(web): 对齐 AntD 原型（搜索 pill / 项目页五页签 / 工作台 KPI 看板）+ 裸色值令牌化
 7239692 fix(server,web): 修复"导入后点不开"的 4 类根因 + 错误响应契约 + 移除登记后无法重新登记
