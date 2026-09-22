@@ -1,5 +1,5 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
-import { Avatar, Button, Space, Tooltip, App as AntdApp } from 'antd';
+import { Avatar, Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
 import { PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -19,10 +19,37 @@ import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
-import { GitOverview } from '@/features/git/GitTab';
+import { GitOverview, GitTab } from '@/features/git/GitTab';
+import { CommitView } from '@/features/git/CommitView';
 import { api } from '@/lib/api';
 import { SEMANTIC } from '@/theme/tokens';
 import type { HealthInfo, SessionData } from '@ttfolio/shared';
+
+/** 内容区错误边界：某个视图渲染崩溃时只降级本面板并给出提示，绝不卸载整棵应用树。 */
+class PaneErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  override state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error };
+  }
+  override render(): React.ReactNode {
+    if (this.state.error !== null) {
+      return (
+        <Alert
+          type="error"
+          style={{ margin: 16 }}
+          message="这个视图渲染出错"
+          description={this.state.error.message}
+          action={
+            <Button size="small" onClick={() => this.setState({ error: null })}>
+              重试
+            </Button>
+          }
+        />
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function Shell(): React.JSX.Element {
   const { tabs, activeTabId, openTab, closeTab, paletteOpen, setPalette, updateActiveLocation } = useAppStore();
@@ -190,6 +217,7 @@ function Shell(): React.JSX.Element {
                 testId="split-detail"
                 left={
                   <div style={{ height: '100%', minWidth: 0, background: SEMANTIC.layoutBg, overflow: 'hidden' }}>
+                    <PaneErrorBoundary>
                     {activeTab === null ? (
                       <div />
                     ) : activeTab.kind === 'overview' ? (
@@ -200,11 +228,19 @@ function Shell(): React.JSX.Element {
                       <TrashPage />
                     ) : activeTab.kind === 'settings' ? (
                       <SettingsPage anchor={activeTab.subTab} />
+                    ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (
+                      // 提交历史点开的独立 git 标签：原先没有渲染分支 → 整页空白（用户报障）
+                      activeTab.subTab === 'commit' && activeTab.targetPath !== null ? (
+                        <CommitView projectId={activeTab.projectId} hash={activeTab.targetPath} />
+                      ) : (
+                        <GitTab projectId={activeTab.projectId} />
+                      )
                     ) : activeTab.subTab === 'git-overview' ? (
                       <GitOverview />
                     ) : (
                       <div />
                     )}
+                    </PaneErrorBoundary>
                   </div>
                 }
                 right={
