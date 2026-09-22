@@ -70,6 +70,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
       <Form layout="inline" labelWrap>
         <Form.Item label="主题">
           <Segmented
+            data-testid="set-theme"
             value={settings.theme}
             onChange={(v) => setSetting('theme', v)}
             options={[{ label: '浅色（默认）', value: 'light' }, { label: '深色', value: 'dark' }, { label: '跟随系统', value: 'system' }]}
@@ -77,13 +78,14 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         </Form.Item>
         <Form.Item label="密度">
           <Segmented
+            data-testid="set-density"
             value={settings.density}
             onChange={(v) => setSetting('density', v)}
             options={[{ label: '紧凑', value: 'small' }, { label: '标准', value: 'middle' }, { label: '舒适', value: 'large' }]}
           />
         </Form.Item>
         <Form.Item label="项目页默认落点">
-          <Select value={settings.defaultProjectTab} onChange={(v) => setSetting('defaultProjectTab', v)} style={{ width: 120 }}
+          <Select data-testid="set-default-tab" value={settings.defaultProjectTab} onChange={(v) => setSetting('defaultProjectTab', v)} style={{ width: 120 }}
             options={[{ value: 'files', label: '文件' }, { value: 'overview', label: '概览' }]} />
         </Form.Item>
       </Form>
@@ -163,12 +165,16 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
 
       <SectionDivider id="watch" />
       <Form layout="inline">
-        <Form.Item label="启用监听"><Switch checked={settings.watchEnabled} onChange={(v) => setSetting('watchEnabled', v)} /></Form.Item>
+        <Form.Item label="启用监听">
+          {/* AntD 的 Switch / InputNumber 不透传 data-testid，故用一层 span 承载，便于自动化定位
+              （此前用 .ant-switch 下标定位，撞上前面 51 条忽略规则的开关，点错了目标） */}
+          <span data-testid="set-watch"><Switch checked={settings.watchEnabled} onChange={(v) => setSetting('watchEnabled', v)} /></span>
+        </Form.Item>
         <Form.Item label="写入稳定窗口 (ms)">
-          <InputNumber value={settings.watchStabilityMs} min={100} max={3000} step={100} onChange={(v) => setSetting('watchStabilityMs', v)} />
+          <span data-testid="set-watch-stability"><InputNumber value={settings.watchStabilityMs} min={100} max={3000} step={100} onChange={(v) => setSetting('watchStabilityMs', v)} /></span>
         </Form.Item>
         <Form.Item label="自动保存（防抖 2s，默认关）">
-          <Switch checked={settings.autoSave} onChange={(v) => setSetting('autoSave', v)} />
+          <span data-testid="set-autosave"><Switch checked={settings.autoSave} onChange={(v) => setSetting('autoSave', v)} /></span>
         </Form.Item>
       </Form>
 
