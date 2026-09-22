@@ -20,6 +20,41 @@ export function PathBar(): React.JSX.Element {
 
   const crumbs = buildCrumbs(tab);
 
+  // 前进/后退的"历史下拉"：让用户直接看到会退/进到哪里（用户反馈纯按钮"莫名其妙"）。
+  // 选中即跳到该历史点（navigate 的 delta = 目标下标 - 当前下标）。
+  const historyMenu = (dir: 'back' | 'forward') => {
+    if (tab === null) return { items: [] };
+    const hist = tab.history;
+    const cur = tab.historyIndex;
+    const idxs: number[] = [];
+    if (dir === 'back') for (let i = cur; i >= 0 && i > cur - 15; i--) idxs.push(i);
+    else for (let i = cur; i < hist.length && i < cur + 15; i++) idxs.push(i);
+    return {
+      items: idxs.flatMap((i) => {
+        const loc = hist[i];
+        if (loc === undefined) return [];
+        const isCurrent = i === cur;
+        return [{
+          key: String(i),
+          label: `${isCurrent ? '● 当前：' : ''}${locSummary(loc, tabs)}`,
+          disabled: isCurrent
+        }];
+      }),
+      onClick: (e: { key: string }) => {
+        const target = Number(e.key);
+        if (!Number.isNaN(target)) navigate(target - cur);
+      }
+    };
+  };
+  const neighborSummary = (dir: 'back' | 'forward'): string | null => {
+    if (tab === null) return null;
+    const idx = dir === 'back' ? tab.historyIndex - 1 : tab.historyIndex + 1;
+    const loc = tab.history[idx];
+    return loc === undefined ? null : locSummary(loc, tabs);
+  };
+  const backTarget = neighborSummary('back');
+  const forwardTarget = neighborSummary('forward');
+
   const themeMenu = {
     items: [
       { key: 'light', label: '浅色（默认）' },
@@ -44,12 +79,16 @@ export function PathBar(): React.JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
       <Space.Compact>
-        <Tooltip title={nav.back ? '后退 (Alt+←)' : '没有可后退的历史'}>
-          <Button size="small" type="text" icon={<ArrowLeftOutlined />} disabled={!nav.back} onClick={() => navigate(-1)} data-testid="nav-back" />
-        </Tooltip>
-        <Tooltip title={nav.forward ? '前进 (Alt+→)' : '没有可前进的历史'}>
-          <Button size="small" type="text" icon={<ArrowRightOutlined />} disabled={!nav.forward} onClick={() => navigate(1)} data-testid="nav-forward" />
-        </Tooltip>
+        <Dropdown menu={historyMenu('back')} trigger={['click']} placement="bottomLeft">
+          <Tooltip title={backTarget !== null ? `后退到：${backTarget}` : '没有可后退的历史'}>
+            <Button size="small" type="text" icon={<ArrowLeftOutlined />} disabled={!nav.back} onClick={() => navigate(-1)} data-testid="nav-back" />
+          </Tooltip>
+        </Dropdown>
+        <Dropdown menu={historyMenu('forward')} trigger={['click']} placement="bottomLeft">
+          <Tooltip title={forwardTarget !== null ? `前进到：${forwardTarget}` : '没有可前进的历史'}>
+            <Button size="small" type="text" icon={<ArrowRightOutlined />} disabled={!nav.forward} onClick={() => navigate(1)} data-testid="nav-forward" />
+          </Tooltip>
+        </Dropdown>
         <Tooltip title="刷新视图（重读磁盘内容，不影响未保存的编辑）">
           <Button
             size="small"
@@ -155,4 +194,23 @@ function subTabLabel(sub: string): string {
     case 'docs': return '文档';
     default: return sub;
   }
+}
+
+/** 历史下拉里的一条位置摘要：让"后退/前进会去哪"一目了然。 */
+function locSummary(loc: TabLocation, tabs: Tab[]): string {
+  if (loc.kind === 'overview') {
+    return loc.subTab === null || loc.subTab === '' ? '工作台总览' : `工作台 · ${loc.subTab}`;
+  }
+  if (loc.kind === 'settings') return '设置';
+  if (loc.kind === 'trash') return '回收站';
+  if (loc.kind === 'git' && loc.projectId !== null) {
+    const name = tabs.find((t) => t.kind === 'project' && t.projectId === loc.projectId)?.title ?? '项目';
+    return `${name} · ${loc.subTab === 'commit' ? `提交 ${loc.targetPath ?? ''}` : 'Git'}`;
+  }
+  if (loc.kind === 'project' && loc.projectId !== null) {
+    const name = tabs.find((t) => t.kind === 'project' && t.projectId === loc.projectId)?.title ?? '项目';
+    const seg = loc.targetPath !== null && loc.targetPath !== '' ? ` · ${loc.targetPath}` : '';
+    return `${name} · ${subTabLabel(loc.subTab ?? 'files')}${seg}`;
+  }
+  return loc.targetPath ?? loc.kind;
 }
