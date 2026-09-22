@@ -20,6 +20,14 @@ export interface SettingsShape {
   docRootBlacklist: string[];
   keybindings: Record<string, string>;
   scanRootDirs: unknown[];
+  /** 可拖拽面板尺寸（见 hooks/usePaneSize.ts） */
+  uiLayout: {
+    sidebarWidth?: number;
+    detailWidth?: number;
+    treeWidth?: number;
+    gitListWidth?: number;
+    docsListWidth?: number;
+  };
 }
 
 export const DEFAULT_SETTINGS: SettingsShape = {
@@ -35,7 +43,8 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   defaultProjectTab: 'files',
   docRootBlacklist: [],
   keybindings: {},
-  scanRootDirs: []
+  scanRootDirs: [],
+  uiLayout: {}
 };
 
 interface SettingsCtx {
@@ -52,7 +61,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   const { data } = useQuery({
     queryKey: ['settings'],
     queryFn: () => api.get<Partial<SettingsShape>>('/api/settings'),
-    initialData: DEFAULT_SETTINGS
+    // 必须用 placeholderData 而不是 initialData：initialData 会把 dataUpdatedAt 记为「现在」，
+    // 叠加全局 staleTime=15000 后 react-query 认为数据是新鲜的 → 根本不发 GET /api/settings
+    // （实测：启动后只有 /api/health，服务端设置永远读不到，界面一直跑默认值）。
+    placeholderData: DEFAULT_SETTINGS
   });
   const settings: SettingsShape = { ...DEFAULT_SETTINGS, ...data };
   const [dark, setDark] = React.useState(false);
