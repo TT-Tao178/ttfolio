@@ -1,0 +1,36 @@
+# electron-builder 配置（NSIS 安装包，Windows x64）
+# 关键决策见 DECISIONS 2026-09-22 桌面版条目：
+#  - 数据目录在 %APPDATA%\ttFolio，卸载默认**不删数据**（索引库/备份/回收站都在那）
+#  - NSIS Unicode 安装器 + 允许改安装目录 → 中文安装路径/中文用户名均可用
+#  - better-sqlite3 以 electron ABI 预编译产物分发（asar 外置，native 模块不能进 asar）
+appId: com.tttao.ttfolio
+productName: TT项目管理工作台
+copyright: Copyright © 2026
+directories:
+  output: dist-electron
+  buildResources: electron/build
+extraMetadata:
+  main: electron/main.cjs
+files:
+  - electron/**/*
+  - app/**/*
+  - packages/server/src/migrations/*.sql
+  - package.json
+  - node_modules/better-sqlite3/**/*
+  - node_modules/bindings/**/*
+  - node_modules/file-uri-to-path/**/*
+asarUnpack:
+  - node_modules/better-sqlite3/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  unicode: true
+  artifactName: TT项目管理工作台-Setup-${version}.${ext}
+  shortcutName: TT项目管理工作台

@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 export function migrationsDir(): string {
-  // 迁移文件与源码同仓发布，路径基于本文件位置
+  // 打包版（esbuild cjs 产物）里 import.meta.url 不存在 → 由 Electron 主进程注入
+  // TTFOLIO_MIGRATIONS_DIR；dev/tsx 下走本文件相对定位。
+  if (process.env['TTFOLIO_MIGRATIONS_DIR'] !== undefined && process.env['TTFOLIO_MIGRATIONS_DIR'] !== '') {
+    return process.env['TTFOLIO_MIGRATIONS_DIR'];
+  }
   const here = dirname(fileURLToPath(import.meta.url));
   return join(here, '..', 'migrations');
 }

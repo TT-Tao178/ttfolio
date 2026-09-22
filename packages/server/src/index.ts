@@ -23,6 +23,12 @@ import { SETTING_KEYS } from '@ttfolio/shared';
 const version = '0.1.0';
 const startedAt = Date.now();
 
+/** 真正的 SQLite 库损坏（才会走"改名自愈"）；native 模块加载失败等启动期错误不算。 */
+function isRealDbCorruption(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /file is not a database|database disk image is malformed|file is encrypted or is not a database|unsupported file format/i.test(msg);
+}
+
 async function main(): Promise<void> {
   const dataDir = resolveDataDir();
   const layout = ensureDataDirs(dataDir);
@@ -30,6 +36,9 @@ async function main(): Promise<void> {
   logger.info({ mod: 'boot', msg: `ttFolio starting, dataDir=${dataDir}` });
 
   // ---- 库：自愈 → 打开 → 迁移 ----
+  // 自愈条件收窄（实测教训）：只有 SQLite 报"文件不是库/镜像损坏"才允许改名另存。
+  // 之前任何 open 失败都会触发改名——native 模块 ABI 不匹配这种**与库无关**的失败
+  // 会把真实索引库改名走，数据像凭空消失（本轮已在用户机上出现过一次，已恢复）。
   const store = new LibraryStore({ id: 'default', dbFile: layout.dbFile });
   let db;
   try {
@@ -40,6 +49,10 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     logger.error({ mod: 'boot', msg: `库打开失败：${err instanceof Error ? err.message : String(err)}` });
+    if (!isRealDbCorruption(err)) {
+      process.stdout.write(`索引库打开失败，但不是库损坏，服务退出且未触碰库文件：${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
     // 损坏自愈：坏库另存，新建空库（登记与索引丢失，项目文件不受影响）
     const broken = `${layout.dbFile}.corrupted-${Date.now()}`;
     try {

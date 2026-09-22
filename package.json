@@ -20,17 +20,22 @@
     "test:e2e": "playwright test",
     "migrate": "node scripts/migrate.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "dist:win": "npm run build && npm run build:server && electron-builder --win nsis"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "@playwright/test": "^1.48.0",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.3.2",
-    "@playwright/test": "^1.48.0",
     "autoprefixer": "^10.4.20",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.37.1",
@@ -42,5 +47,9 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.8",
     "vitest": "^2.1.2"
-  }
+  },
+  "allowScripts": {
+    "electron@44.4.3": true
+  },
+  "main": "electron/main.cjs"
 }

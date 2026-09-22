@@ -5,6 +5,32 @@
 import { runCommand } from './exec.js';
 
 /**
+ * Electron 桥：打包版里服务端跑在 Electron 主进程内，弹窗走系统原生
+ * dialog.showOpenDialog（主进程起了一个带 token 的 127.0.0.1 HTTP 桥）。
+ * 为什么：spawn PowerShell + WinForms 是杀软/EDR 最敏感的组合，安装版误报率高；
+ * 桥接后既消掉误报面，交互也更原生。Web 开发模式未设桥环境变量 → 仍走下面的
+ * PowerShell 分支，两套并存互不影响。
+ */
+async function bridgeDialog(kind: 'folder' | 'file'): Promise<string[] | null> {
+  const url = process.env['TTFOLIO_DIALOG_BRIDGE_URL'];
+  const token = process.env['TTFOLIO_DIALOG_BRIDGE_TOKEN'];
+  if (url === undefined || url === '' || token === undefined || token === '') return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ttfolio-bridge': token },
+      body: JSON.stringify({ kind }),
+      signal: AbortSignal.timeout(300000)
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { paths?: unknown };
+    return Array.isArray(j.paths) ? (j.paths as string[]) : [];
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 前台焦点尽力修复：服务进程是后台进程，直接 ShowDialog() 的对话框没有前台激活权限，
  * Windows 会把它压到活动窗口（浏览器）后面且不闪任务栏——用户看到"点了没反应"。
  * 教科书修法是 AttachThreadInput 临时附加到当前前台线程后 SetForegroundWindow(owner)，
@@ -59,6 +85,8 @@ const PS_FILE = [
 ].join('\n');
 
 export async function pickFolder(timeoutMs = 300000): Promise<string[]> {
+  const bridged = await bridgeDialog('folder');
+  if (bridged !== null) return bridged;
   if (process.platform === 'win32') {
     const r = await runCommand('powershell', ['-NoProfile', '-STA', '-Command', PS_FOLDER_FIXED], { timeoutMs });
     return parseLines(r.stdout);
@@ -76,6 +104,8 @@ export async function pickFolder(timeoutMs = 300000): Promise<string[]> {
 }
 
 export async function pickFile(timeoutMs = 300000): Promise<string[]> {
+  const bridged = await bridgeDialog('file');
+  if (bridged !== null) return bridged;
   if (process.platform === 'win32') {
     const r = await runCommand('powershell', ['-NoProfile', '-STA', '-Command', PS_FILE], { timeoutMs });
     return parseLines(r.stdout);
