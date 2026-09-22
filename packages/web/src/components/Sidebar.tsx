@@ -42,15 +42,10 @@ export function Sidebar(): React.JSX.Element {
   let selected: string = '';
 
   if (domain === 'projects') {
+    // 用户要求移除「已固定/有未提交改动/缺文档/缺架构图/未分析/30 天没打开/已归档」侧栏项。
+    // 这些"我的视图"本身仍保留：工作台总览的「需要处理」卡片会直接跳到对应卡片墙（viewTitle 映射保留）。
     items.push({ key: 'view:all', label: '工作台总览' });
     items.push({ key: 'view:recent', label: '最近打开' });
-    items.push({ key: 'view:pinned', label: '已固定' });
-    items.push({ key: 'view:my-dirty', label: '有未提交改动' });
-    items.push({ key: 'view:my-nodocs', label: '缺文档' });
-    items.push({ key: 'view:my-noarch', label: '缺架构图' });
-    items.push({ key: 'view:my-unanalyzed', label: '未分析' });
-    items.push({ key: 'view:my-stale', label: '30 天没打开' });
-    items.push({ key: 'view:my-archived', label: '已归档' });
     for (const c of collections ?? []) items.push({ key: `col:${c.id}`, label: `${c.name}（${c.memberCount}）` });
     selected = activeTabId !== null ? (useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.subTab?.replace('view:', 'view:') ?? '') : '';
   } else if (domain === 'git') {
