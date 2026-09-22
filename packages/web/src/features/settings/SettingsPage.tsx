@@ -315,7 +315,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
           <Card size="small" title={sectionTitle('about')}>
             <Alert
               type="info"
-              message={`ttFolio · tt项目仓库 v${health?.version ?? '0.1.0'}`}
+              message={`ttFolio · TT项目管理工作台 v${health?.version ?? '0.1.0'}`}
               description={
                 <div style={{ fontSize: 12 }}>
                   <div>应用端口：{health?.port}（仅监听 127.0.0.1）· 用户内容端口：{health?.userContentPort}（只读）</div>
