@@ -1,10 +1,9 @@
 /** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图 + 添加项目。 */
 import {
-  Avatar, Button, Card, Dropdown, Empty, Input, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
+  Button, Empty, Input, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined, FolderOpenOutlined, CopyOutlined, FileTextOutlined,
-  BranchesOutlined, MoreOutlined, StarFilled, StarOutlined, WarningOutlined
+  PlusOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,8 +11,8 @@ import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
-import { LanguageBar } from '@/components/LanguageBar';
 import { Dashboard } from './Dashboard';
+import { ProjectCard } from './ProjectCard';
 import { StateView } from '@/components/StateView';
 import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
@@ -135,94 +134,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         </>
       )}
     </div>
-  );
-}
-
-function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
-  p: ProjectSummary; onOpen: () => void; onPin: () => void; onAnalyze: () => void;
-}): React.JSX.Element {
-  const { message } = App.useApp();
-  const queryClient2 = useQueryClient();
-  const remove = useMutation({
-    mutationFn: (mode: string) => api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
-    onSuccess: () => {
-      void message.success('已移除');
-      void queryInvalidate();
-    }
-  });
-  const queryInvalidate = async (): Promise<void> => {
-    await queryClient2.invalidateQueries({ queryKey: ['projects'] });
-  };
-
-  const menu = {
-    items: [
-      { key: 'open', label: '打开项目', icon: <FolderOpenOutlined />, onClick: onOpen },
-      { key: 'files', label: '打开文件页', icon: <FileTextOutlined />, onClick: onOpen },
-      { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !p.gitIsRepo, onClick: () => useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName) },
-      { type: 'divider' as const },
-      { key: 'copy', label: '复制路径', icon: <CopyOutlined />, onClick: () => { void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); } },
-      { key: 'explorer', label: '在资源管理器中显示', onClick: () => { void api.post('/api/open', { target: 'explorer', projectId: p.id }); } },
-      { key: 'terminal', label: '在此打开终端', onClick: () => { void api.post('/api/open', { target: 'terminal', projectId: p.id }); } },
-      { type: 'divider' as const },
-      { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, onClick: onAnalyze },
-      { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined />, onClick: onPin },
-      { type: 'divider' as const },
-      { key: 'unregister', label: '仅从 ttFolio 移除登记', danger: false, onClick: () => remove.mutate('unregister') },
-      { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, onClick: () => remove.mutate('delete') }
-    ]
-  };
-
-  return (
-    <Card
-      hoverable
-      size="small"
-      style={{ borderColor: p.pathOk ? undefined : SEMANTIC.error }}
-      onClick={onOpen}
-      data-testid="project-card"
-      title={
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
-          <Avatar style={{ background: SEMANTIC.primary, flexShrink: 0 }} size={24}>
-            {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
-          </Avatar>
-          <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
-          {p.alias !== null && <Tag style={{ flexShrink: 0 }}>别名</Tag>}
-          <Tag style={{ flexShrink: 0 }} color="blue">{typeLabel(p.type)}</Tag>
-        </span>
-      }
-      extra={
-        <Dropdown menu={menu} trigger={['contextMenu', 'click']}>
-          <MoreOutlined onClick={(e) => e.stopPropagation()} />
-        </Dropdown>
-      }
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <LanguageBar languages={p.languages} />
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          {p.primaryLanguage ?? '未分析'}
-          {p.languages.length > 0 && ` · ${p.languages[0]?.percent}%`}
-        </div>
-        <div>
-          {p.techStack.slice(0, 3).map((t) => (
-            <Tag key={t} style={{ marginRight: 4 }}>{t}</Tag>
-          ))}
-          {p.techStack.length > 3 && <Tag>+{p.techStack.length - 3}</Tag>}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.75, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span>{p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' ⚠有改动' : ' ✓干净'}` : '非 git'}</span>
-          <span>{relTime(p.gitLastCommitAt)}</span>
-        </div>
-        <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-          <Tag color={p.hasDocs ? 'success' : 'default'}>文档{p.hasDocs ? ' ✓' : ' ✗'}</Tag>
-          <Tag color={p.hasArch ? 'success' : 'default'}>架构图{p.hasArch ? ' ✓' : ' ✗'}</Tag>
-          {p.pathOk === false && <Tag color="error" icon={<WarningOutlined />}>路径失效</Tag>}
-          {p.isPinned && <Tag icon={<StarFilled />}>已固定</Tag>}
-          {p.status === 'archived' && <Tag>已归档</Tag>}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.6 }}>
-          {relTime(p.lastOpenedAt)} · 打开 {p.openCount} 次
-        </div>
-      </div>
-    </Card>
   );
 }
 
