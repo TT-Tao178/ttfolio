@@ -39,6 +39,7 @@ export interface ProjectSummary {
   gitUntracked: number;
   gitLastCommitAt: string | null;
   gitLastCommitAuthor: string | null;
+  gitLastCommitSubject: string | null;
   gitHeadShort: string | null;
   status: ProjectStatus;
   isPinned: boolean;

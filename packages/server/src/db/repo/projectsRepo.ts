@@ -59,6 +59,7 @@ function mapSummary(row: ProjectRow, langs: LanguageStatRow[], tags: string[], c
     gitUntracked: row.git_untracked,
     gitLastCommitAt: row.git_last_commit_at,
     gitLastCommitAuthor: row.git_last_commit_author,
+    gitLastCommitSubject: row.git_last_commit_subject,
     gitHeadShort: row.git_head_short,
     status: row.status === 'archived' ? 'archived' : 'active',
     isPinned: row.is_pinned === 1,

@@ -20,6 +20,7 @@ export interface ProjectRow {
   git_untracked: number;
   git_last_commit_at: string | null;
   git_last_commit_author: string | null;
+  git_last_commit_subject: string | null;
   git_head_short: string | null;
   status: string;
   is_pinned: number;

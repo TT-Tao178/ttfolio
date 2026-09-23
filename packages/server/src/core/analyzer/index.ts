@@ -266,6 +266,7 @@ export async function analyzeProject(
       git_untracked: gitInfo.untracked,
       git_last_commit_at: gitInfo.lastCommitAt,
       git_last_commit_author: gitInfo.lastCommitAuthor,
+      git_last_commit_subject: gitInfo.lastCommitSubject,
       git_head_short: gitInfo.headShort,
       analyzed_at: finishedAt,
       analyze_ms: durationMs,

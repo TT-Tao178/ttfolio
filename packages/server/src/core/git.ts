@@ -365,10 +365,11 @@ export async function summaryForAnalyze(dir: string): Promise<{
   untracked: number;
   lastCommitAt: string | null;
   lastCommitAuthor: string | null;
+  lastCommitSubject: string | null;
   headShort: string | null;
   partial: boolean;
 }> {
-  const empty = { isRepo: false, branch: null, dirty: false, untracked: 0, lastCommitAt: null, lastCommitAuthor: null, headShort: null, partial: false };
+  const empty = { isRepo: false, branch: null, dirty: false, untracked: 0, lastCommitAt: null, lastCommitAuthor: null, lastCommitSubject: null, headShort: null, partial: false };
   if (!(await gitAvailable())) return { ...empty, partial: true };
   try {
     if (!(await isRepo(dir))) return empty;
@@ -378,11 +379,13 @@ export async function summaryForAnalyze(dir: string): Promise<{
     const untracked = parsed.entries.filter((e) => e.state === 'untracked').length;
     let lastCommitAt: string | null = null;
     let lastCommitAuthor: string | null = null;
+    let lastCommitSubject: string | null = null;
     try {
-      const one = await git(dir, ['log', '-1', '--pretty=format:%aI%x1f%an']);
+      const one = await git(dir, ['log', '-1', '--pretty=format:%aI%x1f%an%x1f%s']);
       const parts = one.split('\x1f');
       lastCommitAt = parts[0] ?? null;
       lastCommitAuthor = parts[1] ?? null;
+      lastCommitSubject = parts[2] ?? null;
     } catch {
       // 空仓库没有提交，允许
     }
@@ -399,6 +402,7 @@ export async function summaryForAnalyze(dir: string): Promise<{
       untracked,
       lastCommitAt,
       lastCommitAuthor,
+      lastCommitSubject,
       headShort,
       partial: false
     };
