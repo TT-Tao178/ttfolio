@@ -3,9 +3,10 @@
  *  打包事故复发——2026-09-23 安装版启动即报 Cannot find module 'better-sqlite3'）。
  *  用法：node scripts/verify-dist-electron.mjs
  */
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { spawn } from 'node:child_process';
 
 const unpacked = path.resolve('dist-electron/win-unpacked');
 const asar = path.join(unpacked, 'resources', 'app.asar');
@@ -32,7 +33,8 @@ for (const need of [
   'node_modules/better-sqlite3/package.json',
   'node_modules/better-sqlite3/lib/index.js',
   'node_modules/bindings/bindings.js',
-  'node_modules/file-uri-to-path/index.js'
+  'node_modules/file-uri-to-path/index.js',
+  'packages/web/dist/index.html'
 ]) {
   if (entries.some((e) => e.replaceAll('\\', '/').endsWith(need))) ok(`asar 内含 ${need}`);
   else fail(`asar 内缺 ${need}（node_modules 没被打进包）`);
@@ -56,21 +58,34 @@ if (!existsSync(nativeDir)) {
 // （直接 require unpacked 里的 index.js 会没有 asar 内 node_modules 的解析上下文，误报 bindings 找不到）
 const electronExe = path.join(unpacked, 'TT项目管理工作台.exe');
 if (existsSync(electronExe)) {
-  const { execFileSync: ex } = await import('node:child_process');
-  ex('node', [path.join('node_modules', '@electron', 'asar', 'bin', 'asar.js'), 'extract', asar, '.tmp-test/asar-extract']);
-  const probe = `try{const db=require(${JSON.stringify(path.resolve('.tmp-test/asar-extract/app/server/main.cjs').replace(/\\/g, '/'))});setTimeout(()=>{console.log('ABI-OK');process.exit(0)},4000)}catch(e){console.log('ABI-FAIL:'+e.message.split(String.fromCharCode(10))[0]);process.exit(1)}`;
-  const r = execFileSync(electronExe, ['-e', probe], {
-    encoding: 'utf8', timeout: 60000,
-    env: {
-      ...process.env, ELECTRON_RUN_AS_NODE: '1', TTFOLIO_PORT: '7949',
-      TTFOLIO_MIGRATIONS_DIR: path.resolve('.tmp-test/asar-extract/packages/server/src/migrations')
-    }
+  // 最终冒烟走真实路径：完整 GUI 进程（主进程带 asar+unpacked 融合），验证 health 与前端页面。
+  // 注意：不要用「asar extract + RUN_AS_NODE」做判据——解包目录没有 .node 真身，也没有 asar 感知，必失败。
+  const child = spawn(electronExe, [], {
+    env: { ...process.env, TTFOLIO_PORT: '7949', TTFOLIO_DATA_DIR: path.resolve('.tmp-test/asar-smoke-data') },
+    stdio: ['ignore', 'pipe', 'pipe']
   });
-  if (r.includes('ABI-OK')) ok('服务端 bundle 在打包版 Electron 下完成启动（better-sqlite3 ABI 与依赖解析全部正确）');
-  else fail(`ABI 冒烟失败：${r.trim().slice(0, 200)}`);
+  let smokeErr = '';
+  child.stderr.on('data', (c) => { smokeErr += c; });
+  let healthy = false;
+  let html = '';
+  for (let i = 0; i < 50; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      const res = await fetch('http://127.0.0.1:7949/api/health');
+      if (res.ok) {
+        const page = await fetch('http://127.0.0.1:7949/');
+        html = await page.text();
+        if (html.includes('<title>') && !html.includes('前端尚未构建')) { healthy = true; break; }
+      }
+    } catch { /* 未就绪 */ }
+  }
+  try { child.kill(); } catch { /* 已退出 */ }
+  await new Promise((r) => setTimeout(r, 800));
+  if (healthy) ok('真实启动冒烟通过：health 200 + 前端页面正常返回（非「尚未构建」占位）');
+  else fail(`真实启动冒烟失败：${smokeErr.trim().slice(0, 300) || html.slice(0, 120)}`);
 } else {
   // 静默跳过：CI 或改名后仍能跑前两项
-  console.log('… 未找到 win-unpacked 主程序，跳过 ABI 冒烟');
+  console.log('… 未找到 win-unpacked 主程序，跳过启动冒烟');
 }
 
 if (failed > 0) {

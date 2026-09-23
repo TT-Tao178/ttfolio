@@ -20,7 +20,7 @@ import { getSetting, setSetting } from './db/repo/metaRepo.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
-const version = '0.1.0';
+const version = '0.1.1';
 const startedAt = Date.now();
 
 /** 真正的 SQLite 库损坏（才会走"改名自愈"）；native 模块加载失败等启动期错误不算。 */
@@ -109,6 +109,10 @@ async function main(): Promise<void> {
   const watcher = new WatcherManager(sse, logger);
   const trash = new TrashService(layout.trashDir);
   const webDistCandidates = [
+    // 桌面版（Electron）由主进程注入 asar 内的产物路径；dev/生产 web 模式走 cwd 相对定位
+    ...(process.env['TTFOLIO_WEB_DIST'] !== undefined && process.env['TTFOLIO_WEB_DIST'] !== ''
+      ? [path.resolve(process.env['TTFOLIO_WEB_DIST'])]
+      : []),
     path.resolve(process.cwd(), 'packages', 'web', 'dist'),
     path.resolve(process.cwd(), 'dist')
   ];

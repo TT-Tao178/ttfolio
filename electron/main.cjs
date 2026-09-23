@@ -92,6 +92,7 @@ async function boot() {
   const bridge = await startDialogBridge(bridgeToken);
   process.env['TTFOLIO_PORT'] = String(appPort);
   process.env['TTFOLIO_MIGRATIONS_DIR'] = path.join(__dirname, '..', 'packages', 'server', 'src', 'migrations');
+  process.env['TTFOLIO_WEB_DIST'] = path.join(__dirname, '..', 'packages', 'web', 'dist');
   process.env['TTFOLIO_DIALOG_BRIDGE_URL'] = `http://127.0.0.1:${bridge.port}/dialog`;
   process.env['TTFOLIO_DIALOG_BRIDGE_TOKEN'] = bridgeToken;
 
