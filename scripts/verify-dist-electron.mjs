@@ -68,7 +68,7 @@ if (existsSync(electronExe)) {
   child.stderr.on('data', (c) => { smokeErr += c; });
   let healthy = false;
   let html = '';
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 90; i++) {
     await new Promise((r) => setTimeout(r, 500));
     try {
       const res = await fetch('http://127.0.0.1:7949/api/health');

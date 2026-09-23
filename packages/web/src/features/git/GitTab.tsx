@@ -1,7 +1,7 @@
 /** Git 页签（FR-5.1..5.9）：变更分组、diff、暂存/放弃、提交、历史、分支、降级。 */
 import { Alert, App, Button, Empty, Input, List, Select, Space, Spin, Tag, Tooltip, Tree } from 'antd';
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { GitBranch, GitLogEntry, GitStatus } from '@ttfolio/shared';
 import { relTime } from '@/lib/format';
@@ -21,11 +21,16 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
     queryKey: ['git', projectId, 'status'],
     queryFn: () => api.get<GitStatus>(`/api/git/${projectId}/status`)
   });
-  const { data: log } = useQuery({
+  const { data: log, isFetching } = useQuery({
     queryKey: ['git', projectId, 'log', limit],
     queryFn: () => api.get<GitLogEntry[]>(`/api/git/${projectId}/log`, { limit: String(limit) }),
-    enabled: status?.isRepo === true
+    enabled: status?.isRepo === true,
+    // 「加载更多」增大 limit 时 queryKey 变化：没有 placeholderData 的话 data 会先变 undefined，
+    // 列表闪空 → 页面高度骤减把滚动钳回顶部（用户报障"点了只是跳转到开头"）。
+    placeholderData: keepPreviousData
   });
+  // 返回条数 < limit 说明提交历史已经全部加载，按钮没有存在意义（点了也拉不到更多）
+  const logExhausted = log !== undefined && log.length < limit;
   const { data: branches } = useQuery({
     queryKey: ['git', projectId, 'branches'],
     queryFn: () => api.get<GitBranch[]>(`/api/git/${projectId}/branches`),
@@ -207,6 +212,7 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
           <strong>提交历史</strong>
           <List
             size="small"
+            rowKey="hash"
             dataSource={log ?? []}
             renderItem={(item) => (
               <List.Item
@@ -220,7 +226,13 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 </span>
               </List.Item>
             )}
-            footer={<Button size="small" onClick={() => setLimit(limit + 100)}>加载更多</Button>}
+            footer={
+              logExhausted ? (
+                <span style={{ fontSize: 12, opacity: 0.6 }}>已加载全部 {log?.length ?? 0} 条提交</span>
+              ) : (
+                <Button size="small" loading={isFetching} onClick={() => setLimit(limit + 100)}>加载更多</Button>
+              )
+            }
           />
         </div>
           </div>
