@@ -17,6 +17,7 @@ export function PathBar(): React.JSX.Element {
   const tab = tabs.find((t) => t.id === activeTabId) ?? null;
   // 置灰而不是"按了没反应"：无历史可退时按钮必须是禁用态（原实现两个按钮永远可点但无效）
   const nav = navAvailability(tab);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const crumbs = buildCrumbs(tab);
 
@@ -89,16 +90,19 @@ export function PathBar(): React.JSX.Element {
             <Button size="small" type="text" icon={<ArrowRightOutlined />} disabled={!nav.forward} onClick={() => navigate(1)} data-testid="nav-forward" />
           </Tooltip>
         </Dropdown>
-        <Tooltip title="刷新视图（重读磁盘内容，不影响未保存的编辑）">
+        <Tooltip title="刷新视图（重新拉取全部数据；不影响未保存的编辑）">
           <Button
             size="small"
             type="text"
-            icon={<ReloadOutlined />}
+            icon={<ReloadOutlined spin={refreshing} />}
             data-testid="nav-refresh"
             onClick={() => {
               // 失效全部查询 = 重新拉取所有可见数据；编辑器由 EditorPane 自己做版本判断，
               // 未保存内容不会被覆盖（见 EditorPane 的"版本标识"守卫）。
               void queryClient.invalidateQueries();
+              // 数据没变化时界面纹丝不动，用户感知就是"点了没用"——图标转一圈给明确反馈
+              setRefreshing(true);
+              window.setTimeout(() => setRefreshing(false), 600);
             }}
           />
         </Tooltip>

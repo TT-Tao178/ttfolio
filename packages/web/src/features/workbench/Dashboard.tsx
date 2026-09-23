@@ -50,17 +50,27 @@ export function Dashboard(): React.JSX.Element {
 
   // 分页器防漂移：以第 1 页（最满页）的卡片栅格实际高度锁定项目区最小高度——
   // 翻到内容不满的页时分页器纹丝不动（用户反馈：不满页时「共 N 个项目」会被往上顶）。
-  // 只在第 1 页测量；窗口宽度变化（列数变化）会在回到第 1 页时自动重新校准。
+  // 高度锁定只对产生它的窗口宽度有效：宽度一变（全屏↔窗口）立即失效清零，
+  // 停在/翻回第 1 页时按新列数重新校准——绝不沿用旧宽度的高度（那是切换窗口后大空白的根因）。
   const gridRef = React.useRef<HTMLDivElement | null>(null);
   const [gridMinH, setGridMinH] = useState(0);
+  const [viewportW, setViewportW] = useState(() => window.innerWidth);
+  React.useEffect(() => {
+    const onResize = (): void => setViewportW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  React.useEffect(() => {
+    setGridMinH(0);
+  }, [viewportW]);
   React.useEffect(() => {
     if (page !== 1) return;
     const id = window.setTimeout(() => {
       const h = gridRef.current?.getBoundingClientRect().height ?? 0;
       if (h > 0) setGridMinH((prev) => (Math.abs(prev - h) > 2 ? Math.round(h) : prev));
-    }, 60);
+    }, 80);
     return () => window.clearTimeout(id);
-  }, [page, pageItems.length]);
+  }, [page, viewportW]);
 
   // 与卡片墙一致的动作（Workbench 同款实现，保持两处行为相同）：
   const openProject = (p: ProjectSummary): void => {
