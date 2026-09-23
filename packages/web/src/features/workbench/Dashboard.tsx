@@ -217,7 +217,7 @@ export function Dashboard(): React.JSX.Element {
       )}
 
       {/* 项目区：flex:1 吃掉剩余高度，分页器恒贴本区底部 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 240, marginTop: 16 }}>
+      <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
           <Typography.Title level={5} style={{ margin: 0 }}>项目</Typography.Title>
           <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>共 {total} 个 · 每页 {PAGE_SIZE} 个</span>
@@ -233,7 +233,7 @@ export function Dashboard(): React.JSX.Element {
                 <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} onPin={() => pin.mutate(p)} onAnalyze={() => analyze.mutate([p.id])} />
               ))}
             </div>
-            <div data-testid="dashboard-project-pagination" style={{ display: 'flex', justifyContent: 'center', marginTop: 'auto', paddingTop: 12 }}>
+            <div data-testid="dashboard-project-pagination" style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
               <Pagination
                 current={page}
                 pageSize={PAGE_SIZE}
@@ -249,6 +249,8 @@ export function Dashboard(): React.JSX.Element {
       </div>
 
       {/* 「最近提交」动态流：跨项目按提交时间倒序，点行跳该项目 Git 页签 */}
+      {/* 弹性垫片：内容不满一屏时吃掉剩余空间、把「最近提交」推到底部；超屏时收缩为 0 顺流。 */}
+      <div style={{ flex: '1 1 0%', minHeight: 0 }} />
       {commits.length > 0 && (
         <Card size="small" title="最近提交" style={{ marginTop: 12 }} data-testid="dash-commits">
           <List

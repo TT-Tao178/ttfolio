@@ -8,7 +8,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
 
-const unpacked = path.resolve('dist-electron/win-unpacked');
+const unpacked = path.resolve(process.env['VERIFY_DIST'] ?? 'dist-electron/win-unpacked');
 const asar = path.join(unpacked, 'resources', 'app.asar');
 let failed = 0;
 const fail = (msg) => { failed += 1; console.error(`✗ ${msg}`); };
