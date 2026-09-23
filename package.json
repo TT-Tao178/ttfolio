@@ -22,7 +22,7 @@
     "doctor": "node scripts/doctor.mjs",
     "verify": "node scripts/verify.mjs",
     "build:server": "node scripts/build-server.mjs",
-    "dist:win": "npm run build && npm run build:server && electron-builder --win nsis"
+    "dist:win": "npm run build && npm run build:server && electron-rebuild -f -w better-sqlite3 && electron-builder --win nsis && node scripts/verify-dist-electron.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
@@ -49,7 +49,13 @@
     "vitest": "^2.1.2"
   },
   "allowScripts": {
-    "electron@44.4.3": true
+    "electron@44.4.3": true,
+    "better-sqlite3@12.11.1": true
   },
-  "main": "electron/main.cjs"
+  "main": "electron/main.cjs",
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "bindings": "^1.5.0",
+    "file-uri-to-path": "^2.0.0"
+  }
 }
