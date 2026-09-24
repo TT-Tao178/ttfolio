@@ -31,18 +31,18 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：第二十轮的 docs 提交（其上依次是 总览收敛 / 提交详情视图 / 历史下拉 /
-  自动打开首文件 / **Electron 桌面版** 五个提交；精确哈希看 `git log --oneline -7`）
-- **第二十轮（本轮）新增**：总览移除三张卡 / 提交详情视图 / 前进后退历史下拉 /
-  项目自动打开首文件 / **Electron 打包（dist-electron/TT项目管理工作台-Setup-0.1.0.exe）**
-  （详见 `PROGRESS.md` 顶部第二十轮小节）；远程仓库 `https://github.com/TT-Tao178/ttfolio.git`
-- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ / `npm test` **61 条** ✅
-- dist 已重建并跑过 `verify-build7717.mjs`：生产入口 127.0.0.1:7717 同步带上本轮修复
-- **桌面版注意**：打包用 `npm run dist:win`（先 electron-rebuild better-sqlite3 到
-  electron ABI）；之后本机跑 `npm run dev` 前要 `npm rebuild better-sqlite3` 切回 node ABI——
-  两个 ABI 不能共用同一个 node_modules（index.ts 已加预检，跑错运行时会干净退出
-  且绝不触碰库文件）
-- 数据库无新迁移（仍为 user_version=2）
+- 最新提交：524632e（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
+  0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
+  0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
+- 桌面版版本 **0.1.5**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.5 六个安装包，
+  **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
+  自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次）
+- 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push
+- 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
+  `npm test` **61 条** ✅
+- 数据库 user_version=**3**（0003：projects 加 git_last_commit_subject，只增不改）
+- 第二十一/二十二轮（0.1.1~0.1.5）台账已在 `PROGRESS.md` 顶部补记；总览布局
+  0.1.3→0.1.5 的演进线看该文「第二十二轮」小节
 - e2e：**按用户要求未跑**，交给用户手测
 
 ## 4. 用户报障 4 类：已修且已实测（证据摘要）
@@ -113,6 +113,12 @@ $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是�
 | `verify-round15.mjs` | 第十五轮：外部修改警告收敛（route 伪造 fs/file 版本）/ 侧栏视图项移除 / 挂载多选（拦截 pick-file 与 mounts）；结尾自动清理探针草稿 |
 | `verify-round16.mjs` | 第十六轮：文档大纲点击定位（route 合成 md）/ 设置页全宽卡片核对 |
 | `verify-round17.mjs` | 第十八轮：全量重分析前后语言占比对比（只读扫描） |
+| `verify-round19.mjs` | 第十九轮：面包屑子页签点击跳转、后退还原、标签数不变 |
+| `verify-round20.mjs` | 第二十轮：总览收敛 / 提交详情 / 历史下拉 / 自动打开首文件 |
+| `verify-round21.mjs` | 0.1.2：Git 加载更多——keepPreviousData 不闪空、滚动位置保持、末尾判定 |
+| `verify-round22.mjs` | 0.1.3：总览四模块真实数据 + route 注入 25 假项目翻页分页器防漂移 |
+| `verify-round23.mjs` | 0.1.4：minHeight 随窗口宽度失效清零、回第 1 页重新校准、刷新 spin |
+| `verify-round24.mjs` | 0.1.5：小窗口提交卡与卡片栅格零重叠、大窗垫片贴底 |
 | `dialog-topmost.mjs` | Win32 前台焦点前后对照（按 PID 抓对话框 + 测出现耗时 + GetForegroundWindow；会在桌面短暂闪对话框） |
 | `restore-active-tab.mjs` / `check-active-tab.mjs` | 收尾把活动标签点回第一个 / 只读核对服务端会话活动标签 |
 | `diag-reopen.mjs` | 树节点“反选”诊断：后退后再点同一个文件编辑器不打开 |
