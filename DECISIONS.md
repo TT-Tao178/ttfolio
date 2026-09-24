@@ -32,3 +32,11 @@
 - 2026-09-22 | 桌面版（Electron）服务端**进程内运行** + 原生对话框桥，替代"spawn 子进程 + PowerShell 弹窗" | 安装版应用 spawn PowerShell+WinForms 是杀软/EDR 最敏感组合（用户点名）；进程内运行还消掉"应用 spawn 子进程"的第二个敏感面，且用户机器无需系统 Node。主进程起 127.0.0.1+随机 token 的 HTTP 桥，server 检测 TTFOLIO_DIALOG_BRIDGE_* 即转发弹窗请求 | Web 模式保留 PowerShell 分支（双模式并存）；Electron RUN_AS_NODE spawn（仍是子进程）；node:sqlite 替换 better-sqlite3（API 迁移面大，留作后续）
 - 2026-09-22 | 库损坏自愈收窄：只有 SQLite 报"文件不是库/镜像损坏"才允许改名另存 | 原"任何 open 失败都改名"在本轮真实发生过一次：electron ABI 与 node ABI 切换后跑错运行时，better-sqlite3 加载失败被当成库损坏，真实 library.db 被改名走（已恢复）。ABI/文件缺失类失败与库无关，必须干净退出且不触碰库文件 | 维持宽条件但先备份到回收站式目录（仍会惊吓用户）；不修（数据丢失风险不可接受）
 - 2026-09-22 | 桌面版 NSIS：per-user 免管理员 + Unicode + 可改安装目录 + 卸载不删 %APPDATA% 数据 | 中文安装路径/中文用户名全链路可用；数据目录（索引库/备份/回收站）卸载重装后保留，避免误删用户索引；未签名因此首次运行有 SmartScreen 提示（已告知用户，签名证书未配置） | perMachine 管理员安装（多用户数据目录语义复杂）；oneClick 静默安装（用户失去安装位置控制）
+- 2026-09-23 | native 依赖（better-sqlite3/bindings/file-uri-to-path）在根 package.json 显式声明为生产依赖 | 依赖声明在 workspaces 子包时 electron-builder 按根收集为空，安装版缺模块 | files 手写 node_modules/**（被其专用管道忽略，实测无效）
+- 2026-09-23 | 出包必走 dist:win 全链路，verify-dist-electron 自检（asar 断言 + 打包版真实启动冒烟）全绿才算数 | 曾绕过链路漏 ABI 重建，node-ABI 的 .node 被打进包——自检当场拦截；人工核对不可靠 | 只靠人工冒烟（漏检代价是发出去的安装包跑不起来）
+- 2026-09-23 | 移除 dist:win 里手动 electron-rebuild | electron-builder 打包时本会自动按 electron ABI 重编译 native 依赖 | 保留两步重编译（多余且拖慢出包）
+- 2026-09-23 | 服务端 webDist 定位首位支持 TTFOLIO_WEB_DIST 环境变量，Electron 主进程注入 asar 内路径 | 安装版 cwd 是安装目录，cwd 相对定位必然失败 | 硬编码安装目录假设（用户可改安装路径，脆弱）
+- 2026-09-23 | Git 历史加载：keepPreviousData + rowKey=hash + 返回数<limit 判末尾 | 闪空/整列重建/无用功三件叠加是「加载更多跳顶」根因 | 服务端分页+总数接口（为几十条提交加接口不值）
+- 2026-09-23 | 总览分页防漂移演进：0.1.3 第 1 页栅格高度锁定 → 0.1.4 收紧为随窗口宽度失效清零 → 0.1.5 项目区改顺流布局 + 弹性垫片 | 分页器位置恒定与内容永不重叠两个目标要同时成立；写死 min-height 在窗口变化时必然失效（0.1.3 实际踩坑） | min-height 写死（全屏↔窗口切换即大片空白）
+- 2026-09-23 | 出包遇杀软 EBUSY：临时目录出包、自检通过后移回，自检支持 VERIFY_DIST 指定待检目录 | 杀软实时扫描锁 asar 是环境现实，绕过而非对抗 | 关杀软实时防护（不该让用户降级防护）
+- 2026-09-24 | 提交作者从 GLM Agent &lt;agent@local&gt; 切换为 TT-Tao178 &lt;GitHub noreply 邮箱&gt;（仓库级 config，全局配置不动） | agent@local 未关联 GitHub 账号，贡献图不归属，仓库对外不可归属到作者；noreply 兼顾归属与不暴露真实邮箱 | git filter-repo 改写全部历史作者（动作大需单独评估，暂缓）；改全局 config（越界）
