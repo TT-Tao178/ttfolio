@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 第二十一轮：桌面版启动两连修 + Git「加载更多」修复（0.1.1~0.1.2，补记）
+
+> 本节为后续收口时补记，证据取自各提交正文与当时的探针/自检输出。
+> 安装包 0.1.0~0.1.5 全部保留于 `dist-electron/`。
+
+### ① 安装版启动报 Cannot find module 'better-sqlite3'（fix ec15373）
+
+- **根因**：依赖声明在 packages/server（workspaces 子包），根 package.json 无
+  dependencies；electron-builder 按根声明收包 → 收集为空；files: 里手写
+  `node_modules/**` 又被其专用管道忽略。冒烟没抓到是因为从项目目录跑
+  electron.exe，require 向上命中了开发用 node_modules。
+- **修法**：根 package.json 显式声明 better-sqlite3/bindings/file-uri-to-path 为
+  生产依赖；新增 `scripts/verify-dist-electron.mjs` 出包自检（asar 内断言三件套 +
+  unpacked 必须有 .node + 打包版 Electron 完整启动冒烟）；移除 dist:win 多余的
+  electron-rebuild（electron-builder 本会自动按 electron ABI 重编译）。
+- **验证**：重出包自检全过；win-unpacked GUI 冒烟 health 200、真实数据加载正常。
+
 ## 第二十轮：总览收敛 + 提交详情 + 历史下拉 + 自动打开首文件 + Electron 桌面版（已修，待用户手测）
 
 ### ① 总览移除三张卡（4b90276）② 提交详情视图（07b2a4b）③ 历史下拉（cf40b5d）④ 自动打开首文件（162a179）
