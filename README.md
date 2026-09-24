@@ -101,6 +101,29 @@ scripts/    开发与构建脚本
 - 手动备份、从备份恢复、导出项目清单（JSON / CSV）在「设置 → 数据与备份」
 - 可通过环境变量 `TTFOLIO_DATA_DIR`、`TTFOLIO_PORT` 覆盖默认行为
 
+## 常见问题
+
+**打包后跑 `npm run dev` / `npm test` 报 better-sqlite3 版本错误？**
+打包会把本机 node_modules 切到 Electron ABI。先停掉开发进程，执行
+`npm rebuild better-sqlite3` 切回 Node ABI 即可；服务端启动预检发现 ABI 不匹配时
+会干净退出，不会触碰索引库。
+
+**开发模式页面请求全部失败（ECONNREFUSED）？**
+桌面版运行时会把 `%APPDATA%\ttFolio\runtime.json` 里的 port 写成它自己探测的端口，
+而 Vite 代理读取该文件。把 port 改回 `7717` 后重启 `npm run dev` 即可。
+
+**安装包首次启动特别慢？**
+未签名的安装包首次运行会被杀毒软件全量扫描（可能 60 秒以上），二次启动通常 4 秒内。
+SmartScreen 提示请选「更多信息 → 仍要运行」。
+
+**改了前端代码但界面没变化？**
+Vite 可能缓存了半截模块（编辑器原子写对读方不是原子的）。重启 dev server 即可，
+不要继续改代码排查。
+
+**数据丢了怎么办？**
+索引库只是索引——磁盘上的项目文件原地不动，重新登记/重新分析即可恢复。
+`%APPDATA%\ttFolio\backups\` 下有自动快照（每次迁移前 + 每日）。
+
 ## 许可证
 
 [MIT](LICENSE)
