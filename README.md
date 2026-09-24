@@ -43,6 +43,15 @@ npm run dev
 
 开发模式会同时启动后端（`127.0.0.1:7717`）与前端（`localhost:5173`），打开 `http://localhost:5173` 使用。
 
+两个入口的区别：
+
+- `http://localhost:5173`：开发入口，前端改动热更新（走 Vite 代理访问后端）
+- `http://127.0.0.1:7717`：生产入口，托管 `packages/web/dist` 构建产物（需先 `npm run build`）
+
+注意：better-sqlite3 在本机只有一套 node_modules，开发（Node ABI）与打包（Electron ABI）
+不能共用——如果刚跑过 `npm run dist:win`，开发/测试前需要先 `npm rebuild better-sqlite3`。
+ABI 不匹配时服务端会预检并干净退出，不会触碰索引库（详见 [常见问题](#常见问题)）。
+
 ## 构建桌面版
 
 ```bash
