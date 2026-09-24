@@ -17,6 +17,18 @@
   electron-rebuild（electron-builder 本会自动按 electron ABI 重编译）。
 - **验证**：重出包自检全过；win-unpacked GUI 冒烟 health 200、真实数据加载正常。
 
+### ② 安装版打开提示「前端尚未构建」，版本升至 0.1.1（fix 7b9ab75）
+
+- **根因**：服务端只从 `process.cwd()` 定位 packages/web/dist，安装版 cwd 是
+  安装目录、且前端产物根本没进 asar（electron-builder files 漏收）。
+- **修法**：webDist 候选首位支持 `TTFOLIO_WEB_DIST` 环境变量；Electron 主进程注入
+  该变量指向 asar 内 dist；files 收 `packages/web/dist/**`；产物自检新增
+  index.html 断言，启动冒烟改走真实 GUI 路径（health 200 + 页面非占位文案）。
+- **教训（自检拦下一次事故）**：曾绕过 dist:win 直接跑 electron-builder，漏了
+  前置 ABI 重建，把 node-ABI 的 .node 打进包——自检启动冒烟当场拦截；另 npx
+  会解析到缓存旧包，必须用项目本地 node_modules/.bin。
+- **验证**：自检 7 项全绿；0.1.0 旧安装包保留未删。
+
 ## 第二十轮：总览收敛 + 提交详情 + 历史下拉 + 自动打开首文件 + Electron 桌面版（已修，待用户手测）
 
 ### ① 总览移除三张卡（4b90276）② 提交详情视图（07b2a4b）③ 历史下拉（cf40b5d）④ 自动打开首文件（162a179）
