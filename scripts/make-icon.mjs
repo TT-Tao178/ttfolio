@@ -16,8 +16,9 @@ const pngs = [];
 for (const size of sizes) {
   const sized = svg.replace(/width="\d+" height="\d+"/, `width="${size}" height="${size}"`);
   await page.setViewportSize({ width: size, height: size });
-  await page.setContent(`<style>*{margin:0;padding:0}</style>${sized}`);
-  const buf = await page.locator('svg').screenshot({ type: 'png' });
+  // omitBackground 保留透明通道：圆角四角必须透明，否则桌面图标四周会露白底
+  await page.setContent(`<style>*{margin:0;padding:0;background:transparent}</style>${sized}`);
+  const buf = await page.locator('svg').screenshot({ type: 'png', omitBackground: true });
   pngs.push(buf);
   console.log(`渲染 ${size}x${size} -> ${buf.length} bytes`);
 }

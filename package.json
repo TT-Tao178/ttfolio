@@ -1,7 +1,7 @@
 {
   "name": "ttfolio",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "ttFolio - a local project workbench (tt项目仓库)",
   "workspaces": [
     "packages/*"
