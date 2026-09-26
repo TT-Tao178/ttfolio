@@ -1,5 +1,27 @@
 # PROGRESS
 
+## 第二十三轮：TT 品牌图标落地桌面版（0.1.6，已修，待用户手测）
+
+- **用户需求**：左上角蓝白色 TT（界面方形 Avatar：`tt-primary` #1677ff 底 + 白色粗体字）
+  要成为安装后的桌面图标——此前 exe/安装包/快捷方式一直是 Electron 默认图标。
+- **改动（e7949c1）**：
+  - `electron/build/icon.svg` 作为图标**单一真源**：按 26px 头像等比放大（圆角 4px→40、
+    字号约 0.52 倍边长、微收字距），改 logo 只改这一个文件；
+  - `scripts/make-icon.mjs`：无头 Chromium 矢量渲染 16/24/32/48/64/128/256 七个尺寸，
+    按 PNG-in-ICO 规范零依赖拼装 `icon.ico`（重生成：`node scripts/make-icon.mjs`）；
+  - `electron-builder.yml` 显式 `win.icon`；版本 0.1.5→0.1.6；
+  - `.gitignore` 的 `build/` 根锚定为 `/build/`——旧规则误伤 `electron/build`
+    （buildResources 源资产目录，非构建产物）。
+- **出包网络事故（如实记录）**：本次 electron-builder 在 packaging 阶段反复挂死
+  （zip 100% 后等待 600s 超时）。取证：GitHub releases/download 路径被加速器返回
+  400，卡的是 electron zip 的 **SHASUMS256.txt 校验文件**（zip 本体有缓存）。
+  处置：从 npmmirror 手动取 SHASUMS 放入 `%LOCALAPPDATA%\electron\Cache\<hash>\`，
+  并以 `NODE_USE_SYSTEM_CA=1` + `ELECTRON_MIRROR`/`ELECTRON_BUILDER_BINARIES_MIRROR`
+  指向 npmmirror 重跑，一次通过。已写入 HANDOVER 环境陷阱。
+- **实测**：门禁三绿；dist:win 全链路自检 7 项全绿；ExtractAssociatedIcon 实抽
+  win-unpacked exe 与 Setup-0.1.6.exe 图标均为蓝底白 TT、与界面 logo 一致；
+  0.1.0~0.1.5 旧包全部保留。
+
 ## 第二十一轮：桌面版启动两连修 + Git「加载更多」修复（0.1.1~0.1.2，补记）
 
 > 本节为后续收口时补记，证据取自各提交正文与当时的探针/自检输出。

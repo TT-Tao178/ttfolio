@@ -34,9 +34,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 - 最新提交：9008394（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
   0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
   0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
-- 桌面版版本 **0.1.5**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.5 六个安装包，
+- 桌面版版本 **0.1.6**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.6 七个安装包，
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次）
+- 品牌图标已落地：exe/安装包/快捷方式均为蓝底白 TT（真源 `electron/build/icon.svg`，
+  重生成 `node scripts/make-icon.mjs`）；git 提交身份已全局统一为
+  TT-Tao178 <GitHub noreply>，历史已 filter-repo 改写归一（2026-09-25）
 - 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
   `npm test` **61 条** ✅
@@ -91,6 +94,15 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 $src = (curl.exe -s "http://localhost:5173/src/app/store.ts") -join "`n"
 $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是这个问题
 ```
+
+**出包时 electron-builder 在 packaging 阶段挂死（zip 100% 后长时间超时）**：
+加速器对 `github.com/.../releases/download` 路径返回 400 时，卡的多半是 electron zip 的
+`SHASUMS256.txt` 校验文件（zip 本体通常已在 `%LOCALAPPDATA%\electron\Cache\<hash>\`）。
+**处置**：从 npmmirror 手动取 SHASUMS 放进对应缓存目录，并用
+`NODE_USE_SYSTEM_CA=1 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`
+重跑 `npx electron-builder --win nsis`（再补 `node scripts/verify-dist-electron.mjs`）。
+2026-09-26 出 0.1.6 即此法一次通过。
 
 ## 7. 测试资产（探针脚本，均在 `.tmp-test/probe/`，已被 .gitignore 忽略）
 
