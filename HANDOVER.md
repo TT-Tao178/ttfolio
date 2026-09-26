@@ -34,12 +34,13 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 - 最新提交：9008394（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
   0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
   0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
-- 桌面版版本 **0.1.6**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.6 七个安装包，
+- 桌面版版本 **0.1.7**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.7 八个安装包，
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次）
-- 品牌图标已落地：exe/安装包/快捷方式均为蓝底白 TT（真源 `electron/build/icon.svg`，
-  重生成 `node scripts/make-icon.mjs`）；git 提交身份已全局统一为
-  TT-Tao178 <GitHub noreply>，历史已 filter-repo 改写归一（2026-09-25）
+- 品牌图标已落地：exe/安装包/快捷方式均为蓝底白 TT、大圆角（rx 60/256）且
+  四角透明（真源 `electron/build/icon.svg`，重生成 `node scripts/make-icon.mjs`）；
+  git 提交身份已全局统一为 TT-Tao178 <GitHub noreply>，历史已 filter-repo
+  改写归一（2026-09-25）
 - 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
   `npm test` **61 条** ✅
