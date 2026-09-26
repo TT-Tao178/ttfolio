@@ -9,7 +9,7 @@ node_modules/
 
 # ---- 构建产物（npm run build 可重建） ----
 dist/
-build/
+/build/
 out/
 
 # ---- 数据库与运行期数据（索引库/备份/回收站/缩略图/日志，全部可重建或属用户隐私） ----

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- 品牌图标单一真源：复刻顶栏 logo（App.tsx 方形 Avatar，背景 tt-primary #1677ff，白色粗体 TT）
+       圆角按 26px 头像 4px 等比放大；字号约 0.52 倍边长，微收字距更贴近界面观感 -->
+  <rect width="256" height="256" rx="40" ry="40" fill="#1677ff"/>
+  <text x="128" y="128" text-anchor="middle" dominant-baseline="central"
+        font-family="'Segoe UI','Microsoft YaHei',Arial,sans-serif"
+        font-size="132" font-weight="700" fill="#ffffff" letter-spacing="-4">TT</text>
+</svg>

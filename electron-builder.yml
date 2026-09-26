@@ -23,6 +23,7 @@ files:
 asarUnpack:
   - node_modules/better-sqlite3/**/*
 win:
+  icon: electron/build/icon.ico
   target:
     - target: nsis
       arch:
