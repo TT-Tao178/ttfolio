@@ -1,6 +1,6 @@
 /** 项目页（3.3）：页签固定 概览→文件→Git→架构图→文档，快捷键 1–5，默认落「文件」。 */
 import { Alert, Button, Descriptions, Form, Input, Modal, Progress, Space, Tabs, Tag, App } from 'antd';
-import { ReloadOutlined, StarOutlined, StarFilled, CopyOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { ReloadOutlined, StarOutlined, StarFilled, CopyOutlined, FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
@@ -246,16 +246,49 @@ function ProjectGone({ projectId, onClose, onBack }: { projectId: string; onClos
 
 function RelocateNotice({ projectId, dirPath, name }: { projectId: string; dirPath: string; name: string }): React.JSX.Element {
   const [newPath, setNewPath] = useState('');
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const relocate = useMutation({
     mutationFn: () => api.post(`/api/projects/${projectId}/relocate`, { dirPath: newPath }),
     onSuccess: () => {
-      void message.success('已重新定位');
+      void message.success('已重新定位，正在重新分析');
       void queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     onError: (e) => void message.error(e instanceof Error ? e.message : '失败')
   });
+  const pick = async (): Promise<void> => {
+    try {
+      const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
+      const first = r.paths[0];
+      if (first !== undefined) setNewPath(first);
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : '选择目录失败');
+    }
+  };
+  const closeThisTab = (): void => {
+    const st = useAppStore.getState();
+    const t = st.tabs.find((x) => x.kind === 'project' && x.projectId === projectId);
+    if (t !== undefined) st.closeTab(t.id);
+  };
+  const unregister = useMutation({
+    mutationFn: () => api.del(`/api/projects/${projectId}?mode=unregister`),
+    onSuccess: async () => {
+      void message.success('已移除登记（磁盘文件未受影响）');
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      closeThisTab();
+    },
+    onError: (e) => void message.error(e instanceof Error ? e.message : '移除失败')
+  });
+  const confirmUnregister = (): void => {
+    modal.confirm({
+      title: `移除「${name}」的登记？`,
+      content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可在「添加项目」重新登记。',
+      okText: '移除登记',
+      okButtonProps: { danger: true },
+      onOk: () => unregister.mutateAsync()
+    });
+  };
   return (
     <div style={{ padding: 32 }}>
       <Alert
@@ -265,9 +298,15 @@ function RelocateNotice({ projectId, dirPath, name }: { projectId: string; dirPa
           <div>
             <p>原路径不存在（可能被移动、改名或删除）：{dirPath}</p>
             <Space.Compact style={{ width: 480 }}>
-              <Input value={newPath} onChange={(e) => setNewPath(e.target.value)} placeholder="输入新路径，原索引数据将保留" data-testid="relocate-input" />
-              <Button type="primary" disabled={newPath === ''} onClick={() => relocate.mutate()} data-testid="relocate-btn">重新定位</Button>
+              <Input value={newPath} onChange={(e) => setNewPath(e.target.value)} onPressEnter={() => { if (newPath.trim() !== '') relocate.mutate(); }} placeholder="粘贴项目所在的新目录路径，原索引数据将保留" data-testid="relocate-input" />
+              <Button icon={<FolderOpenOutlined />} onClick={() => void pick()} data-testid="relocate-pick">选择目录…</Button>
+              <Button type="primary" loading={relocate.isPending} disabled={newPath.trim() === ''} onClick={() => relocate.mutate()} data-testid="relocate-btn">重新定位</Button>
             </Space.Compact>
+            <div style={{ marginTop: 12 }}>
+              <Button danger type="link" icon={<DeleteOutlined />} loading={unregister.isPending} onClick={confirmUnregister} data-testid="relocate-unregister">
+                项目已被彻底删除？移除登记…
+              </Button>
+            </div>
           </div>
         }
       />
