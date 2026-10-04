@@ -83,7 +83,14 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       hoverable
       size="small"
       style={{ borderColor: p.pathOk ? undefined : SEMANTIC.error }}
-      onClick={onOpen}
+      onClick={(e) => {
+        // 两类点击要忽略（都沿 React 树冒泡到卡片，会造成「点弹窗按钮却打开项目/切页」）：
+        // 1) Dropdown 菜单项：弹层 DOM 挂在触发器父节点（卡片内），closest 可识别
+        if ((e.target as HTMLElement).closest('.ant-dropdown') !== null) return;
+        // 2) Modal 弹窗内按钮：portal 到 body，DOM 上不在卡片内——用 contains 识别
+        if (!e.currentTarget.contains(e.target as Node)) return;
+        onOpen();
+      }}
       data-testid="project-card"
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
