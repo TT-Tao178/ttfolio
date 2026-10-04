@@ -34,9 +34,13 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 - 最新提交：9008394（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
   0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
   0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
-- 桌面版版本 **0.1.7**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.7 八个安装包，
+- 桌面版版本 **0.1.8**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.8 九个安装包，
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
-  自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次）
+  自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次；出包前必须
+  停 dev——node 进程锁 .node 文件会让 electron-rebuild 失败）
+- 失效项目闭环已补全：卡片菜单「重新定位到新目录…」（RelocateModal 双入口）、
+  移除操作二次确认、详情失效页「选择目录…/移除登记…」；真源
+  `packages/web/src/features/workbench/RelocateModal.tsx`
 - 品牌图标已落地：exe/安装包/快捷方式均为蓝底白 TT、大圆角（rx 60/256）且
   四角透明（真源 `electron/build/icon.svg`，重生成 `node scripts/make-icon.mjs`）；
   git 提交身份已全局统一为 TT-Tao178 <GitHub noreply>，历史已 filter-repo
