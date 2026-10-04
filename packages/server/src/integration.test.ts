@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { runMigrations } from './db/migrate.js';
-import { insertProject, getProjectByPathKey, patchProject, softDeleteProject, listProjects } from './db/repo/projectsRepo.js';
+import { insertProject, getProjectByPathKey, getProjectRow, patchProject, softDeleteProject, listProjects, checkPathOk } from './db/repo/projectsRepo.js';
 import { getSession, putSession } from './db/repo/sessionRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
@@ -192,6 +192,34 @@ describe('软删除与 rev 乐观锁', () => {
     softDeleteProject(db, row.id);
     expect(getProjectByPathKey(db, pathKey(projDir))).toBeUndefined();
     expect(listProjects(db, { status: 'all' }).find((p) => p.id === row.id)).toBeUndefined();
+  });
+});
+
+describe('失效项目：检测 → 重新定位 → 移除登记', () => {
+  it('目录移动后置失效，relocate 语义改指新家恢复，移除登记后列表不可见', () => {
+    const dirA = path.join(root, '失效项目A');
+    fs.mkdirSync(dirA);
+    const idA = insertProject(db, { dirPath: dirA, dirPathKey: pathKey(dirA), diskName: '失效项目A', defaultArchDir: '架构图' }).id;
+
+    // 用户把目录移走 → 失效检测置 path_ok=0，且列表可按 pathOk 过滤出失效项
+    const dirB = path.join(root, '失效项目A-新家');
+    fs.renameSync(dirA, dirB);
+    checkPathOk(db, (p) => fs.existsSync(p));
+    expect(getProjectRow(db, idA)?.path_ok).toBe(0);
+    expect(listProjects(db, { status: 'all', pathOk: false }).some((x) => x.id === idA)).toBe(true);
+
+    // relocate 语义（路由层：先查重再 patch 回 path_ok=1）
+    expect(getProjectByPathKey(db, pathKey(dirB))).toBeUndefined();
+    patchProject(db, idA, { dir_path: dirB, dir_path_key: pathKey(dirB), disk_name: path.basename(dirB), path_ok: 1 });
+    expect(getProjectByPathKey(db, pathKey(dirB))?.id).toBe(idA);
+    expect(getProjectRow(db, idA)?.path_ok).toBe(1);
+    expect(listProjects(db, { status: 'all', pathOk: false }).some((x) => x.id === idA)).toBe(false);
+
+    // 移除登记：软删除 → 列表与按 key 查找均不可见
+    softDeleteProject(db, idA);
+    expect(getProjectByPathKey(db, pathKey(dirB))).toBeUndefined();
+    expect(listProjects(db, { status: 'all' }).some((x) => x.id === idA)).toBe(false);
+    fs.rmSync(dirB, { recursive: true, force: true });
   });
 });
 
