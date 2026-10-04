@@ -5,10 +5,10 @@
  */
 import { App, Avatar, Card, Dropdown, Tag } from 'antd';
 import {
-  BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
+  AimOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
   ReloadOutlined, StarFilled, StarOutlined, WarningOutlined
 } from '@ant-design/icons';
-import React from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
@@ -16,13 +16,15 @@ import { useAppStore } from '@/app/store';
 import { LanguageBar } from '@/components/LanguageBar';
 import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
+import { RelocateModal } from '@/features/workbench/RelocateModal';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   p: ProjectSummary; onOpen: () => void; onPin: () => void; onAnalyze: () => void;
 }): React.JSX.Element {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient2 = useQueryClient();
+  const [relocateOpen, setRelocateOpen] = useState(false);
   const remove = useMutation({
     mutationFn: (mode: string) => api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
     onSuccess: () => {
@@ -33,22 +35,46 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   const queryInvalidate = async (): Promise<void> => {
     await queryClient2.invalidateQueries({ queryKey: ['projects'] });
   };
+  const confirmUnregister = (): void => {
+    modal.confirm({
+      title: `仅移除「${p.alias ?? p.diskName}」的登记？`,
+      content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
+      okText: '移除登记',
+      okButtonProps: { danger: true },
+      onOk: () => remove.mutateAsync('unregister')
+    });
+  };
+  const confirmDelete = (): void => {
+    modal.confirm({
+      title: `移除登记并删除「${p.alias ?? p.diskName}」的文件？`,
+      content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
+      okText: '移入回收站',
+      okButtonProps: { danger: true },
+      onOk: () => remove.mutateAsync('delete')
+    });
+  };
 
   const menu = {
     items: [
+      ...(p.pathOk === false
+        ? [
+            { key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined />, onClick: () => setRelocateOpen(true) },
+            { type: 'divider' as const }
+          ]
+        : []),
       { key: 'open', label: '打开项目', icon: <FolderOpenOutlined />, onClick: onOpen },
       { key: 'files', label: '打开文件页', icon: <FileTextOutlined />, onClick: onOpen },
       { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !p.gitIsRepo, onClick: () => useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName) },
       { type: 'divider' as const },
       { key: 'copy', label: '复制路径', icon: <CopyOutlined />, onClick: () => { void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); } },
-      { key: 'explorer', label: '在资源管理器中显示', onClick: () => { void api.post('/api/open', { target: 'explorer', projectId: p.id }); } },
-      { key: 'terminal', label: '在此打开终端', onClick: () => { void api.post('/api/open', { target: 'terminal', projectId: p.id }); } },
+      { key: 'explorer', label: '在资源管理器中显示', disabled: p.pathOk === false, onClick: () => { void api.post('/api/open', { target: 'explorer', projectId: p.id }); } },
+      { key: 'terminal', label: '在此打开终端', disabled: p.pathOk === false, onClick: () => { void api.post('/api/open', { target: 'terminal', projectId: p.id }); } },
       { type: 'divider' as const },
-      { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, onClick: onAnalyze },
+      { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false, onClick: onAnalyze },
       { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined />, onClick: onPin },
       { type: 'divider' as const },
-      { key: 'unregister', label: '仅从 ttFolio 移除登记', danger: false, onClick: () => remove.mutate('unregister') },
-      { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, onClick: () => remove.mutate('delete') }
+      { key: 'unregister', label: '仅从 ttFolio 移除登记', onClick: confirmUnregister },
+      { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false, onClick: confirmDelete }
     ]
   };
 
@@ -66,7 +92,9 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
           </Avatar>
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
           {p.alias !== null && <Tag style={{ flexShrink: 0 }}>别名</Tag>}
-          <Tag style={{ flexShrink: 0 }} color="blue">{typeLabel(p.type)}</Tag>
+          {p.pathOk === false
+            ? <Tag style={{ flexShrink: 0 }} color="error" icon={<WarningOutlined />}>目录失效</Tag>
+            : <Tag style={{ flexShrink: 0 }} color="blue">{typeLabel(p.type)}</Tag>}
         </span>
       }
       extra={
@@ -108,6 +136,13 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
           {relTime(p.lastOpenedAt)} · 打开 {p.openCount} 次
         </div>
       </div>
+      <RelocateModal
+        projectId={p.id}
+        name={p.alias ?? p.diskName}
+        dirPath={p.dirPath}
+        open={relocateOpen}
+        onClose={() => setRelocateOpen(false)}
+      />
     </Card>
   );
 }
