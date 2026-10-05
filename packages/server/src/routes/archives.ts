@@ -5,6 +5,7 @@ import type { AppContext } from '../context.js';
 import { ok, fail } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { archiveCreateSchema, archivePatchSchema } from '@ttfolio/shared';
+import { toApiError } from './helpers.js';
 import { listArchives, upsertArchive, patchArchive, deleteArchive, setArchiveViewed, toArchiveInfo } from '../db/repo/docsRepo.js';
 import { getProjectRow } from '../db/repo/projectsRepo.js';
 import { computeArchiveMeta } from '../core/analyzer/index.js';
@@ -107,9 +108,41 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
     setArchiveViewed(ctx.db(), id);
     return ok({ done: true });
   });
+
+  // ---- 文本类文件只读内容（第 26 轮）----
+  // 为什么不走 7817 arch 通道：页面与 7817 跨源，fetch 读文本会被 CORS 拦（iframe/img 不受限）。
+  // 只读约束：rel 必须解析在登记目录内（防 ../ 越界）+ 文本扩展名白名单 + 2MB 上限，绝不写盘。
+  app.get('/api/archives/:id/file', async (req) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { rel?: string };
+    if (q.rel === undefined || q.rel === '') return fail('BAD_REQUEST', '缺少 rel');
+    const db = ctx.db();
+    const row = listArchives(db, '').find((a) => a.id === id);
+    if (row === undefined) return fail('NOT_FOUND', '架构图目录不存在', 404);
+    if (!/\.(md|markdown|txt|json)$/i.test(q.rel)) return fail('BAD_REQUEST', '仅支持文本类文件');
+    const abs = path.resolve(row.dir_path, q.rel);
+    const dirAbs = path.resolve(row.dir_path);
+    const relCheck = path.relative(dirAbs, abs);
+    if (relCheck.indexOf('..') === 0 || path.isAbsolute(relCheck)) return fail('PATH_OUT_OF_SCOPE', '路径越界');
+    const st = fsx.statSafe(abs);
+    if (st === null || st.isDir) return fail('NOT_FOUND', '文件不存在', 404);
+    if (st.size > 2 * 1024 * 1024) return fail('BAD_REQUEST', '文件超过 2MB，请用系统工具查看');
+    try {
+      const content = fsx.readTextFile(abs, st.size).content;
+      logActivity(db, { kind: 'archive.read_text', level: 'L1', projectId: getArchiveProjectId(db, id), targetPath: abs, actor: currentActor().actor });
+      return ok({ content });
+    } catch (err) {
+      return fail(...toApiErrorTuple(err));
+    }
+  });
 };
 
 function getArchiveProjectId(db: import('better-sqlite3').Database, id: string): string | null {
   const row = db.prepare<[string], { project_id: string }>('SELECT project_id FROM archives WHERE id = ?').get(id);
   return row?.project_id ?? null;
+}
+
+function toApiErrorTuple(err: unknown): [import('@ttfolio/shared').ErrorCode, string, number, unknown?] {
+  const e = toApiError(err);
+  return [e.code, e.message, e.status, e.detail];
 }

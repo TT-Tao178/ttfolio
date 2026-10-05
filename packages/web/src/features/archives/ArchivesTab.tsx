@@ -61,8 +61,8 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
 
   const selected = files.find((f) => f.rel === selectedRel) ?? null;
 
-  // 文本类文件的只读内容：走 7817 arch 通道 fetch（架构图目录可能不在项目白名单内，
-  // 不能用 /api/fs/file）；json 尝试格式化，其余原样
+  // 文本类文件的只读内容：走同源 API（页面与 7817 跨源，fetch archUrl 会被 CORS 拦）；
+  // 服务端三重只读约束——rel 解析在登记目录内、文本扩展名白名单、2MB 上限
   const [textContent, setTextContent] = useState<string | null>(null);
   useEffect(() => {
     if (current === null || selected === null || selected.kind !== 'text') {
@@ -70,13 +70,11 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
       return;
     }
     let cancelled = false;
-    void fetch(archUrl(projectId, current.id, selected.rel))
+    void api
+      .get<{ content: string }>(`/api/archives/${current.id}/file`, { rel: selected.rel })
       .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.text();
-      })
-      .then((raw) => {
         if (cancelled) return;
+        let raw = r.content;
         if (selected.rel.toLowerCase().endsWith('.json')) {
           try {
             raw = JSON.stringify(JSON.parse(raw), null, 2);
