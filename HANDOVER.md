@@ -34,7 +34,7 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 - 最新提交：9008394（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
   0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
   0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
-- 桌面版版本 **0.1.9**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.9 十个安装包，
+- 桌面版版本 **0.1.10**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.1.10 十一个安装包，
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次；出包前必须
   停 dev——node 进程锁 .node 文件会让 electron-rebuild 失败；杀软 EBUSY 锁
