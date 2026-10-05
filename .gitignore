@@ -60,3 +60,4 @@ desktop.ini
 # ---- 桌面版打包产物 ----
 /app/
 /dist-electron/
+/dist-electron-tmp*/

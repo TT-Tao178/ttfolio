@@ -106,6 +106,32 @@
   electron-rebuild EPERM 连败两次；按命令行过滤 ttfolio 相关 node 进程全清后
   一次通过。出包前置检查应含「ttfolio 相关 node 进程清零」。
 
+## 第二十七轮：开源规范化改造（0.2.4，7 个提交）
+
+> 体检结论与实施方案见 PLAN-第27轮-开源规范化.md；四项分叉经用户拍板：
+> 只改安装包文件名 / 中文主 README / 内部文档移 docs/internal / Release+topics。
+
+- **体检**（对照正规可上线开源项目）：达标 5 项（MIT/CHANGELOG/工程配置/门禁/分支）；
+  A 级差距 4 项——GitHub Releases 为 0（4 个 tag 全是 Web 阶段旧里程碑）、package.json
+  六个元数据字段缺失（author 缺失致 exe Publisher 空）、README 单语且品牌三叫法混用、
+  仓库 topics/homepage 空；B 级无 CI/模板/截图（CI 用户此前明确不加）；C 级敏感信息
+  （真实路径/项目名在 5 个 tracked 文件 + 1 条提交信息）与根目录 7 份内部文档混杂。
+- **提交**：2a06ea3 元数据补全（author=TT-Tao178/license=MIT/repository/bugs/homepage/
+  keywords/英文 description）；5c69800 playwright e2e 目录改相对解析（去本机绝对路径，
+  amend 修正 ../ 层级）；8af456c 七份内部文档 git mv 入 docs/internal/（根目录只留
+  开源门面）；a8583f3 artifactName 改 ttFolio-Setup（productName/shortcutName/appId
+  按拍板不动）；6174dc4 README 中文主重写（语言切换行+三徽章+品牌统一+新包名）；
+  a491411 README.en.md 英文同构；90457c2 userData 随数据目录隔离。
+- **过程事故（已修）**：0.2.4 首次自检「启动冒烟失败」——取证为用户开着的安装版
+  （4 进程）持单实例锁，冒烟实例启动即退出码 0；此前多次冒烟通过只是碰巧用户未开
+  应用。修法：TTFOLIO_DATA_DIR 隔离时 setPath('userData') 同步隔离，锁随数据目录
+  分离；重打包后 7 项全绿（带着在用安装版通过——自检从此不依赖用户关应用）。
+  另：杀软 EBUSY 锁旧 asar 第四次出现，绕过流程已熟（换全新输出目录）。
+- **出包**：ttFolio-Setup-0.2.4.exe（首个 ASCII 新名安装包）自检 7 项全绿；
+  0.1.0~0.2.3 共 14 个旧包全部保留（现 15 个）。
+- **发布**：tag v0.2.4 + GitHub Release 挂安装包 + topics/description 更新（首个
+  桌面版 Release，README 的 Releases 链接自此有效）。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
