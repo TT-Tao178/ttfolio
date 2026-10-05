@@ -323,6 +323,8 @@ export interface ArchiveMeta {
   htmlFiles: Array<{ rel: string; mtime: string; size: number; hasSourceJson: boolean }>;
   /** 图片文件（第 26 轮）：png/jpg/jpeg/gif/webp/svg/bmp——架构图目录常见产物，供页签内直接预览 */
   imageFiles: Array<{ rel: string; mtime: string; size: number; hasSourceJson: boolean }>;
+  /** 文本类文件（第 26 轮）：md/markdown/txt/json——archify 产物的说明与源文件，只读取文本预览 */
+  textFiles: Array<{ rel: string; mtime: string; size: number; hasSourceJson: boolean }>;
   totalBytes: number;
   entryRel: string | null;
   entrySource: 'index_html' | 'manual' | 'list';
@@ -332,10 +334,12 @@ export interface ArchiveMeta {
 export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null): ArchiveMeta {
   const htmlFiles: ArchiveMeta['htmlFiles'] = [];
   const imageFiles: ArchiveMeta['imageFiles'] = [];
+  const textFiles: ArchiveMeta['textFiles'] = [];
   let totalBytes = 0;
   const stack: string[] = [dirAbs];
   let indexRel: string | null = null;
   const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i;
+  const TEXT_RE = /\.(md|markdown|txt|json)$/i;
   while (stack.length > 0) {
     const dir = stack.pop();
     if (dir === undefined) break;
@@ -366,11 +370,14 @@ export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null):
         };
       } else if (IMAGE_RE.test(lower)) {
         imageFiles[imageFiles.length] = { rel, mtime: st.mtimeIso, size: st.size, hasSourceJson: false };
+      } else if (TEXT_RE.test(lower)) {
+        textFiles[textFiles.length] = { rel, mtime: st.mtimeIso, size: st.size, hasSourceJson: false };
       }
     }
   }
   htmlFiles.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
   imageFiles.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
+  textFiles.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
   let entryRel: string | null = null;
   let entrySource: ArchiveMeta['entrySource'] = 'list';
   if (manualEntry !== undefined && manualEntry !== null && manualEntry !== '') {
@@ -380,5 +387,5 @@ export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null):
     entryRel = indexRel;
     entrySource = 'index_html';
   }
-  return { htmlFiles, imageFiles, totalBytes, entryRel, entrySource };
+  return { htmlFiles, imageFiles, textFiles, totalBytes, entryRel, entrySource };
 }

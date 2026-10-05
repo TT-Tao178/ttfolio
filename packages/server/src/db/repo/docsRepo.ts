@@ -147,7 +147,8 @@ export function toArchiveInfo(
   htmlFiles: ArchiveEntryFile[],
   sourceJsonFiles: string[],
   changed: boolean,
-  imageFiles: ArchiveEntryFile[] = []
+  imageFiles: ArchiveEntryFile[] = [],
+  textFiles: ArchiveEntryFile[] = []
 ): ArchiveInfo {
   return {
     id: row.id,
@@ -165,6 +166,7 @@ export function toArchiveInfo(
     changed,
     htmlFiles,
     imageFiles,
+    textFiles,
     sourceJsonFiles
   };
 }

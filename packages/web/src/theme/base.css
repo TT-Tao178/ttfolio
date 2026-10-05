@@ -72,3 +72,5 @@ body,
 /* 面包屑可点击段：主题色 + 手型光标 + hover 下划线（第 26 轮：用户报「看不出能点」） */
 .tt-crumb-link { color: var(--tt-primary); cursor: pointer; }
 .tt-crumb-link:hover { text-decoration: underline; }
+/* 特异性高于 antd cssinjs 的 .ant-breadcrumb-link（运行时注入会盖过 base.css 的单类规则） */
+.ant-breadcrumb .tt-crumb-link { color: var(--tt-primary); cursor: pointer; }

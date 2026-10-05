@@ -24,7 +24,7 @@ interface ArchFile {
   rel: string;
   mtime: string;
   size: number;
-  kind: 'html' | 'image';
+  kind: 'html' | 'image' | 'text';
   hasSourceJson: boolean;
 }
 
@@ -48,17 +48,49 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
     return list.find((a) => a.id === archId) ?? list[0] ?? null;
   }, [archives, archId]);
 
-  // HTML + 图片合并成一份文件列表（按修改时间倒序）
+  // HTML + 图片 + 文本合并成一份文件列表（按修改时间倒序）
   const files: ArchFile[] = useMemo(() => {
     if (current === null) return [];
     const all: ArchFile[] = [
       ...current.htmlFiles.map((f) => ({ ...f, kind: 'html' as const })),
-      ...current.imageFiles.map((f) => ({ ...f, kind: 'image' as const, hasSourceJson: false }))
+      ...current.imageFiles.map((f) => ({ ...f, kind: 'image' as const, hasSourceJson: false })),
+      ...current.textFiles.map((f) => ({ ...f, kind: 'text' as const, hasSourceJson: false }))
     ];
     return all.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
   }, [current]);
 
   const selected = files.find((f) => f.rel === selectedRel) ?? null;
+
+  // 文本类文件的只读内容：走 7817 arch 通道 fetch（架构图目录可能不在项目白名单内，
+  // 不能用 /api/fs/file）；json 尝试格式化，其余原样
+  const [textContent, setTextContent] = useState<string | null>(null);
+  useEffect(() => {
+    if (current === null || selected === null || selected.kind !== 'text') {
+      setTextContent(null);
+      return;
+    }
+    let cancelled = false;
+    void fetch(archUrl(projectId, current.id, selected.rel))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
+      .then((raw) => {
+        if (cancelled) return;
+        if (selected.rel.toLowerCase().endsWith('.json')) {
+          try {
+            raw = JSON.stringify(JSON.parse(raw), null, 2);
+          } catch { /* 非 JSON 内容原样展示 */ }
+        }
+        setTextContent(raw);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setTextContent(`读取失败：${e instanceof Error ? e.message : '未知错误'}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [current, selected, projectId]);
 
   // 进入页签 / 切换目录后自动打开：入口优先（无入口取第一个文件）——贴合「直接查看」
   useEffect(() => {
@@ -99,6 +131,18 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
       return (
         <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 12, overflow: 'auto' }}>
           <img src={url} alt={selected.rel} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} data-testid="archive-image" />
+        </div>
+      );
+    }
+    if (selected.kind === 'text') {
+      return (
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0 }}>
+          <div style={{ fontSize: 12, opacity: 0.6 }}>只读文本预览（{fmtBytes(selected.size)}）</div>
+          <pre
+            data-testid="archive-text"
+            className="tt-mono"
+            style={{ flex: 1, overflow: 'auto', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 12, margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+          >{textContent ?? '加载中…'}</pre>
         </div>
       );
     }
@@ -143,7 +187,7 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
                   {f.rel.includes('/') ? f.rel.slice(f.rel.lastIndexOf('/') + 1) : f.rel}
                 </span>
                 {current?.entryRel === f.rel && <Tag color="blue" style={{ marginRight: 0 }}>入口</Tag>}
-                <Tag style={{ marginRight: 0 }} color={f.kind === 'html' ? 'green' : 'purple'}>{f.kind === 'html' ? 'HTML' : '图片'}</Tag>
+                <Tag style={{ marginRight: 0 }} color={f.kind === "html" ? "green" : f.kind === "image" ? "purple" : "geekblue"}>{f.kind === "html" ? "HTML" : f.kind === "image" ? "图片" : "文本"}</Tag>
                 <span style={{ fontSize: 11, opacity: 0.55 }}>{relTime(f.mtime)}</span>
               </List.Item>
             )}

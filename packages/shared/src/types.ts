@@ -91,6 +91,8 @@ export interface ArchiveInfo {
   htmlFiles: ArchiveEntryFile[];
   /** 图片文件（第 26 轮）：架构图目录常见产物，页签内直接预览 */
   imageFiles: ArchiveEntryFile[];
+  /** 文本类文件（第 26 轮）：md/txt/json 说明与源文件，只读文本预览 */
+  textFiles: ArchiveEntryFile[];
   sourceJsonFiles: string[];
 }
 
