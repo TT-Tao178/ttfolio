@@ -16,6 +16,13 @@ const net = require('node:net');
 const crypto = require('node:crypto');
 const path = require('node:path');
 
+// TTFOLIO_DATA_DIR 隔离数据目录时（自检冒烟 / 多数据目录测试），userData 也跟着隔离——
+// 单实例锁按 userData 区分，否则冒烟实例会被用户正在使用的安装版持锁挡掉（启动即退出，
+// verify-dist-electron 因此误报「启动冒烟失败」）。
+if (process.env['TTFOLIO_DATA_DIR'] !== undefined && process.env['TTFOLIO_DATA_DIR'] !== '') {
+  app.setPath('userData', path.join(process.env['TTFOLIO_DATA_DIR'], 'electron-userData'));
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
