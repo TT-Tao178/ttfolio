@@ -11,8 +11,10 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 
-export function MoveCopyModal({ projectId, items, mode, onClose }: {
+export function MoveCopyModal({ projectId, items, mode, onClose, onDone }: {
   projectId: string; items: string[]; mode: 'move' | 'copy' | null; onClose: () => void;
+  /** 成功后回调：移动/复制会让已展开子层的本地缓存过期，FilesTab 用它强制整树刷新 */
+  onDone?: () => void;
 }): React.JSX.Element | null {
   const [targetDir, setTargetDir] = useState('');
   const { message, modal } = App.useApp();
@@ -30,6 +32,7 @@ export function MoveCopyModal({ projectId, items, mode, onClose }: {
       .then(async () => {
         void message.success(`${verb}完成`);
         await queryClient.invalidateQueries({ queryKey: ['tree', projectId] });
+        onDone?.();
         onClose();
       })
       .catch((e: unknown) => {

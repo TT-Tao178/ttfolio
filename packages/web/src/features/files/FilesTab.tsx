@@ -380,6 +380,12 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         items={mcTarget?.items ?? []}
         mode={mcTarget?.mode ?? null}
         onClose={() => setMcTarget(null)}
+        onDone={() => {
+          // 移动/复制后已展开子层是本地缓存，invalidate 根查询清不掉——整树收起强制重读，
+          // 用户重新展开看到的一定是新结构
+          setExpandedKeys([]);
+          void refetch();
+        }}
       />
     </div>
   );
