@@ -130,9 +130,10 @@ type Crumb = { title: React.ReactNode };
 
 /** 可点击段的可视化包装：主题色 + 手型光标 + hover 下划线。
  *  用户报障「没办法点击项目名/文件」——第 7/19 轮已实现点击逻辑，但渲染成灰色纯文本
- *  （实测 rgba(0,0,0,0.45) + cursor:auto），视觉上与不可点完全一致，没有任何可供性。 */
+ *  （实测 rgba(0,0,0,0.45) + cursor:auto），视觉上与不可点完全一致，没有任何可供性。
+ *  颜色走内联：antd cssinjs 运行时注入的链接色会按顺序盖过 base.css 的类规则。 */
 function crumbLink(text: string, onClick: () => void): Crumb {
-  return { title: <a className="tt-crumb-link" onClick={onClick}>{text}</a> };
+  return { title: <a className="tt-crumb-link" style={{ color: 'var(--tt-primary)', cursor: 'pointer' }} onClick={onClick}>{text}</a> };
 }
 
 /**
