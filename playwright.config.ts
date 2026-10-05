@@ -16,7 +16,8 @@ export default defineConfig({
     timeout: 60000,
     env: {
       TTFOLIO_PORT: '7733',
-      TTFOLIO_DATA_DIR: process.env['TTFOLIO_E2E_DATA'] ?? 'D:/Workspace-1/code/ttfolio/.tmp-test/e2e-data'
+      // 相对仓库根解析（开源合规：默认值不得带开发者本机绝对路径）
+      TTFOLIO_DATA_DIR: process.env['TTFOLIO_E2E_DATA'] ?? new URL('./.tmp-test/e2e-data', import.meta.url).pathname.replace(/^\/([A-Za-z]):/, '$1:')
     }
   }
 });
