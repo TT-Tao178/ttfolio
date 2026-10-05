@@ -126,7 +126,14 @@ export function PathBar(): React.JSX.Element {
   );
 }
 
-type Crumb = { title: string; onClick?: () => void };
+type Crumb = { title: React.ReactNode };
+
+/** 可点击段的可视化包装：主题色 + 手型光标 + hover 下划线。
+ *  用户报障「没办法点击项目名/文件」——第 7/19 轮已实现点击逻辑，但渲染成灰色纯文本
+ *  （实测 rgba(0,0,0,0.45) + cursor:auto），视觉上与不可点完全一致，没有任何可供性。 */
+function crumbLink(text: string, onClick: () => void): Crumb {
+  return { title: <a className="tt-crumb-link" onClick={onClick}>{text}</a> };
+}
 
 /**
  * 面包屑（FR-1.5：域 / 项目 / 子路径，可逐级点击）。
@@ -137,17 +144,17 @@ type Crumb = { title: string; onClick?: () => void };
  */
 function buildCrumbs(tab: Tab | null): Crumb[] {
   if (tab === null || tab.kind === 'overview') {
-    return [{ title: '工作台', onClick: () => goHome() }];
+    return [crumbLink('工作台', () => goHome())];
   }
-  const crumbs: Crumb[] = [{ title: '工作台', onClick: () => goHome() }];
+  const crumbs: Crumb[] = [crumbLink('工作台', () => goHome())];
   if (tab.kind === 'project' && tab.projectId !== null) {
     const projectId = tab.projectId;
-    crumbs.push({ title: tab.title === '' ? '项目' : tab.title, onClick: () => openAt({ kind: 'project', projectId, targetPath: null, subTab: 'overview' }) });
+    crumbs.push(crumbLink(tab.title === '' ? '项目' : tab.title, () => openAt({ kind: 'project', projectId, targetPath: null, subTab: 'overview' })));
     // 子页签（文件/Git/架构图/文档）可点：跳回该子页签并清 targetPath（关闭右侧编辑器）。
     // 用户报障：打开文件后点「文件」没有反应、回不去文件列表页——原来这段是纯文本。
     if (tab.subTab !== null) {
       const subTab = tab.subTab;
-      crumbs.push({ title: subTabLabel(subTab), onClick: () => openAt({ kind: 'project', projectId, targetPath: null, subTab }) });
+      crumbs.push(crumbLink(subTabLabel(subTab), () => openAt({ kind: 'project', projectId, targetPath: null, subTab })));
     }
   } else {
     if (tab.title !== '') crumbs.push({ title: tab.title });
