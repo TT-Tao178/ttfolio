@@ -10,7 +10,7 @@
  * 3) 「前进/后退」原先无历史可退：openFile 是死代码（`void openFile;`），选择文件从不写标签历史。
  *    现在编辑器打开哪个文件由标签的 targetPath 驱动，选中文件即写入历史，前进/后退可直接回放。
  */
-import { Alert, Button, Dropdown, Empty, Input, Modal, Space, Switch, Tree, App } from 'antd';
+import { Alert, Button, Empty, Input, Menu, Modal, Space, Switch, Tree, App } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
   CopyOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined, ReloadOutlined, ScissorOutlined, SearchOutlined,
@@ -109,21 +109,23 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   failedRef.current = failedPaths;
   const { message, modal } = App.useApp();
 
-  // 右键菜单（第 26 轮）：复制/移动目标弹窗 + 绝对路径所需的项目根。
-  // dirPath 走 ref：toAntdTree 在 effect/loadChildren 里构建树，闭包拿到的一定是最新值
+  // 右键菜单（第 27 轮重构为容器委托 + 受控固定定位菜单）：mcTarget 是复制/移动弹窗，
+  // dirPath 为复制绝对路径所需的项目根（与详情页共享查询缓存）
   const [mcTarget, setMcTarget] = useState<{ items: string[]; mode: 'move' | 'copy' } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   const { data: detailData } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`)
   });
   const dirPathRef = useRef<string | null>(null);
   dirPathRef.current = detailData?.dirPath ?? null;
-  const menuCtx: TreeMenuCtx = React.useMemo(() => ({
-    projectId,
-    getDirPath: () => dirPathRef.current,
-    notify: (msg) => message.success(msg),
-    onMoveCopy: (items, mode) => setMcTarget({ items, mode })
-  }), [projectId, message]);
+  /** 剪贴板写入兜底：非安全上下文或权限拒绝时给出可见提示，不静默失败 */
+  const writeClipboard = (text: string, okMsg: string): void => {
+    navigator.clipboard.writeText(text).then(
+      () => { void message.success(okMsg); },
+      () => { void message.error('复制失败：浏览器未授权剪贴板，请手动选择路径文本复制'); }
+    );
+  };
 
   const { data: rootData, isLoading, error, refetch } = useQuery({
     queryKey: ['tree', projectId, '', showIgnored],
@@ -137,8 +139,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
 
   // 根节点 → 树（合并而非重建：保住已展开分支）
   useEffect(() => {
-    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current, menuCtx)));
-  }, [rootData, menuCtx]);
+    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current)));
+  }, [rootData]);
 
   // 「打开项目默认展开第一个文件」：打开项目落「文件」页签时入口会设置 pendingAutoOpenProject，
   // 这里消费一次——自动选中第一个文本文件（没有文本文件就选第一个文件）；用户主动回到
@@ -172,7 +174,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           path: rel,
           showIgnored: showIgnored ? '1' : '0'
         });
-        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current, menuCtx)));
+        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current)));
         setFailedPaths((prev) => prev.filter((p) => p !== rel));
       } catch (e) {
         const code = e instanceof ApiClientError ? e.code : '';
@@ -190,7 +192,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         void message.error(`展开「${rel}」失败：${hint}`);
       }
     },
-    [projectId, showIgnored, message, menuCtx]
+    [projectId, showIgnored, message]
   );
 
   // 面包屑目录段点击（第 26 轮）：逐层懒加载展开到目标目录并选中——
@@ -219,6 +221,38 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       setSelectedPath(cur);
     })();
   }, [treeLocate, projectId, loadChildren]);
+
+  // 右键菜单（第 27 轮定稿）：document 级原生 contextmenu 监听——React 合成事件挂在
+  // root 容器上，树重渲染与事件派发存在时序竞争（右键偶发不弹的根因）；原生监听挂在
+  // document 上，不经过 React 调度，任何渲染状态下都稳定触发。
+  useEffect(() => {
+    const onCtx = (e: MouseEvent): void => {
+      const t = e.target as HTMLElement;
+      if (t.closest?.('[data-testid="tree-ctx-menu"]') !== null) return;
+      const treeEl = t.closest('[data-testid="file-tree"]');
+      if (treeEl === null) return;
+      const el = t.closest('[data-path]') ?? t.closest('.ant-tree-treenode')?.querySelector('[data-path]') ?? null;
+      if (el === null) return;
+      e.preventDefault();
+      const x = Math.min(e.clientX, window.innerWidth - 210);
+      const y = Math.min(e.clientY, window.innerHeight - 240);
+      setCtxMenu({ x, y, path: el.getAttribute('data-path') ?? '' });
+    };
+    document.addEventListener('contextmenu', onCtx);
+    return () => document.removeEventListener('contextmenu', onCtx);
+  }, [projectId]);
+
+  // 右键菜单打开时，点击任意其它位置关闭（菜单容器 onMouseDown 已阻止冒泡，内部点击不受影响）
+  useEffect(() => {
+    if (ctxMenu === null) return;
+    const close = (): void => setCtxMenu(null);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('blur', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('blur', close);
+    };
+  }, [ctxMenu]);
 
   const del = useMutation({
     mutationFn: (paths: string[]) => api.post('/api/fs/delete', { projectId, paths, confirm: true }),
@@ -280,7 +314,10 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <div style={{ flex: 1, overflow: 'auto' }} data-testid="file-tree">
+        <div
+          style={{ flex: 1, overflow: 'auto' }}
+          data-testid="file-tree"
+        >
           {filter.length > 0 ? (
             (searchData?.results ?? []).length === 0 ? (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配文件" />
@@ -387,16 +424,46 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           void refetch();
         }}
       />
+
+      {/* 右键菜单（第 27 轮）：固定定位受控菜单——document mousedown 关闭，
+          容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行 */}
+      {ctxMenu !== null && (
+        <div
+          data-testid="tree-ctx-menu"
+          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <Menu
+            selectable={false}
+            style={{ border: 'none', background: 'transparent' }}
+            onClick={({ key }) => {
+              const path = ctxMenu.path;
+              setCtxMenu(null);
+              if (key === 'copy-to') setMcTarget({ items: [path], mode: 'copy' });
+              else if (key === 'move-to') setMcTarget({ items: [path], mode: 'move' });
+              else if (key === 'explorer') void api.post('/api/open', { target: 'explorer', projectId, path });
+              else if (key === 'copy-rel') writeClipboard(path, `已复制相对路径：${path}`);
+              else if (key === 'copy-abs') {
+                const dir = dirPathRef.current;
+                if (dir === null) { void message.error('项目信息尚未加载'); return; }
+                const abs = absJoin(dir, path);
+                writeClipboard(abs, `已复制绝对路径：${abs}`);
+              }
+            }}
+            items={[
+              { key: 'copy-to', label: '复制到…', icon: <CopyOutlined /> },
+              { key: 'move-to', label: '移动到…', icon: <ScissorOutlined /> },
+              { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined /> },
+              { type: 'divider' as const },
+              { key: 'copy-rel', label: '复制相对路径' },
+              { key: 'copy-abs', label: '复制绝对路径' }
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
-}
-
-/** 右键菜单上下文（第 26 轮）：菜单项动作所需的最新值经 ref 读取，避免闭包过期 */
-interface TreeMenuCtx {
-  projectId: string;
-  getDirPath: () => string | null;
-  notify: (msg: string) => void;
-  onMoveCopy: (items: string[], mode: 'move' | 'copy') => void;
 }
 
 /** 相对路径 → 绝对路径（项目根 + 相对段，Windows 分隔符） */
@@ -405,7 +472,7 @@ function absJoin(dir: string, rel: string): string {
   return `${dir}${sep}${rel.split('/').join('\\')}`;
 }
 
-function toAntdTree(nodes: TreeNode[], failed: string[] = [], menuCtx: TreeMenuCtx | null = null): DataNode[] {
+function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
   return nodes.map((n) => {
     const key = n.path;
     const gitColor = n.gitState !== undefined ? GIT_COLORS[n.gitState] : undefined;
@@ -424,47 +491,11 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = [], menuCtx: TreeMenuC
     const tip = [isFailed ? '展开失败（权限不足或路径已失效）' : '', linkNote, n.gitState !== undefined ? `Git: ${n.gitState}` : '']
       .filter((s) => s !== '')
       .join(' · ');
-    // 右键菜单（第 26 轮，用户点名 5 项）：挂 body 隔离 DOM 冒泡——菜单点击不得触发
-    // 树节点的选中/展开（ProjectCard 教训：弹层挂进节点 DOM 里点击会冒泡串台）
-    const title = menuCtx !== null ? (
-      <Dropdown
-        trigger={['contextMenu']}
-        getPopupContainer={() => document.body}
-        menu={{
-          items: [
-            { key: 'copy-to', label: '复制到…', icon: <CopyOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); menuCtx.onMoveCopy([key], 'copy'); } },
-            { key: 'move-to', label: '移动到…', icon: <ScissorOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); menuCtx.onMoveCopy([key], 'move'); } },
-            { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); void api.post('/api/open', { target: 'explorer', projectId: menuCtx.projectId, path: key }); } },
-            { type: 'divider' as const },
-            {
-              key: 'copy-rel', label: '复制相对路径', onClick: (info) => {
-                info.domEvent.stopPropagation();
-                void navigator.clipboard.writeText(key);
-                menuCtx.notify(`已复制相对路径：${key}`);
-              }
-            },
-            {
-              key: 'copy-abs', label: '复制绝对路径', disabled: menuCtx.getDirPath() === null, onClick: (info) => {
-                info.domEvent.stopPropagation();
-                const dir = menuCtx.getDirPath();
-                if (dir === null) return;
-                const abs = absJoin(dir, key);
-                void navigator.clipboard.writeText(abs);
-                menuCtx.notify(`已复制绝对路径：${abs}`);
-              }
-            }
-          ]
-        }}
-      >
-        <span style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
-          {n.name}
-          {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
-          {n.ignored === true ? '（忽略）' : ''}
-          {isFailed ? '（展开失败）' : ''}
-        </span>
-      </Dropdown>
-    ) : (
-      <span style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
+    // 右键菜单（第 27 轮重构）：节点只带 data-path 标记，菜单由树容器级
+    // onContextMenu 委托 + 受控固定定位菜单实现——不依赖 trigger 落点，
+    // 右键节点任意位置（含行空白）都能弹，且与 React mousedown 重渲染无竞争。
+    const title = (
+      <span data-path={key} style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
         {n.name}
         {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
         {n.ignored === true ? '（忽略）' : ''}
