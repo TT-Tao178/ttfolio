@@ -34,5 +34,5 @@ nsis:
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
   unicode: true
-  artifactName: TT项目管理工作台-Setup-${version}.${ext}
+  artifactName: ttFolio-Setup-${version}.${ext}
   shortcutName: TT项目管理工作台
