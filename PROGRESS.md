@@ -1,5 +1,62 @@
 # PROGRESS
 
+## 第二十六轮：面包屑逐级定位 + 架构图内嵌查看 + 文件树右键菜单（0.1.9，已修，待用户手测）
+
+> 三项需求先出规划文档（PLAN-第26轮-交互三件套.md，未随本轮提交）经用户批准后实施；
+> 全部按小步提交法拆分，共 9 个功能/修复提交 + 1 个版本提交。
+
+### ① 面包屑逐级可点（121f57a + be60aa7）
+
+- **取证反转**：点击功能第 7/19 轮就有且好使（verify-round19 重跑通过），真实痛点是
+  **可点段渲染成灰色纯文本**（round26 探针实测 rgba(0,0,0,0.45)+cursor:auto）——没有
+  任何「能点」的视觉信号。
+- **改动**：可点段（工作台/项目名/子页签）包 `.tt-crumb-link`（主题色内联 + pointer +
+  hover 下划线；antd cssinjs 运行时注入会盖过 base.css 类规则，颜色走内联一锤定音）；
+  **目录段（除最后一段文件名外）可点**——清 targetPath 回文件列表 + `store.treeLocate`
+  定位请求，FilesTab 受控 expandedKeys 逐层懒加载展开并选中（loadChildren 幂等）。
+- **实测**：可点段 rgb(22,119,255)+pointer；点目录段后编辑器关闭、树展开到该目录并
+  高亮；点「文件」回列表（第 19 轮行为回归通过）。
+
+### ② 架构图软件内直接查看（056092a + 38c62f8 + 73fc738 + 6c09161 + 6d16389）
+
+- **真实根因**：取证用户真实架构图目录（D:\Workspace-1\架构图\ttFolio）——产物共
+  25 个文件四类（3 主图 HTML + 3 visual-check HTML + 12 PNG + 7 md/json + json 源），
+  而旧扫描只收 .html，图片/文本全被挡在列表外——「只是显示一些文件」由此而来。
+- **改动**：扫描新增 imageFiles（png/jpg/jpeg/gif/webp/svg/bmp）与 textFiles
+  （md/markdown/txt/json），shared 只增字段、链路带默认参数（contract.ts 等旧调用点
+  兼容）；页签重构为 **DocsTab 同款常驻分栏**——左文件列表（三类 Tag + 入口标记 +
+  多目录 Select），右预览（HTML→iframe 同 sandbox、图片→img、文本→只读 <pre> 且
+  json 格式化）；进入自动打开入口文件；分栏宽度持久化 archListWidth。
+- **过程中抓到的真 bug（CORS）**：文本预览最初 fetch 7817 arch 地址被浏览器 CORS
+  拦（iframe/img 不受限但 fetch 受限）→ 新增同源只读接口
+  `GET /api/archives/:id/file?rel=`，三重只读约束：rel 经 path.relative 不得越出
+  登记目录（C-02 口径，项目 lint 禁 startsWith 走 indexOf 等价实现）+ 文本扩展名
+  白名单 + 2MB 上限；日志 archive.read_text（L1）。7817 零改动。
+- **实测（真实目录，零 mock）**：25 项三类计数 6/12/7 全对；MD 预览 3384 字符真实
+  内容（架构分析说明文档）；PNG naturalWidth 加载成功；HTML iframe 正常。
+
+### ③ 文件树右键菜单（540f239 + f2c6475）
+
+- **取证**：后端三项能力全部现成——复制=fs/move 的 copy 模式、移动=同接口、
+  资源管理器=/api/open 已支持可选 path（explorer /select 可定位选中），后端零改动。
+- **改动**：MoveCopyModal（目标目录粘贴 + pick-folder 双入口；后端「目标已存在」
+  转「跳过同名项继续」，刻意不做覆盖防误删）；树节点 title 包 Dropdown
+  （contextMenu，**弹层挂 body** 与树节点 DOM 物理隔离，防 ProjectCard 式点击串台）；
+  5 项菜单——复制到…/移动到…/在资源管理器中打开/复制相对路径/复制绝对路径
+  （项目根取共享详情缓存，ref 供菜单闭包读最新值）；目录与文件同款。
+- **实测**：五项齐全；fs/move 请求体（mode/items/targetDir）与 /open 请求体
+  （含 path）拦截断言全过——**移动/复制全程 route 拦截，零真实写盘**；剪贴板
+  相对/绝对路径内容逐一比对正确。
+
+### 门禁与收口
+
+- typecheck / lint（0 警告）/ test 62 条全绿；0.1.9 安装包自检 7 项全绿
+  （出包遇杀软 EBUSY 锁旧 asar——按 0.1.5 既定绕过：electron-builder 输出
+  dist-electron-tmp + VERIFY_DIST 指向 win-unpacked 自检 + 安装包移回，锁源进程
+  未强杀以避免误伤用户可能开着的安装版）；0.1.0~0.1.8 全部保留。
+- 探针 verify-round26（route 合成）ROUND26 PASS + round26-real（真实目录零 mock）
+  全过；inspect-data 复核 drafts=0、trash=0、忽略规则无禁用。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
