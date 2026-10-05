@@ -10,22 +10,23 @@
  * 3) 「前进/后退」原先无历史可退：openFile 是死代码（`void openFile;`），选择文件从不写标签历史。
  *    现在编辑器打开哪个文件由标签的 targetPath 驱动，选中文件即写入历史，前进/后退可直接回放。
  */
-import { Alert, Button, Empty, Input, Modal, Space, Switch, Tree, App } from 'antd';
+import { Alert, Button, Dropdown, Empty, Input, Modal, Space, Switch, Tree, App } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
-  FileOutlined, FolderOutlined, ReloadOutlined, SearchOutlined,
+  CopyOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined, ReloadOutlined, ScissorOutlined, SearchOutlined,
   FileAddOutlined, FolderAddOutlined, LinkOutlined
 } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { TreeNode, TreeResponse } from '@ttfolio/shared';
+import type { ProjectDetail, TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 import { EditorPane } from './EditorPane';
 import { PaneSplit } from '@/components/PaneSplit';
 import { ImagePreview } from './ImagePreview';
+import { MoveCopyModal } from './MoveCopyModal';
 
 const GIT_COLORS: Record<string, string> = {
   modified: SEMANTIC.warning,
@@ -108,6 +109,22 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   failedRef.current = failedPaths;
   const { message, modal } = App.useApp();
 
+  // 右键菜单（第 26 轮）：复制/移动目标弹窗 + 绝对路径所需的项目根。
+  // dirPath 走 ref：toAntdTree 在 effect/loadChildren 里构建树，闭包拿到的一定是最新值
+  const [mcTarget, setMcTarget] = useState<{ items: string[]; mode: 'move' | 'copy' } | null>(null);
+  const { data: detailData } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`)
+  });
+  const dirPathRef = useRef<string | null>(null);
+  dirPathRef.current = detailData?.dirPath ?? null;
+  const menuCtx: TreeMenuCtx = React.useMemo(() => ({
+    projectId,
+    getDirPath: () => dirPathRef.current,
+    notify: (msg) => message.success(msg),
+    onMoveCopy: (items, mode) => setMcTarget({ items, mode })
+  }), [projectId, message]);
+
   const { data: rootData, isLoading, error, refetch } = useQuery({
     queryKey: ['tree', projectId, '', showIgnored],
     queryFn: () => api.get<TreeResponse>('/api/fs/tree', { projectId, path: '', showIgnored: showIgnored ? '1' : '0' })
@@ -120,8 +137,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
 
   // 根节点 → 树（合并而非重建：保住已展开分支）
   useEffect(() => {
-    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current)));
-  }, [rootData]);
+    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current, menuCtx)));
+  }, [rootData, menuCtx]);
 
   // 「打开项目默认展开第一个文件」：打开项目落「文件」页签时入口会设置 pendingAutoOpenProject，
   // 这里消费一次——自动选中第一个文本文件（没有文本文件就选第一个文件）；用户主动回到
@@ -155,7 +172,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           path: rel,
           showIgnored: showIgnored ? '1' : '0'
         });
-        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current)));
+        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current, menuCtx)));
         setFailedPaths((prev) => prev.filter((p) => p !== rel));
       } catch (e) {
         const code = e instanceof ApiClientError ? e.code : '';
@@ -173,7 +190,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         void message.error(`展开「${rel}」失败：${hint}`);
       }
     },
-    [projectId, showIgnored, message]
+    [projectId, showIgnored, message, menuCtx]
   );
 
   // 面包屑目录段点击（第 26 轮）：逐层懒加载展开到目标目录并选中——
@@ -358,11 +375,31 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       />
       <NewEntryModal projectId={projectId} parent={newParent} kind={newEntry?.kind ?? null} onClose={() => setNewEntry(null)} />
       <RenameModal projectId={projectId} path={renameTarget} onClose={() => setRenameTarget(null)} />
+      <MoveCopyModal
+        projectId={projectId}
+        items={mcTarget?.items ?? []}
+        mode={mcTarget?.mode ?? null}
+        onClose={() => setMcTarget(null)}
+      />
     </div>
   );
 }
 
-function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
+/** 右键菜单上下文（第 26 轮）：菜单项动作所需的最新值经 ref 读取，避免闭包过期 */
+interface TreeMenuCtx {
+  projectId: string;
+  getDirPath: () => string | null;
+  notify: (msg: string) => void;
+  onMoveCopy: (items: string[], mode: 'move' | 'copy') => void;
+}
+
+/** 相对路径 → 绝对路径（项目根 + 相对段，Windows 分隔符） */
+function absJoin(dir: string, rel: string): string {
+  const sep = dir.endsWith('\\') || dir.endsWith('/') ? '' : '\\';
+  return `${dir}${sep}${rel.split('/').join('\\')}`;
+}
+
+function toAntdTree(nodes: TreeNode[], failed: string[] = [], menuCtx: TreeMenuCtx | null = null): DataNode[] {
   return nodes.map((n) => {
     const key = n.path;
     const gitColor = n.gitState !== undefined ? GIT_COLORS[n.gitState] : undefined;
@@ -381,16 +418,56 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
     const tip = [isFailed ? '展开失败（权限不足或路径已失效）' : '', linkNote, n.gitState !== undefined ? `Git: ${n.gitState}` : '']
       .filter((s) => s !== '')
       .join(' · ');
-    return {
-      key,
-      title: (
+    // 右键菜单（第 26 轮，用户点名 5 项）：挂 body 隔离 DOM 冒泡——菜单点击不得触发
+    // 树节点的选中/展开（ProjectCard 教训：弹层挂进节点 DOM 里点击会冒泡串台）
+    const title = menuCtx !== null ? (
+      <Dropdown
+        trigger={['contextMenu']}
+        getPopupContainer={() => document.body}
+        menu={{
+          items: [
+            { key: 'copy-to', label: '复制到…', icon: <CopyOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); menuCtx.onMoveCopy([key], 'copy'); } },
+            { key: 'move-to', label: '移动到…', icon: <ScissorOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); menuCtx.onMoveCopy([key], 'move'); } },
+            { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined />, onClick: (info) => { info.domEvent.stopPropagation(); void api.post('/api/open', { target: 'explorer', projectId: menuCtx.projectId, path: key }); } },
+            { type: 'divider' as const },
+            {
+              key: 'copy-rel', label: '复制相对路径', onClick: (info) => {
+                info.domEvent.stopPropagation();
+                void navigator.clipboard.writeText(key);
+                menuCtx.notify(`已复制相对路径：${key}`);
+              }
+            },
+            {
+              key: 'copy-abs', label: '复制绝对路径', disabled: menuCtx.getDirPath() === null, onClick: (info) => {
+                info.domEvent.stopPropagation();
+                const dir = menuCtx.getDirPath();
+                if (dir === null) return;
+                const abs = absJoin(dir, key);
+                void navigator.clipboard.writeText(abs);
+                menuCtx.notify(`已复制绝对路径：${abs}`);
+              }
+            }
+          ]
+        }}
+      >
         <span style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
           {n.name}
           {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
           {n.ignored === true ? '（忽略）' : ''}
           {isFailed ? '（展开失败）' : ''}
         </span>
-      ),
+      </Dropdown>
+    ) : (
+      <span style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
+        {n.name}
+        {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
+        {n.ignored === true ? '（忽略）' : ''}
+        {isFailed ? '（展开失败）' : ''}
+      </span>
+    );
+    return {
+      key,
+      title,
       icon: n.kind === 'dir' ? <FolderOutlined /> : <FileOutlined />,
       // 未知/越界的链接当叶子且不可选：点了也读不到，不如明确禁用
       isLeaf: linkDisabled ? true : n.kind !== 'dir',
