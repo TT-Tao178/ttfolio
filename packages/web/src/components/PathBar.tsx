@@ -160,11 +160,23 @@ function buildCrumbs(tab: Tab | null): Crumb[] {
     if (tab.title !== '') crumbs.push({ title: tab.title });
     if (tab.subTab !== null) crumbs.push({ title: subTabLabel(tab.subTab) });
   }
-  // 子路径：把 targetPath 按 / \ 拆成多段，逐段显示（相对项目根，比只显示 basename 更可定位）
-  if (tab.targetPath !== null && tab.targetPath !== '') {
-    for (const seg of tab.targetPath.split(/[\\/]/).filter((s) => s !== '' && s !== '.')) {
-      crumbs.push({ title: seg });
-    }
+  // 子路径：把 targetPath 按 / \ 拆成多段，逐段显示（相对项目根，比只显示 basename 更可定位）。
+  // 目录段（除最后一段外）可点：回文件列表并让树定位到该目录（FilesTab 消费 treeLocate）；
+  // 最后一段是当前文件名——就是当前位置，保持纯文本。
+  if (tab.targetPath !== null && tab.targetPath !== '' && tab.kind === 'project' && tab.projectId !== null) {
+    const segs = tab.targetPath.split(/[\\/]/).filter((s) => s !== '' && s !== '.');
+    const projectId = tab.projectId;
+    segs.forEach((seg, i) => {
+      if (i < segs.length - 1) {
+        const dir = segs.slice(0, i + 1).join('/');
+        crumbs.push(crumbLink(seg, () => {
+          openAt({ kind: 'project', projectId, targetPath: null, subTab: tab.subTab });
+          useAppStore.getState().setTreeLocate({ projectId, path: dir });
+        }));
+      } else {
+        crumbs.push({ title: seg });
+      }
+    });
   }
   return crumbs;
 }

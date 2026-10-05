@@ -53,6 +53,9 @@ interface AppState {
   /** 待自动打开第一个文件的项目 id（打开项目落「文件」页签时设置，FilesTab 消费后清空） */
   pendingAutoOpenProject: string | null;
   requestAutoOpenProject: (projectId: string) => void;
+  /** 面包屑目录段点击的定位请求（第 26 轮）：FilesTab 监听 nonce 变化，展开树到该目录并选中 */
+  treeLocate: { projectId: string; path: string; nonce: number } | null;
+  setTreeLocate: (loc: { projectId: string; path: string }) => void;
   syncFromServer: (tabs: Array<{ id: string; kind: TabKind; projectId?: string | null; targetPath?: string | null; subTab?: string | null; titleSnapshot?: string | null; scrollJson?: string | null; navHistoryJson?: string | null; navIndex?: number; isPinned?: boolean }>, activeId: string | null) => void;
 }
 
@@ -196,6 +199,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
   pendingAutoOpenProject: null,
   requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
+  treeLocate: null,
+  setTreeLocate: (loc) => set({ treeLocate: { ...loc, nonce: Date.now() } }),
 
   syncFromServer: (serverTabs, activeId) => {
     const tabs = serverTabs.map<Tab>((t) => {

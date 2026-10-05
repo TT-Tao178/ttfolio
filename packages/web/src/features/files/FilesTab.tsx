@@ -97,6 +97,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   /** 树上选中的节点（可能是目录）：作为"删除/新建"的作用对象，与"编辑器打开的文件"分开 */
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [treeData, setTreeData] = useState<DataNode[]>([]);
+  /** 受控展开（面包屑目录段点击时逐层展开定位；普通点击仍走 rc-tree 内部） */
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [filter, setFilter] = useState('');
   const [newEntry, setNewEntry] = useState<{ kind: 'file' | 'dir' } | null>(null);
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
@@ -173,6 +175,33 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     },
     [projectId, showIgnored, message]
   );
+
+  // 面包屑目录段点击（第 26 轮）：逐层懒加载展开到目标目录并选中——
+  // loadChildren 幂等（attachChildren 直接替换该层 children），已展开层重复加载无副作用。
+  const treeLocate = useAppStore((s) => s.treeLocate);
+  const locateNonceRef = useRef(0);
+  useEffect(() => {
+    if (treeLocate === null || treeLocate.projectId !== projectId) return;
+    if (locateNonceRef.current === treeLocate.nonce) return;
+    locateNonceRef.current = treeLocate.nonce;
+    const segs = treeLocate.path.split('/').filter((s) => s !== '');
+    void (async () => {
+      let cur = '';
+      const toExpand: React.Key[] = [];
+      for (const seg of segs) {
+        cur = cur === '' ? seg : `${cur}/${seg}`;
+        try {
+          await loadChildren(cur);
+        } catch {
+          /* 失败已由 loadChildren 提示；后续层无法展开，停在已到达处 */
+          break;
+        }
+        toExpand.push(cur);
+      }
+      setExpandedKeys((prev) => Array.from(new Set([...prev, ...toExpand])));
+      setSelectedPath(cur);
+    })();
+  }, [treeLocate, projectId, loadChildren]);
 
   const del = useMutation({
     mutationFn: (paths: string[]) => api.post('/api/fs/delete', { projectId, paths, confirm: true }),
@@ -284,6 +313,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               blockNode
               treeData={treeData}
               selectedKeys={selectedPath === null ? [] : [selectedPath]}
+              expandedKeys={expandedKeys}
+              onExpand={(keys) => setExpandedKeys(keys)}
               loadData={async (node) => {
                 // 自己 catch：rc-tree 会吞掉 loadData 的 rejection，不接住就表现为"点了没反应"
                 try {
