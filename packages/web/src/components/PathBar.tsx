@@ -128,12 +128,13 @@ export function PathBar(): React.JSX.Element {
 
 type Crumb = { title: React.ReactNode };
 
-/** 可点击段的可视化包装：主题色 + 手型光标 + hover 下划线。
- *  用户报障「没办法点击项目名/文件」——第 7/19 轮已实现点击逻辑，但渲染成灰色纯文本
- *  （实测 rgba(0,0,0,0.45) + cursor:auto），视觉上与不可点完全一致，没有任何可供性。
- *  颜色走内联：antd cssinjs 运行时注入的链接色会按顺序盖过 base.css 的类规则。 */
+/** 可点击段的可视化包装（第 27 轮按用户反馈调整）：保持面包屑默认文字色与原布局，
+ *  手型光标 + hover 浅背景块提示可点（不下划线、不变色；背景走 color-mix(currentColor)
+ *  深浅主题自动适配——具体样式见 base.css 的 .tt-crumb-link）。
+ *  第 26 轮教训：颜色/下划线等不能只写类规则（antd cssinjs 运行时注入会盖过），
+ *  因此默认色用 color:inherit 显式声明，背景与圆角无覆盖冲突走类规则。 */
 function crumbLink(text: string, onClick: () => void): Crumb {
-  return { title: <a className="tt-crumb-link" style={{ color: 'var(--tt-primary)', cursor: 'pointer' }} onClick={onClick}>{text}</a> };
+  return { title: <a className="tt-crumb-link" style={{ color: 'inherit', cursor: 'pointer' }} onClick={onClick}>{text}</a> };
 }
 
 /**

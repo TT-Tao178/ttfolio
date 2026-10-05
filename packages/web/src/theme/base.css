@@ -69,8 +69,7 @@ body,
 .tt-diff-del { background: rgba(255, 77, 79, 0.1); }
 .tt-diff-hunk { opacity: 0.55; }
 
-/* 面包屑可点击段：主题色 + 手型光标 + hover 下划线（第 26 轮：用户报「看不出能点」） */
-.tt-crumb-link { color: var(--tt-primary); cursor: pointer; }
-.tt-crumb-link:hover { text-decoration: underline; }
-/* 特异性高于 antd cssinjs 的 .ant-breadcrumb-link（运行时注入会盖过 base.css 的单类规则） */
-.ant-breadcrumb .tt-crumb-link { color: var(--tt-primary); cursor: pointer; }
+/* 面包屑可点击段（第 27 轮按用户反馈：默认文字色、无下划线，hover 用浅背景块提示可点；
+   背景色取 currentColor 低透明——深浅主题自动适配；负 margin 抵消 padding 避免布局位移） */
+.tt-crumb-link { color: inherit; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
+.tt-crumb-link:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
