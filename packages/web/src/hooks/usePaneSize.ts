@@ -15,6 +15,7 @@ export interface UiLayout {
   treeWidth?: number;
   gitListWidth?: number;
   docsListWidth?: number;
+  archListWidth?: number;
 }
 
 export interface PaneSize {
