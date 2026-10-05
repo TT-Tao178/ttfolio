@@ -1,34 +1,47 @@
-# TT项目管理工作台 (ttFolio)
+# ttFolio · TT项目管理工作台
 
-一个本地优先的项目工作台。把硬盘上的项目文件夹登记进来，在同一个界面里浏览源码、查看 Git 状态、管理文档与架构图、执行全局搜索。
+**简体中文** | [English](README.en.md)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](https://github.com/TT-Tao178/ttfolio/releases)
+[![Version](https://img.shields.io/badge/version-0.2.4-1677ff.svg)](CHANGELOG.md)
+
+一个**本地优先**的项目工作台：把硬盘上的项目文件夹登记进来，在同一个界面里浏览源码、查看 Git、
+管理文档与架构图、执行全局搜索。
 
 **磁盘是真相，数据库只是索引。** 项目文件原地不动，ttFolio 只在其上提供索引、入口与关系。
 
 - 纯本地运行：单机单人，服务只监听 `127.0.0.1`，无遥测、无 CDN、运行期不出网
-- 除用户显式操作外，被登记目录零改动；删除一律先进入回收站且可按原路径恢复
-- 索引库损坏可自愈，启动前自动快照；清空索引库不会删除任何项目文件
+- 除用户显式操作外，被登记目录零改动；删除一律先进回收站且可按原路径恢复
+- 索引库启动前自动快照，损坏可自愈；清空索引库不会删除任何项目文件
 
-## 功能
+## 功能特性
 
 - **项目登记**：粘贴路径（多行 / 引号 / `\\?\` 前缀）、系统文件夹对话框、父目录批量登记
-- **自动分析**：项目类型识别（前端 / 后端 / 前后端分离 / 微服务 / 素材仓库等）、按字节统计的语言占比（对齐 GitHub Linguist 口径，支持 90+ 语言与 Makefile / Dockerfile / .env 等文件名识别）、技术栈标签、Git 摘要
-- **文件浏览与编辑**：懒加载文件树、CodeMirror 6 编辑器、草稿保护（强杀进程不丢字）、外部修改检测、保存冲突三选一（对比 / 放弃本地 / 覆盖磁盘）、编码与换行符原样保持（UTF-8/BOM/UTF-16/GBK、CRLF/LF）
-- **Git**：工作区状态、diff、暂存、提交（一次提交只包含暂存内容）、提交历史与提交详情、分支切换；不做 push/pull，不存储凭据
-- **文档**：项目内 Markdown 自动发现、挂载外部文档（支持系统对话框多选）、目录大纲跳转、Markdown 渲染
-- **架构图**：登记架构图目录，独立端口只读访问，iframe 沙箱隔离
+- **自动分析**：项目类型识别（前端 / 后端 / 前后端分离 / 微服务 / 素材仓库等）、按字节统计的语言占比
+  （对齐 GitHub Linguist 口径，90+ 语言与 Makefile / Dockerfile / .env 等文件名识别）、技术栈标签、Git 摘要
+- **文件浏览与编辑**：懒加载文件树、CodeMirror 6 编辑器、草稿保护（强杀进程不丢字）、外部修改检测、
+  保存冲突三选一（对比 / 放弃本地 / 覆盖磁盘）、编码与换行符原样保持（UTF-8/BOM/UTF-16/GBK、CRLF/LF）
+- **文件操作**：右键菜单（复制到… / 移动到… / 在资源管理器中打开 / 复制相对与绝对路径）、
+  面包屑逐级点击定位（点目录段自动展开文件树到该处）
+- **Git**：工作区状态、diff、暂存、提交、提交历史与提交详情、分支切换；不做 push/pull，不存储凭据
+- **文档**：项目内 Markdown 自动发现、挂载外部文档（多选）、目录大纲跳转、渲染阅读
+- **架构图**：登记架构图目录，页签内直接查看——HTML / 图片 / 文本（md/json）三类文件常驻分栏预览，
+  独立只读端口访问，iframe 沙箱隔离
 - **搜索**：命令面板（Ctrl+K）与全局搜索——项目名 / 文件名 / 文件内容（SQLite FTS5，中文友好，增量索引）
 - **工作台总览**：项目卡片、需要关注的项目、聚合语言构成、跨项目最近提交
+- **失效项目闭环**：目录被移动/删除后一键重新定位（双入口）或移除登记（二次确认）
 - **回收站**：删除先进回收站，可恢复到原路径；彻底删除需二次确认
-- **桌面版**：Electron 打包的 Windows 安装包（NSIS），系统原生文件对话框
+- **桌面版**：Electron 打包的 Windows 安装包（NSIS）、TT 品牌图标、系统原生文件对话框
 
 ## 安装
 
 ### 桌面版（推荐）
 
-从 [Releases](../../releases) 页面下载 `TT项目管理工作台-Setup-x.y.z.exe`：
+从 [Releases](../../releases) 页面下载 `ttFolio-Setup-x.y.z.exe`：
 
 - 支持 Windows 10/11 x64，无需安装 Node.js 或其他运行环境
-- 安装时可以自定义安装目录（中文路径可用），不需要管理员权限
+- 安装时可自定义安装目录（中文路径可用），不需要管理员权限
 - 数据保存在 `%APPDATA%\ttFolio\`，卸载软件不会删除数据
 - 安装包未做代码签名，首次运行时 Windows SmartScreen 会提示，选择「更多信息 → 仍要运行」即可
 
@@ -43,24 +56,18 @@ npm run dev
 
 开发模式会同时启动后端（`127.0.0.1:7717`）与前端（`localhost:5173`），打开 `http://localhost:5173` 使用。
 
-两个入口的区别：
-
-- `http://localhost:5173`：开发入口，前端改动热更新（走 Vite 代理访问后端）
-- `http://127.0.0.1:7717`：生产入口，托管 `packages/web/dist` 构建产物（需先 `npm run build`）
-
-注意：better-sqlite3 在本机只有一套 node_modules，开发（Node ABI）与打包（Electron ABI）
-不能共用——如果刚跑过 `npm run dist:win`，开发/测试前需要先 `npm rebuild better-sqlite3`。
-ABI 不匹配时服务端会预检并干净退出，不会触碰索引库（详见 [常见问题](#常见问题)）。
-
 ## 构建桌面版
 
 ```bash
 npm run dist:win
 ```
 
-产物为 `dist-electron/` 下的 NSIS 安装包。构建脚本会自动完成 Web 前端打包、服务端 esbuild 打包、better-sqlite3 的 Electron ABI 重编译以及产物自检（node_modules 完整性、前端产物、真实启动冒烟）。
+产物为 `dist-electron/` 下的 NSIS 安装包（`ttFolio-Setup-x.y.z.exe`）。构建脚本自动完成 Web 前端打包、
+服务端 esbuild 打包、better-sqlite3 的 Electron ABI 重编译、产物自检（node_modules 完整性、前端产物、
+真实启动冒烟，7 项全绿才算成功）。
 
-注意：打包会消耗几分钟时间，且打包后本机 `node_modules` 中的 better-sqlite3 为 Electron ABI，需要先执行 `npm rebuild better-sqlite3` 才能继续本地开发。
+注意：打包会消耗几分钟，且打包后本机 `node_modules` 中的 better-sqlite3 为 Electron ABI，
+继续本地开发前需先执行 `npm rebuild better-sqlite3`。
 
 ## 开发
 
@@ -71,7 +78,8 @@ npm run test        # Vitest 单元与集成测试（真实 SQLite 与 git 夹�
 npm run build       # 生产构建
 ```
 
-提交遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)，提交正文说明修改原因、影响面与验证方式。
+提交遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)，
+提交正文说明修改原因、影响面与验证方式。
 
 ### 目录结构
 
@@ -126,4 +134,4 @@ Vite 可能缓存了半截模块（编辑器原子写对读方不是原子的）
 
 ## 许可证
 
-[MIT](LICENSE)
+[MIT](LICENSE) © TT-Tao178
