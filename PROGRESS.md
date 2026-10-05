@@ -88,6 +88,24 @@
 - 实测：span 恢复 inline、节点 24px 正常单行、icon 与文字同行；截图
   目视文件树排版整齐；inspect-data 零残留。
 
+### 右键可用性修复轮（0.2.3，b0bf0d9）
+
+- **用户实测 0.2.2 右键文件无菜单**——推翻上一轮「仅测试工具时序问题」的结论，
+  真实机器复现证明产品确不可用。取证定位两个失效路径：①Dropdown 包在 title 文字
+  span 上，右键落点在行内空白/文字外时事件不经过 span；②右键 mousedown 引发树
+  重渲染，React 合成事件（挂 root 容器）与渲染存在时序竞争。
+- **重构**：节点 title 只带 data-path 标记（零额外 DOM）；右键由 document 级原生
+  contextmenu 监听统一处理（不经过 React 调度，任何渲染状态下稳定触发）——closest
+  data-path、行内空白回退该行节点；命中后弹出固定定位受控菜单（antd Menu，五项
+  与交互不变）。配套：点击其它处/窗口失焦自动关闭；剪贴板写入补失败兜底提示。
+- **实测**：真实 Playwright 右键五落点连续验证（package.json/LICENSE/README.md
+  文字 + packages/scripts 行内空白）全部弹出；round26 全量回归 PASS（文本预览 mock
+  修正为同源接口拦截）；门禁三绿；inspect-data 零残留。
+- **环境教训（如实记录）**：多轮 shell 后台起的 dev 残留 9 个 tsx watch 进程——
+  端口清理只杀监听子进程，watch 父进程加载着 better-sqlite3 的 .node 导致
+  electron-rebuild EPERM 连败两次；按命令行过滤 ttfolio 相关 node 进程全清后
+  一次通过。出包前置检查应含「ttfolio 相关 node 进程清零」。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
