@@ -321,6 +321,8 @@ function countComposeServices(text: string): number {
 
 export interface ArchiveMeta {
   htmlFiles: Array<{ rel: string; mtime: string; size: number; hasSourceJson: boolean }>;
+  /** 图片文件（第 26 轮）：png/jpg/jpeg/gif/webp/svg/bmp——架构图目录常见产物，供页签内直接预览 */
+  imageFiles: Array<{ rel: string; mtime: string; size: number; hasSourceJson: boolean }>;
   totalBytes: number;
   entryRel: string | null;
   entrySource: 'index_html' | 'manual' | 'list';
@@ -329,9 +331,11 @@ export interface ArchiveMeta {
 /** 架构图目录元数据（入口识别：manual → index.html → list）。 */
 export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null): ArchiveMeta {
   const htmlFiles: ArchiveMeta['htmlFiles'] = [];
+  const imageFiles: ArchiveMeta['imageFiles'] = [];
   let totalBytes = 0;
   const stack: string[] = [dirAbs];
   let indexRel: string | null = null;
+  const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|bmp)$/i;
   while (stack.length > 0) {
     const dir = stack.pop();
     if (dir === undefined) break;
@@ -360,10 +364,13 @@ export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null):
           size: st.size,
           hasSourceJson: fsx.exists(abs.replace(/\.html?$/i, '.architecture.json'))
         };
+      } else if (IMAGE_RE.test(lower)) {
+        imageFiles[imageFiles.length] = { rel, mtime: st.mtimeIso, size: st.size, hasSourceJson: false };
       }
     }
   }
   htmlFiles.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
+  imageFiles.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
   let entryRel: string | null = null;
   let entrySource: ArchiveMeta['entrySource'] = 'list';
   if (manualEntry !== undefined && manualEntry !== null && manualEntry !== '') {
@@ -373,5 +380,5 @@ export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null):
     entryRel = indexRel;
     entrySource = 'index_html';
   }
-  return { htmlFiles, totalBytes, entryRel, entrySource };
+  return { htmlFiles, imageFiles, totalBytes, entryRel, entrySource };
 }

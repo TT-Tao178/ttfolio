@@ -89,6 +89,8 @@ export interface ArchiveInfo {
   lastViewedAt: string | null;
   changed: boolean;
   htmlFiles: ArchiveEntryFile[];
+  /** 图片文件（第 26 轮）：架构图目录常见产物，页签内直接预览 */
+  imageFiles: ArchiveEntryFile[];
   sourceJsonFiles: string[];
 }
 

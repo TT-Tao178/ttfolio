@@ -35,7 +35,8 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
           a,
           meta.htmlFiles,
           meta.htmlFiles.filter((f) => f.hasSourceJson).map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
-          countChanged || entryMtimeChanged
+          countChanged || entryMtimeChanged,
+          meta.imageFiles
         )
       );
     }

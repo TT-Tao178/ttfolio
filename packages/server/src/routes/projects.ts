@@ -118,7 +118,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
         row,
         meta.htmlFiles,
         meta.htmlFiles.filter((f) => f.hasSourceJson).map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
-        countChanged || entryChanged
+        countChanged || entryChanged,
+        meta.imageFiles
       );
     });
     return ok({

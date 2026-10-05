@@ -146,7 +146,8 @@ export function toArchiveInfo(
   row: ArchiveRow,
   htmlFiles: ArchiveEntryFile[],
   sourceJsonFiles: string[],
-  changed: boolean
+  changed: boolean,
+  imageFiles: ArchiveEntryFile[] = []
 ): ArchiveInfo {
   return {
     id: row.id,
@@ -163,6 +164,7 @@ export function toArchiveInfo(
     lastViewedAt: row.last_viewed_at,
     changed,
     htmlFiles,
+    imageFiles,
     sourceJsonFiles
   };
 }
