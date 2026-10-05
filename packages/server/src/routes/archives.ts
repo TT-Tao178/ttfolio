@@ -117,7 +117,9 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
     const q = req.query as { rel?: string };
     if (q.rel === undefined || q.rel === '') return fail('BAD_REQUEST', '缺少 rel');
     const db = ctx.db();
-    const row = listArchives(db, '').find((a) => a.id === id);
+    const pid = getArchiveProjectId(db, id);
+    if (pid === null) return fail('NOT_FOUND', '架构图目录不存在', 404);
+    const row = listArchives(db, pid).find((a) => a.id === id);
     if (row === undefined) return fail('NOT_FOUND', '架构图目录不存在', 404);
     if (!/\.(md|markdown|txt|json)$/i.test(q.rel)) return fail('BAD_REQUEST', '仅支持文本类文件');
     const abs = path.resolve(row.dir_path, q.rel);
@@ -129,7 +131,7 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
     if (st.size > 2 * 1024 * 1024) return fail('BAD_REQUEST', '文件超过 2MB，请用系统工具查看');
     try {
       const content = fsx.readTextFile(abs, st.size).content;
-      logActivity(db, { kind: 'archive.read_text', level: 'L1', projectId: getArchiveProjectId(db, id), targetPath: abs, actor: currentActor().actor });
+      logActivity(db, { kind: 'archive.read_text', level: 'L1', projectId: pid, targetPath: abs, actor: currentActor().actor });
       return ok({ content });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
