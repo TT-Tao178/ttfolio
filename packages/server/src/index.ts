@@ -20,7 +20,7 @@ import { getSetting, setSetting } from './db/repo/metaRepo.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
-const version = '0.1.10';
+const version = '0.2.1';
 const startedAt = Date.now();
 
 /** 真正的 SQLite 库损坏（才会走"改名自愈"）；native 模块加载失败等启动期错误不算。 */
