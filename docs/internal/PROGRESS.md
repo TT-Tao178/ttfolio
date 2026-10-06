@@ -195,7 +195,12 @@
   侧栏集合计数同步）。菜单入口「归属集合…」放「固定」之后；弹窗条件渲染 +
   key=项目 id 防缓存串台。
 - **实测**：typecheck / lint（0 警告）/ test 62 条全绿；界面行为交用户手测
-  （手测要点见提交信息）。未升版本未出包——等手测通过按惯例升 0.2.8 走 dist:win 全链路。
+  （手测要点见提交信息）。
+- **发布（0.2.8）**：版本提交 0a13d99 后走 dist:win 全链路——build/rebuild 一次过，
+  packaging 阶段 EBUSY 第 6 次（杀软锁旧 win-unpacked 的 app.asar，unlink 失败），
+  按既定流程换全新输出目录 dist-electron-tmp5 出包 + VERIFY_DIST 指向其 win-unpacked
+  自检 7 项全绿（含真实启动冒烟 health 200），安装包与 blockmap 移回 dist-electron
+  （共 19 个，旧包一律保留）。
 
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
