@@ -18,7 +18,7 @@ import {
 } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiClientError } from '@/lib/api';
+import { api, ApiClientError, rawUrl } from '@/lib/api';
 import type { ProjectDetail, TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
@@ -139,8 +139,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
 
   // 根节点 → 树（合并而非重建：保住已展开分支）
   useEffect(() => {
-    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current)));
-  }, [rootData]);
+    setTreeData((prev) => mergeRoots(prev, toAntdTree(rootData?.nodes ?? [], failedRef.current, projectId)));
+  }, [rootData, projectId]);
 
   // 「打开项目默认展开第一个文件」：打开项目落「文件」页签时入口会设置 pendingAutoOpenProject，
   // 这里消费一次——自动选中第一个文本文件（没有文本文件就选第一个文件）；用户主动回到
@@ -174,7 +174,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           path: rel,
           showIgnored: showIgnored ? '1' : '0'
         });
-        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current)));
+        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current, projectId)));
         setFailedPaths((prev) => prev.filter((p) => p !== rel));
       } catch (e) {
         const code = e instanceof ApiClientError ? e.code : '';
@@ -472,7 +472,7 @@ function absJoin(dir: string, rel: string): string {
   return `${dir}${sep}${rel.split('/').join('\\')}`;
 }
 
-function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
+function toAntdTree(nodes: TreeNode[], failed: string[] = [], projectId = ''): DataNode[] {
   return nodes.map((n) => {
     const key = n.path;
     const gitColor = n.gitState !== undefined ? GIT_COLORS[n.gitState] : undefined;
@@ -505,7 +505,22 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = []): DataNode[] {
     return {
       key,
       title,
-      icon: n.kind === 'dir' ? <FolderOutlined /> : <FileOutlined />,
+      icon:
+        n.kind !== 'dir' && IMAGE_EXT.includes(n.name.split('.').pop()?.toLowerCase() ?? '') ? (
+          /* 图片文件：icon 槽显示 16px 缩略图（/raw 只读代理），加载失败隐藏自身 */
+          <img
+            src={rawUrl(projectId, key)}
+            alt=""
+            loading="lazy"
+            data-testid="tree-thumb"
+            onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+            style={{ width: 16, height: 16, objectFit: 'cover', borderRadius: 2, border: '1px solid rgba(128,128,128,0.25)' }}
+          />
+        ) : n.kind === 'dir' ? (
+          <FolderOutlined />
+        ) : (
+          <FileOutlined />
+        ),
       // 未知/越界的链接当叶子且不可选：点了也读不到，不如明确禁用
       isLeaf: linkDisabled ? true : n.kind !== 'dir',
       disabled: linkDisabled,
