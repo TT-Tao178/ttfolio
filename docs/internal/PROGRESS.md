@@ -202,6 +202,24 @@
   自检 7 项全绿（含真实启动冒烟 health 200），安装包与 blockmap 移回 dist-electron
   （共 19 个，旧包一律保留）。
 
+### 侧栏项目右键菜单轮（0.2.9，fde6f61 + 0d3ecad）
+
+- **用户纠正**：「项目那里右键没有菜单」指的是**左侧栏项目列表**——第 28 轮做的是
+  总览/卡片墙的项目卡片，侧栏项目条目右键仍是浏览器默认菜单。
+- **改动**：文件树/项目卡片同款定稿模式搬进 Sidebar——document 级 contextmenu 委托
+  + 受控固定定位菜单；项目条目 label 带 data-project-id，行内空白回退
+  closest('.ant-menu-item') 内查找；菜单 8 项（打开项目/文件页/Git/归属集合…/固定/
+  复制路径/资源管理器/重新分析）；projects/git/archives/docs 四域项目列表共用同一
+  label，右键处处可用。
+- **ABI 双态实录（已知坑再次应验）**：0.2.8 出包的 electron-rebuild 把
+  better-sqlite3 翻到 Electron ABI，门禁 vitest 集成测试随之报 NODE_MODULE_VERSION
+  不匹配——`npm rebuild better-sqlite3` 翻回 Node ABI 后 62 条复绿，与代码改动无关；
+  随后出 0.2.9 时 dist:win 会自行再翻回 Electron ABI，无需人工干预。
+- **实测**：typecheck / lint（0 警告）/ test 62 条全绿；界面行为交用户手测。
+- **发布（0.2.9）**：dist:win packaging 阶段 EBUSY 第 7 次（同一位置同一锁源），
+  换 dist-electron-tmp6 出包 + 自检 7 项全绿（含真实启动冒烟），安装包与 blockmap
+  移回 dist-electron（共 20 个，旧包一律保留）。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有

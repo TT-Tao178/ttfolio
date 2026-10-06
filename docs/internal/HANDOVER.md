@@ -33,14 +33,14 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：0.2.8 发布（版本 0a13d99 + 出包自检 7 项全绿，ttFolio-Setup-0.2.8.exe
-  已入 dist-electron 共 19 个）；其上是卡片右键 + 集合归属轮 3 个提交（归属集合弹窗 /
-  卡片右键菜单 / 集合视图过滤修复）；再上是 0.2.7 收口 e598e84、
+- 最新提交：0.2.9 发布（侧栏项目右键菜单 fde6f61 + 版本 0d3ecad + 出包自检 7 项
+  全绿，ttFolio-Setup-0.2.9.exe 已入 dist-electron 共 20 个）；其上是 0.2.8 发布
+  （卡片右键菜单 + 集合归属 + 集合视图过滤）；再上是 0.2.7 收口 e598e84、
   0.2.7 树缩略图 / 0.2.7 版本 / 0.2.6 图片缩放
   查看器 / 0.2.5 顶栏品牌区去除 / 0.2.4 开源规范化（元数据/双语 README/安装包名
   ttFolio-Setup）；桌面版功能逐轮台账见 PROGRESS（精确哈希看 `git log --oneline`）
-- 桌面版版本 **0.2.8**；`dist-electron/` 下共十九个安装包（0.1.0~0.2.3 中文名 +
-  ttFolio-Setup-0.2.4~0.2.8 新名），
+- 桌面版版本 **0.2.9**；`dist-electron/` 下共二十个安装包（0.1.0~0.2.3 中文名 +
+  ttFolio-Setup-0.2.4~0.2.9 新名），
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过两次；出包前必须
   停 dev 并清 ttfolio 相关 node 进程（按命令行过滤）——进程锁 .node 文件会让
@@ -53,6 +53,11 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   文本走同源接口 /api/archives/:id/file，三重只读约束）；文件树右键菜单
   5 项（document 级委托 + 受控定位菜单，0.2.3 重构后真实右键稳定可用；复制到/移动到
   走 MoveCopyModal + fs/move，资源管理器显式传 path）
+- 第二十九轮（0.2.9，已出包待手测）：侧栏项目列表右键操作菜单——用户纠正第 28 轮
+  的「项目右键」指左侧栏项目列；Sidebar 换文件树/卡片同款 document 级委托 + 受控
+  定位菜单，8 项含「归属集合…」，四域项目列表共用。**ABI 双态坑再次应验**：出包后
+  跑 vitest 须先 `npm rebuild better-sqlite3` 翻回 Node ABI（集成测试报
+  NODE_MODULE_VERSION 不匹配即此因，非代码问题）
 - 第二十八轮（0.2.8，已出包待手测）：项目卡片任意位置右键弹操作菜单
   （文件树同款受控定位菜单，菜单定义与「…」图标 Dropdown 共用，ProjectCard 一处改
   Dashboard/卡片墙两处生效）；集合成员维护入口「归属集合…」弹窗
@@ -73,16 +78,16 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   建连但 POST 被 301 重定向到主站），用户选择浏览器手动拖（dist-electron 下
   文件名与 Release 版本号一一对应）；v0.2.4 Release 页面：
   https://github.com/TT-Tao178/ttfolio/releases/tag/v0.2.4
-- **待用户验证/待查（第 28 轮收口时）**：
+- **待用户验证/待查（第 29 轮收口时）**：
   1. ~~右键菜单在安装版是否弹出~~ ✅ 用户装 0.2.7 实测**能弹**（0.2.3 起的修复在
-     安装版生效，闭案）；项目卡片右键为第 28 轮新增，待手测
+     安装版生效，闭案）
   2. 安装版 Electron 实例登记接口返回 ok 却不落库（elec-verify 测试库 0 行，
      原因未定位）——仅影响测试数据目录，用户真实库未复现，待查
-  3. dist-electron-tmp / tmp2 / tmp3 目录被杀软/残留进程锁，留在磁盘可稍后手动删
+  3. dist-electron-tmp / tmp2~tmp6 目录被杀软/残留进程锁，留在磁盘可稍后手动删
   4. dev.mjs 已根治 runtime.json 旧端口竞态（起 server 前清旧文件）
-  5. 第 28 轮三件（卡片右键菜单 / 归属集合弹窗 / 集合视图过滤）——0.2.8 已出包
-     （ttFolio-Setup-0.2.8.exe），等用户装包手测；通过则 Release 手动补传资产
-     （uploads.github.com 被加速器拦，浏览器拖传）
+  5. 第 28/29 轮四件（卡片右键 / 归属集合弹窗 / 集合视图过滤 / 侧栏项目右键）——
+     **装 ttFolio-Setup-0.2.9.exe 手测**（0.2.9 已含全部）；通过则 Release 手动补传
+     资产（uploads.github.com 被加速器拦，浏览器拖传）
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
   `npm test` **62 条** ✅
 - 数据库 user_version=**3**（0003：projects 加 git_last_commit_subject，只增不改）
