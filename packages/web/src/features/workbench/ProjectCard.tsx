@@ -6,7 +6,7 @@
 import { App, Avatar, Card, Dropdown, Menu, Tag } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  AimOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
+  AimOutlined, AppstoreOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
   ReloadOutlined, StarFilled, StarOutlined, WarningOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
@@ -18,6 +18,7 @@ import { LanguageBar } from '@/components/LanguageBar';
 import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from '@/features/workbench/RelocateModal';
+import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
@@ -29,6 +30,8 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   // 右键菜单（第 28 轮）：受控固定定位菜单——「…」图标的 Dropdown 只覆盖图标本身，
   // 卡片主体右键此前弹的是浏览器默认菜单。菜单 items 与「…」Dropdown 共用一份。
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  // 归属集合弹窗：条件渲染 + key=项目 id，每次打开全新挂载（勾选态取打开瞬间快照）
+  const [pickerOpen, setPickerOpen] = useState(false);
   const remove = useMutation({
     mutationFn: (mode: string) => api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
     onSuccess: () => {
@@ -77,6 +80,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     { type: 'divider' as const },
     { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false },
     { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined /> },
+    { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
     { type: 'divider' as const },
     { key: 'unregister', label: '仅从 ttFolio 移除登记' },
     { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false }
@@ -92,6 +96,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       case 'terminal': void api.post('/api/open', { target: 'terminal', projectId: p.id }); break;
       case 'analyze': onAnalyze(); break;
       case 'pin': onPin(); break;
+      case 'collections': setPickerOpen(true); break;
       case 'unregister': confirmUnregister(); break;
       case 'delete': confirmDelete(); break;
     }
@@ -194,6 +199,9 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         open={relocateOpen}
         onClose={() => setRelocateOpen(false)}
       />
+      {pickerOpen && (
+        <CollectionPickerModal key={p.id} project={p} onClose={() => setPickerOpen(false)} />
+      )}
       {/* 受控右键菜单（第 28 轮，文件树 0.2.3 同款模式）：固定定位 + document mousedown 关闭，
           容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行；卡片 onClick 已排除本容器 */}
       {ctxMenu !== null && (
