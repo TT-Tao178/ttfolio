@@ -3,12 +3,13 @@
  * 从 Workbench.tsx 原地抽出：总览（Dashboard）也要放项目卡片，而 Workbench 已引用 Dashboard，
  * 若 Dashboard 反向 import Workbench 会形成循环依赖。
  */
-import { App, Avatar, Card, Dropdown, Tag } from 'antd';
+import { App, Avatar, Card, Dropdown, Menu, Tag } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   AimOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
   ReloadOutlined, StarFilled, StarOutlined, WarningOutlined
 } from '@ant-design/icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
@@ -25,6 +26,9 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   const { message, modal } = App.useApp();
   const queryClient2 = useQueryClient();
   const [relocateOpen, setRelocateOpen] = useState(false);
+  // 右键菜单（第 28 轮）：受控固定定位菜单——「…」图标的 Dropdown 只覆盖图标本身，
+  // 卡片主体右键此前弹的是浏览器默认菜单。菜单 items 与「…」Dropdown 共用一份。
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const remove = useMutation({
     mutationFn: (mode: string) => api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
     onSuccess: () => {
@@ -54,29 +58,56 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     });
   };
 
-  const menu = {
-    items: [
-      ...(p.pathOk === false
-        ? [
-            { key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined />, onClick: () => setRelocateOpen(true) },
-            { type: 'divider' as const }
-          ]
-        : []),
-      { key: 'open', label: '打开项目', icon: <FolderOpenOutlined />, onClick: onOpen },
-      { key: 'files', label: '打开文件页', icon: <FileTextOutlined />, onClick: onOpen },
-      { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !p.gitIsRepo, onClick: () => useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName) },
-      { type: 'divider' as const },
-      { key: 'copy', label: '复制路径', icon: <CopyOutlined />, onClick: () => { void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); } },
-      { key: 'explorer', label: '在资源管理器中显示', disabled: p.pathOk === false, onClick: () => { void api.post('/api/open', { target: 'explorer', projectId: p.id }); } },
-      { key: 'terminal', label: '在此打开终端', disabled: p.pathOk === false, onClick: () => { void api.post('/api/open', { target: 'terminal', projectId: p.id }); } },
-      { type: 'divider' as const },
-      { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false, onClick: onAnalyze },
-      { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined />, onClick: onPin },
-      { type: 'divider' as const },
-      { key: 'unregister', label: '仅从 ttFolio 移除登记', onClick: confirmUnregister },
-      { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false, onClick: confirmDelete }
-    ]
+  // 菜单定义为纯数据（key/label/icon），动作集中 handleMenuAction 分发——
+  // 受控右键菜单与「…」图标 Dropdown 两处触发共用，行为保持一致
+  const menuItems: MenuProps['items'] = [
+    ...(p.pathOk === false
+      ? [
+          { key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined /> },
+          { type: 'divider' as const }
+        ]
+      : []),
+    { key: 'open', label: '打开项目', icon: <FolderOpenOutlined /> },
+    { key: 'files', label: '打开文件页', icon: <FileTextOutlined /> },
+    { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !p.gitIsRepo },
+    { type: 'divider' as const },
+    { key: 'copy', label: '复制路径', icon: <CopyOutlined /> },
+    { key: 'explorer', label: '在资源管理器中显示', disabled: p.pathOk === false },
+    { key: 'terminal', label: '在此打开终端', disabled: p.pathOk === false },
+    { type: 'divider' as const },
+    { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false },
+    { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined /> },
+    { type: 'divider' as const },
+    { key: 'unregister', label: '仅从 ttFolio 移除登记' },
+    { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false }
+  ];
+  const handleMenuAction = (key: string): void => {
+    switch (key) {
+      case 'relocate': setRelocateOpen(true); break;
+      case 'open':
+      case 'files': onOpen(); break;
+      case 'git': useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName); break;
+      case 'copy': void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); break;
+      case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
+      case 'terminal': void api.post('/api/open', { target: 'terminal', projectId: p.id }); break;
+      case 'analyze': onAnalyze(); break;
+      case 'pin': onPin(); break;
+      case 'unregister': confirmUnregister(); break;
+      case 'delete': confirmDelete(); break;
+    }
   };
+
+  // 右键菜单打开时，点击任意其它位置关闭（菜单容器 onMouseDown 已阻止冒泡，菜单内点击不受影响）
+  useEffect(() => {
+    if (ctxMenu === null) return;
+    const close = (): void => setCtxMenu(null);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('blur', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('blur', close);
+    };
+  }, [ctxMenu]);
 
   return (
     <Card
@@ -84,12 +115,24 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       size="small"
       style={{ borderColor: p.pathOk ? undefined : SEMANTIC.error }}
       onClick={(e) => {
-        // 两类点击要忽略（都沿 React 树冒泡到卡片，会造成「点弹窗按钮却打开项目/切页」）：
+        // 三类点击要忽略（都沿 React 树冒泡到卡片，会造成「点弹窗按钮却打开项目/切页」）：
         // 1) Dropdown 菜单项：弹层 DOM 挂在触发器父节点（卡片内），closest 可识别
         if ((e.target as HTMLElement).closest('.ant-dropdown') !== null) return;
-        // 2) Modal 弹窗内按钮：portal 到 body，DOM 上不在卡片内——用 contains 识别
+        // 2) 受控右键菜单：菜单项 click 冒泡到卡片会误开项目
+        if ((e.target as HTMLElement).closest('[data-testid="project-ctx-menu"]') !== null) return;
+        // 3) Modal 弹窗内按钮：portal 到 body，DOM 上不在卡片内——用 contains 识别
         if (!e.currentTarget.contains(e.target as Node)) return;
         onOpen();
+      }}
+      onContextMenu={(e) => {
+        // 弹层/Modal 内的右键不接管（弹层挂卡片外或 body，contains 可识别）
+        if (!e.currentTarget.contains(e.target as Node)) return;
+        e.preventDefault();
+        // 边界收口：贴右边留菜单宽度、贴底下留菜单高度（14 项约 520px），小窗口下保底 8px
+        setCtxMenu({
+          x: Math.min(e.clientX, window.innerWidth - 232),
+          y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520))
+        });
       }}
       data-testid="project-card"
       title={
@@ -105,7 +148,8 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         </span>
       }
       extra={
-        <Dropdown menu={menu} trigger={['contextMenu', 'click']}>
+        // 卡片主体右键已由受控菜单接管，这里收窄为纯点击触发，避免两种右键菜单并存
+        <Dropdown menu={{ items: menuItems, onClick: ({ key }) => handleMenuAction(key) }} trigger={['click']}>
           <MoreOutlined onClick={(e) => e.stopPropagation()} />
         </Dropdown>
       }
@@ -150,6 +194,26 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         open={relocateOpen}
         onClose={() => setRelocateOpen(false)}
       />
+      {/* 受控右键菜单（第 28 轮，文件树 0.2.3 同款模式）：固定定位 + document mousedown 关闭，
+          容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行；卡片 onClick 已排除本容器 */}
+      {ctxMenu !== null && (
+        <div
+          data-testid="project-ctx-menu"
+          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <Menu
+            selectable={false}
+            style={{ border: 'none', background: 'transparent' }}
+            items={menuItems}
+            onClick={({ key }) => {
+              setCtxMenu(null);
+              handleMenuAction(key);
+            }}
+          />
+        </div>
+      )}
     </Card>
   );
 }
