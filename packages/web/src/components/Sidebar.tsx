@@ -17,6 +17,13 @@ import { SEMANTIC } from '@/theme/tokens';
 
 type MenuKey = string;
 
+/** 侧栏条目：集合项带 children（可折叠成员列表，第 30 轮），其余为平面项 */
+type SidebarItem = {
+  key: MenuKey;
+  label: React.ReactNode;
+  children?: Array<{ key: MenuKey; label: React.ReactNode }>;
+};
+
 export function Sidebar(): React.JSX.Element {
   const { domain, openTab, activeTabId } = useAppStore();
   const queryClient = useQueryClient();
@@ -120,7 +127,7 @@ export function Sidebar(): React.JSX.Element {
     }
   };
 
-  const items: Array<{ key: MenuKey; label: React.ReactNode }> = [];
+  const items: SidebarItem[] = [];
   let selected: string = '';
 
   if (domain === 'projects') {
@@ -128,7 +135,29 @@ export function Sidebar(): React.JSX.Element {
     // 这些"我的视图"本身仍保留：工作台总览的「需要处理」卡片会直接跳到对应卡片墙（viewTitle 映射保留）。
     items.push({ key: 'view:all', label: '工作台总览' });
     items.push({ key: 'view:recent', label: '最近打开' });
-    for (const c of collections ?? []) items.push({ key: `col:${c.id}`, label: `${c.name}（${c.memberCount}）` });
+    // 集合 = 可折叠子菜单（第 30 轮，用户需求：加入集合的项目要在侧栏能展开/收起查看）——
+    // 点集合名=展开/收起成员列表；子项首位「打开集合视图」保留原平面条目的卡片墙入口；
+    // 成员项目可直接点开，且带 data-project-id 可用右键整套菜单。收起为默认态。
+    for (const c of collections ?? []) {
+      const members = c.projectIds
+        .map((pid) => (projects ?? []).find((p) => p.id === pid))
+        .filter((p): p is ProjectSummary => p !== undefined);
+      items.push({
+        key: `col:${c.id}`,
+        label: `${c.name}（${c.memberCount}）`,
+        children: [
+          { key: `colview:${c.id}`, label: '打开集合视图' },
+          ...members.map((p) => ({
+            key: `colproj:${c.id}:${p.id}`,
+            label: (
+              <span data-project-id={p.id} className="tt-ellipsis" style={{ display: 'block', maxWidth: 150 }}>
+                {p.alias ?? p.diskName}
+              </span>
+            )
+          }))
+        ]
+      });
+    }
     selected = activeTabId !== null ? (useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.subTab?.replace('view:', 'view:') ?? '') : '';
   } else if (domain === 'git') {
     items.push({ key: 'git-overview', label: '跨项目 Git 总览' });
@@ -208,10 +237,21 @@ export function Sidebar(): React.JSX.Element {
       return;
     }
     if (key.startsWith('col:')) {
-      const cid = key.slice(4);
+      // 集合标题点击=antd 子菜单原生展开/收起（第 30 轮），这里不再开标签，直接吞掉
+      return;
+    }
+    if (key.startsWith('colview:')) {
+      const cid = key.slice(8);
       const col = (collections ?? []).find((c) => c.id === cid);
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
       openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: `col:${cid}`, scroll: 0 }, col?.name ?? '集合');
+      return;
+    }
+    if (key.startsWith('colproj:')) {
+      // 集合成员项目直接点开（files 页签），与主列表点项目一致
+      const pid = key.split(':')[2];
+      const p = (projects ?? []).find((x) => x.id === pid);
+      if (p !== undefined) openProject(p, 'files');
       return;
     }
     if (key.startsWith('proj:')) {
