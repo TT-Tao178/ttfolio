@@ -141,7 +141,7 @@ function Shell(): React.JSX.Element {
       {/* 顶栏：标签 + 搜索/导入/设置（品牌区 logo+名称已去除——与系统窗口标题栏/任务栏重复，第 27 轮）。高度对齐《界面原型-AntD.html》#top = 56px */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
         <Space size={6}>
-          <span style={{ fontSize: 12, opacity: 0.6 }}>TT项目管理工作台 · a local project workbench</span>
+          <span style={{ fontSize: 12, opacity: 0.6 }}>a local project workbench</span>
         </Space>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
           <TabBar />
