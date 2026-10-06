@@ -1,5 +1,5 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
-import { Avatar, Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
+import { Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
 import { PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -138,11 +138,9 @@ function Shell(): React.JSX.Element {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 顶栏：LOGO + 标签 + 搜索/导入/设置。高度对齐《界面原型-AntD.html》#top = 56px */}
+      {/* 顶栏：标签 + 搜索/导入/设置（品牌区 logo+名称已去除——与系统窗口标题栏/任务栏重复，第 27 轮）。高度对齐《界面原型-AntD.html》#top = 56px */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
         <Space size={6}>
-          <Avatar shape="square" size={26} style={{ background: SEMANTIC.primary, fontWeight: 700 }}>TT</Avatar>
-          <strong>ttFolio</strong>
           <span style={{ fontSize: 12, opacity: 0.6 }}>TT项目管理工作台 · a local project workbench</span>
         </Space>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
