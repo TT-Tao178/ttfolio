@@ -298,7 +298,7 @@ export function parseSubTab(subTab: string | null): Record<string, string> {
       default: return { status: 'active' };
     }
   }
-  if (subTab.startsWith('col:')) return { status: 'active' };
+  if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };
   if (subTab.startsWith('{')) {
     try {
       return JSON.parse(subTab) as Record<string, string>;
