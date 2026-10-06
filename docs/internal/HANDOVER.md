@@ -33,15 +33,17 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：9008394（README 重写 + MIT）；其上依次是 0.1.5 小窗口叠卡修复 /
-  0.1.4 窗口适配与刷新反馈 / 0.1.3 总览四模块（含迁移 0003）/ 0.1.2 Git 加载更多 /
-  0.1.1 前端尚未构建修复 / ABI 收包修复（精确哈希看 `git log --oneline -8`）
-- 桌面版版本 **0.2.7**；`dist-electron/` 下有 Setup-0.1.0 ~ 0.2.3（中文名）与 ttFolio-Setup-0.2.4 起共十五个安装包，
+- 最新提交：e598e84（0.2.7 收口）；其上是 0.2.7 树缩略图 / 0.2.7 版本 / 0.2.6 图片缩放
+  查看器 / 0.2.5 顶栏品牌区去除 / 0.2.4 开源规范化（元数据/双语 README/安装包名
+  ttFolio-Setup）；桌面版功能逐轮台账见 PROGRESS（精确哈希看 `git log --oneline`）
+- 桌面版版本 **0.2.7**；`dist-electron/` 下共十八个安装包（0.1.0~0.2.3 中文名 +
+  ttFolio-Setup-0.2.4~0.2.7 新名），
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
-  自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过一次；出包前必须
-  停 dev——node 进程锁 .node 文件会让 electron-rebuild 失败；杀软 EBUSY 锁
-  旧 asar 时按 0.1.5/0.1.9 经验：electron-builder 输出临时目录
-  `-c.directories.output=dist-electron-tmp` + `VERIFY_DIST=dist-electron-tmp/win-unpacked`
+  自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过两次；出包前必须
+  停 dev 并清 ttfolio 相关 node 进程（按命令行过滤）——进程锁 .node 文件会让
+  electron-rebuild 失败；杀软 EBUSY 锁
+  旧 asar 时按 0.1.5/0.1.9 经验：electron-builder 输出全新临时目录
+  `-c.directories.output=dist-electron-tmpN` + `VERIFY_DIST=dist-electron-tmpN/win-unpacked`
   自检 + 安装包移回）
 - 第二十六轮交互三件套：面包屑可点段有视觉信号、目录段点击→树逐层定位
   （store.treeLocate）；架构图页签为常驻分栏（HTML/图片/文本三类文件直接预览，
@@ -55,7 +57,21 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   四角透明（真源 `electron/build/icon.svg`，重生成 `node scripts/make-icon.mjs`）；
   git 提交身份已全局统一为 TT-Tao178 <GitHub noreply>，历史已 filter-repo
   改写归一（2026-09-25）
-- 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push
+- 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push；
+  GitHub 已开源规范化（topics/description/双语 README/Release v0.2.4），但
+  **全部 15 个 Release 均未挂安装包资产**——uploads.github.com 被用户加速器精确
+  拦截（直连/HTTP 代理/socks/借道 github 入口 IP 四通道全试不通，第四通道能
+  建连但 POST 被 301 重定向到主站），用户选择浏览器手动拖（dist-electron 下
+  文件名与 Release 版本号一一对应）；v0.2.4 Release 页面：
+  https://github.com/TT-Tao178/ttfolio/releases/tag/v0.2.4
+- **待用户验证/待查（第 27 轮遗留）**：
+  1. 右键菜单在安装版是否弹出——0.2.3 起为 document 级委托（dev 五落点验证弹），
+     用户报告不弹疑为旧安装包（0.2.3 起才含修复）；装 0.2.7 实测，仍不弹则按
+     右键位置取证
+  2. 安装版 Electron 实例登记接口返回 ok 却不落库（elec-verify 测试库 0 行，
+     原因未定位）——仅影响测试数据目录，用户真实库未复现，待查
+  3. dist-electron-tmp / tmp2 / tmp3 目录被杀软/残留进程锁，留在磁盘可稍后手动删
+  4. dev.mjs 已根治 runtime.json 旧端口竞态（起 server 前清旧文件）
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
   `npm test` **62 条** ✅
 - 数据库 user_version=**3**（0003：projects 加 git_last_commit_subject，只增不改）
