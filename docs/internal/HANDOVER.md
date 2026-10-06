@@ -57,7 +57,7 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   改写归一（2026-09-25）
 - 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
-  `npm test` **61 条** ✅
+  `npm test` **62 条** ✅
 - 数据库 user_version=**3**（0003：projects 加 git_last_commit_subject，只增不改）
 - 第二十一/二十二轮（0.1.1~0.1.5）台账已在 `PROGRESS.md` 顶部补记；总览布局
   0.1.3→0.1.5 的演进线看该文「第二十二轮」小节

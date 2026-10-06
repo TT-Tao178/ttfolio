@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 本地开发：并行启动 server(tsx watch) 与 web(vite)，等待 runtime.json 出现后把 token 传给 vite 代理。
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import os from 'node:os';
 import process from 'node:process';
@@ -64,7 +64,11 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-// 1) 先起 server（tsx watch）
+// 1) 先起 server（tsx watch）。起之前清掉上次运行留下的 runtime.json——
+//    否则下方轮询会立即读到旧端口（server 尚未重启完成），vite 代理指向死端口（ECONNREFUSED）
+for (const p of runtimeCandidates()) {
+  try { if (existsSync(p)) unlinkSync(p); } catch { /* 被占用时忽略，轮询仍会等 mtime 更新 */ }
+}
 spawnChild('server', 'npx', ['tsx', 'watch', 'packages/server/src/index.ts']);
 
 // 2) 轮询等待 runtime.json（最多 30 秒），拿到端口与 token
