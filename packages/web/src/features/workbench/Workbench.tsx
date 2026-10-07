@@ -3,7 +3,7 @@ import {
   Button, Dropdown, Empty, Input, Menu, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
 } from 'antd';
 import {
-  MoreOutlined, PlusOutlined, ReloadOutlined
+  InboxOutlined, MoreOutlined, PlusOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
-import { buildProjectMenu } from './projectMenu';
+import { buildProjectMenu, useArchiveProject } from './projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 /** 已消费过的「添加项目」信号值：跨挂载保留，避免重新挂载时重复弹窗。 */
@@ -118,6 +118,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
     void api.post(`/api/projects/${p.id}/open`);
   };
+  const archiveProject = useArchiveProject();
   const menuFor = (p: ProjectSummary): ReturnType<typeof buildProjectMenu> =>
     buildProjectMenu(p, {
       onOpen: () => openProjectTab(p),
@@ -125,6 +126,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       onPin: () => pin.mutate(p),
       onAnalyze: () => analyze.mutate([p.id]),
       onCollections: () => setPickerProject(p),
+      onArchive: () => archiveProject(p),
       onRelocate: () => setRelocateProject(p),
       onUnregister: () => confirmUnregister(p),
       onDelete: () => confirmDelete(p),
@@ -203,6 +205,10 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         <div style={{ flex: 1 }} />
         <Tooltip title="重建分析（全部项目）">
           <Button icon={<ReloadOutlined />} onClick={() => analyze.mutate([])} />
+        </Tooltip>
+        {/* 归档的找回入口：归档后项目从卡片墙消失，这里进「已归档」视图（评审二.5 的闭环） */}
+        <Tooltip title="已归档项目（查看 / 恢复）">
+          <Button icon={<InboxOutlined />} data-testid="archived-view-btn" onClick={() => useAppStore.getState().openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: 'view:my-archived', scroll: 0 }, '已归档')} />
         </Tooltip>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)} data-testid="add-project-btn">
           添加项目

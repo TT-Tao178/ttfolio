@@ -7,13 +7,45 @@
  * 各自持有确认弹窗与请求逻辑，本模块不持有 mutation。
  */
 import type { MenuProps } from 'antd';
+import { App as AntdApp } from 'antd';
 import {
-  AimOutlined, AppstoreOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined,
+  AimOutlined, AppstoreOutlined, InboxOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined,
   ReloadOutlined, StarFilled, StarOutlined
 } from '@ant-design/icons';
-import { api } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+
+/**
+ * 归档/取消归档（评审二.5：PATCH 与「已归档」视图都在，但没有任何入口，
+ * 视图成为死路）。归档前确认（归档后从总览/卡片墙消失，入口在卡片墙工具栏
+ * 「已归档」按钮）；取消归档直接执行。
+ */
+export function useArchiveProject(): (p: ProjectSummary) => void {
+  const { modal, message } = AntdApp.useApp();
+  const queryClient = useQueryClient();
+  return (p: ProjectSummary): void => {
+    const archiving = p.status !== 'archived';
+    const run = (): Promise<unknown> =>
+      api.patch(`/api/projects/${p.id}`, { rev: p.rev, status: archiving ? 'archived' : 'active' })
+        .then(() => {
+          void message.success(archiving ? '已归档（卡片墙工具栏「已归档」可找回）' : '已取消归档');
+          return queryClient.invalidateQueries({ queryKey: ['projects'] });
+        })
+        .catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'));
+    if (archiving) {
+      modal.confirm({
+        title: `归档「${p.alias ?? p.diskName}」？`,
+        content: '归档后从工作台总览与卡片墙隐藏（磁盘文件不受影响）；卡片墙工具栏的「已归档」按钮可查看与恢复。',
+        okText: '归档',
+        onOk: () => run()
+      });
+    } else {
+      void run();
+    }
+  };
+}
 
 export interface ProjectMenuHandlers {
   /** 打开项目：跟随设置 defaultProjectTab */
@@ -24,6 +56,8 @@ export interface ProjectMenuHandlers {
   onAnalyze: () => void;
   /** 打开归属集合弹窗 */
   onCollections: () => void;
+  /** 归档/取消归档（useArchiveProject） */
+  onArchive: () => void;
   /** 失效项目重定位弹窗 */
   onRelocate: () => void;
   /** 仅移除登记（消费方负责确认弹窗 + 请求） */
@@ -55,6 +89,7 @@ export function buildProjectMenu(p: ProjectSummary, h: ProjectMenuHandlers): {
     { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false },
     { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined /> },
     { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
+    { key: 'archive', label: p.status === 'archived' ? '取消归档' : '归档…', icon: <InboxOutlined /> },
     { type: 'divider' as const },
     { key: 'unregister', label: '仅从 ttFolio 移除登记' },
     { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false }
@@ -71,6 +106,7 @@ export function buildProjectMenu(p: ProjectSummary, h: ProjectMenuHandlers): {
       case 'analyze': h.onAnalyze(); break;
       case 'pin': h.onPin(); break;
       case 'collections': h.onCollections(); break;
+      case 'archive': h.onArchive(); break;
       case 'unregister': h.onUnregister(); break;
       case 'delete': h.onDelete(); break;
     }

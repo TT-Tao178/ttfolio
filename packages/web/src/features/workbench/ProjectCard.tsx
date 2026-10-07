@@ -15,7 +15,7 @@ import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from '@/features/workbench/RelocateModal';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
-import { buildProjectMenu } from '@/features/workbench/projectMenu';
+import { buildProjectMenu, useArchiveProject } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
@@ -72,12 +72,14 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     void api.post(`/api/projects/${p.id}/open`);
   };
   // 菜单定义与分发收敛到共享模块（与表格视图共用一份，评审 P2）：确认类动作注入
+  const archiveProject = useArchiveProject();
   const menu = buildProjectMenu(p, {
     onOpen,
     onOpenFiles: openFiles,
     onPin,
     onAnalyze,
     onCollections: () => setPickerOpen(true),
+    onArchive: () => archiveProject(p),
     onRelocate: () => setRelocateOpen(true),
     onUnregister: confirmUnregister,
     onDelete: confirmDelete,
