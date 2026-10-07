@@ -336,6 +336,9 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
 function CollectionsCard({ collections, name, setName, onChange }: {
   collections: CollectionInfo[]; name: string; setName: (v: string) => void; onChange: () => void;
 }): React.JSX.Element {
+  // 删除集合是级联操作（collection_members ON DELETE CASCADE，成员关系一并清掉），
+  // 必须二次确认——评审发现此前 × 一次误点即删
+  const { modal } = App.useApp();
   return (
     <div>
       <Space.Compact style={{ width: '100%', margin: '6px 0' }}>
@@ -349,7 +352,21 @@ function CollectionsCard({ collections, name, setName, onChange }: {
         }}>创建</Button>
       </Space.Compact>
       {(collections ?? []).map((c) => (
-        <Tag key={c.id} closable onClose={() => void api.del(`/api/collections/${c.id}`).then(onChange)}>
+        <Tag
+          key={c.id}
+          closable
+          onClose={(e) => {
+            e.preventDefault();
+            modal.confirm({
+              title: `删除集合「${c.name}」？`,
+              content: `集合下 ${c.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响，之后可重新归属。`,
+              okText: '删除集合',
+              okButtonProps: { danger: true },
+              cancelText: '取消',
+              onOk: () => void api.del(`/api/collections/${c.id}`).then(onChange)
+            });
+          }}
+        >
           {c.name}（{c.memberCount}）
         </Tag>
       ))}

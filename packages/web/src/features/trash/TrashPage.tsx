@@ -71,7 +71,22 @@ export function TrashPage(): React.JSX.Element {
         >
           清空回收站
         </Button>
-        <Button size="small" onClick={() => void api.post('/api/trash/purge-old').then(invalidate)}>清理超过保留期的条目</Button>
+        {/* 「清理超期」是批量不可恢复操作（与单条彻底删除同级 L3），此前无确认直接执行——评审后补齐 */}
+        <Button
+          size="small"
+          onClick={() =>
+            modal.confirm({
+              title: '清理超过保留期的条目？',
+              content: '将彻底删除所有超过 30 天保留期的条目，不可恢复。',
+              okText: '清理（L3）',
+              okButtonProps: { danger: true },
+              cancelText: '取消',
+              onOk: () => void api.post('/api/trash/purge-old').then(invalidate)
+            })
+          }
+        >
+          清理超过保留期的条目
+        </Button>
       </Space>
       <StateView loading={isLoading} error={error} empty={(items ?? []).length === 0} emptyText="回收站是空的">
         <List
