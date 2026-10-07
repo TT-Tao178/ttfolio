@@ -31,6 +31,10 @@ export const MAX_SESSION_TABS = 30;
 
 export const DEFAULT_ARCH_DIR_NAME = '架构图';
 
+/** 检查更新用：本产品的 GitHub 仓库（Releases 元数据走 api.github.com，不经被加速器拦截的下载域） */
+export const GITHUB_REPO = 'TT-Tao178/ttfolio';
+export const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
+
 /** settings 表的键（type_safe 常量） */
 export const SETTING_KEYS = {
   theme: 'theme', // light | dark | system
@@ -50,7 +54,9 @@ export const SETTING_KEYS = {
   defaultProjectTab: 'default_project_tab', // files | overview
   // 可拖拽面板尺寸（纯 UI 偏好，但按 C-29 统一落服务端，不用 localStorage）：
   // { sidebarWidth, detailWidth, treeWidth, gitListWidth, docsListWidth }
-  uiLayout: 'ui_layout_json'
+  uiLayout: 'ui_layout_json',
+  // GitHub 访问令牌（仓库当前为私有，查 Releases 需要能读该仓库的 Token；只写不读回显）
+  githubToken: 'github_token'
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

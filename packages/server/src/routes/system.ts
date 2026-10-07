@@ -8,9 +8,9 @@ import {
   listCommandTemplates, createCommandTemplate, updateCommandTemplate, deleteCommandTemplate
 } from '../db/repo/rulesRepo.js';
 import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
-import { validateTemplateArgs } from '../core/openExternal.js';
+import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
-import { SETTING_KEYS, TRASH_RETENTION_DAYS } from '@ttfolio/shared';
+import { SETTING_KEYS, TRASH_RETENTION_DAYS, GITHUB_REPO, GITHUB_RELEASES_URL } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { join } from 'node:path';
 import { listProjects } from '../db/repo/projectsRepo.js';
@@ -91,6 +91,91 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       if (!enabled) ctx.watcher.unwatchAll();
     }
     return ok({ saved: true });
+  });
+
+  // ---- 检查更新（轻方案）：只经 api.github.com 查 Releases 元数据（加速器不拦该域），
+  // 不做自动下载——安装包按现行惯例由用户手动下载/浏览器拖传。仓库私有，需要能读该
+  // 仓库的 Token（存 settings.github_token，仅写不回显）。 ----
+
+  /** 语义化版本比较：a 大于 b 返回 true（只认数字段，忽略 v 前缀与预发布后缀） */
+  function semverNewer(a: string, b: string): boolean {
+    const p = (s: string): number[] => s.replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
+    const [a1 = 0, a2 = 0, a3 = 0] = p(a);
+    const [b1 = 0, b2 = 0, b3 = 0] = p(b);
+    return a1 !== b1 ? a1 > b1 : a2 !== b2 ? a2 > b2 : a3 > b3;
+  }
+
+  app.get('/api/update/status', async () => {
+    const token = getSetting(ctx.db(), SETTING_KEYS.githubToken);
+    return ok({
+      currentVersion: ctx.version,
+      repo: GITHUB_REPO,
+      releaseUrl: GITHUB_RELEASES_URL,
+      tokenSet: token !== null && token !== ''
+    });
+  });
+
+  app.post('/api/update/token', async (req) => {
+    const b = (req.body ?? {}) as { token?: string | null };
+    const token = typeof b.token === 'string' ? b.token.trim() : '';
+    if (token !== '') {
+      // 宽松校验：GitHub Token 形态（ghp_/gho_/github_pat_ 开头）且无空白；长度下限防手滑
+      if (token.length < 20 || /\s/.test(token) || !/^(ghp_|gho_|ghub_|github_pat_)/.test(token)) {
+        return fail('BAD_REQUEST', '不像 GitHub Token：应以 ghp_ / gho_ / github_pat_ 开头、无空白、长度 ≥ 20');
+      }
+      setSetting(ctx.db(), SETTING_KEYS.githubToken, token);
+      logActivity(ctx.db(), { kind: 'settings.change', level: 'L1', detail: { key: SETTING_KEYS.githubToken, action: 'set' } });
+    } else {
+      setSetting(ctx.db(), SETTING_KEYS.githubToken, '');
+      logActivity(ctx.db(), { kind: 'settings.change', level: 'L1', detail: { key: SETTING_KEYS.githubToken, action: 'clear' } });
+    }
+    return ok({ saved: true, tokenSet: token !== '' });
+  });
+
+  app.get('/api/update/check', async () => {
+    const db = ctx.db();
+    const token = getSetting(db, SETTING_KEYS.githubToken);
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'ttFolio-update-check',
+      'X-GitHub-Api-Version': '2022-11-28'
+    };
+    if (token !== null && token !== '') headers.Authorization = `Bearer ${token}`;
+    let res: Response;
+    try {
+      res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        headers,
+        signal: AbortSignal.timeout(8000)
+      });
+    } catch {
+      return fail('IO_ERROR', '访问 GitHub 失败（网络/加速器原因）。可稍后重试，或直接打开 Releases 页面查看。', 502);
+    }
+    if (res.status === 401 || res.status === 403) {
+      return fail('PERMISSION_DENIED', 'GitHub 返回无权限：Token 无效/过期，或触发 API 限流（私有仓库需要能读本仓库的 Token）。', res.status === 401 ? 401 : 429);
+    }
+    if (res.status === 404) {
+      return ok({ currentVersion: ctx.version, latestVersion: null, hasUpdate: false, releaseUrl: GITHUB_RELEASES_URL, assets: [] as string[], note: '该仓库还没有任何 Release' });
+    }
+    if (!res.ok) {
+      return fail('IO_ERROR', `GitHub 返回 ${res.status}`, 502);
+    }
+    const data = (await res.json()) as { tag_name?: string; html_url?: string; assets?: Array<{ name: string }> };
+    const latestVersion = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/i, '') : '';
+    const hasUpdate = latestVersion !== '' && semverNewer(latestVersion, ctx.version);
+    return ok({
+      currentVersion: ctx.version,
+      latestVersion: latestVersion === '' ? null : latestVersion,
+      hasUpdate,
+      releaseUrl: typeof data.html_url === 'string' && data.html_url !== '' ? data.html_url : GITHUB_RELEASES_URL,
+      assets: (data.assets ?? []).map((a) => a.name),
+      note: hasUpdate && !(data.assets ?? []).some((a) => a.name.endsWith('.exe')) ? '新版本尚未上传安装包资产（ Releases 页可能只有源码）' : null
+    });
+  });
+
+  app.post('/api/update/open-release', async () => {
+    await openUrlInBrowser(GITHUB_RELEASES_URL);
+    logActivity(ctx.db(), { kind: 'open.external', level: 'L1', detail: { target: 'releases' } });
+    return ok({ opened: true });
   });
 
   // ---- 忽略规则 ----

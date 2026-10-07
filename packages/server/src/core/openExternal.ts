@@ -68,6 +68,20 @@ export async function openTerminal(dir: string): Promise<void> {
   fireAndForget('x-terminal-emulator', ['--working-directory', dir]);
 }
 
+export async function openUrlInBrowser(url: string): Promise<void> {
+  // 只接受 https URL（检查更新/打开 Release 页用；防拼接出 file:/smb: 之类被系统处理器接走）
+  if (!/^https:\/\//.test(url)) throw new AppError('BAD_REQUEST', '仅允许打开 https 链接');
+  if (process.platform === 'win32') {
+    fireAndForget('rundll32', ['url.dll,FileProtocolHandler', url]);
+    return;
+  }
+  if (process.platform === 'darwin') {
+    fireAndForget('open', [url]);
+    return;
+  }
+  fireAndForget('xdg-open', [url]);
+}
+
 export function renderTemplateArgs(args: string[], values: { path: string; file: string; project: string; paths: string }): string[] {
   return args.map((a) =>
     a
