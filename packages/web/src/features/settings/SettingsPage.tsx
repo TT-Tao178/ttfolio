@@ -9,6 +9,7 @@ import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/share
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
+import { UpdateCheck } from './UpdateCheck';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
 
@@ -326,6 +327,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                 </div>
               }
             />
+            {/* 手动检查更新（api.github.com 元数据 + 引导手动下载，评审 C10 轻方案） */}
+            <UpdateCheck />
           </Card>
         </SectionAnchor>
       </div>
