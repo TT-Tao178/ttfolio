@@ -22,7 +22,7 @@ data/
 *.db.corrupted-*
 *.db.before-restore
 backups/
-trash/
+/trash/
 thumbs/
 logs/
 runtime.json
