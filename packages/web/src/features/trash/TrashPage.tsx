@@ -24,12 +24,36 @@ export function TrashPage(): React.JSX.Element {
   };
 
   const restore = useMutation({
-    mutationFn: (id: string) => api.post('/api/trash/restore', { id }),
+    mutationFn: (v: { id: string; targetDir?: string }) => api.post('/api/trash/restore', v),
     onSuccess: () => {
-      void message.success('已恢复到原路径');
+      void message.success('已恢复');
       invalidate();
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '恢复失败')
+    onError: (e, v) => {
+      // 原路径被占用（服务端 409 TRASH_PATH_TAKEN）：此前只能报错死路——后端 restore
+      // 本就支持 targetDir（评审时核实），接上「选择其他目录恢复」
+      if (e instanceof ApiClientError && e.code === 'TRASH_PATH_TAKEN') {
+        modal.confirm({
+          title: '原路径已被占用',
+          content: '可指定其他目录恢复（将保持条目原名）。',
+          okText: '选择目录…',
+          cancelText: '取消',
+          onOk: async () => {
+            try {
+              void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
+              const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
+              const dir = r.paths[0];
+              if (dir !== undefined) restore.mutate({ id: v.id, targetDir: dir });
+              else void message.info('未选择目录');
+            } catch {
+              void message.error('打开系统对话框失败');
+            }
+          }
+        });
+        return;
+      }
+      void message.error(e instanceof ApiClientError ? e.message : '恢复失败');
+    }
   });
 
   const purge = useMutation({
@@ -100,7 +124,7 @@ export function TrashPage(): React.JSX.Element {
                 <span style={{ fontSize: 12, opacity: 0.6 }}>{fmtBytes(t.sizeBytes)} · {relTime(t.deletedAt)}</span>
                 <Space>
                   <Button size="small" onClick={() => setPreview(t)}>预览</Button>
-                  <Button size="small" type="primary" icon={<UndoOutlined />} onClick={() => restore.mutate(t.id)}>恢复</Button>
+                  <Button size="small" type="primary" icon={<UndoOutlined />} onClick={() => restore.mutate({ id: t.id })}>恢复</Button>
                   <Button
                     size="small"
                     danger
