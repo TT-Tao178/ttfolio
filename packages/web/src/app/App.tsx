@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
 import { SettingsProvider, useSettings } from '@/app/settings';
 import { useAppStore, serializeSession } from '@/app/store';
+import { useCloseTab } from '@/app/useCloseTab';
 import { useSse, type SseState } from '@/app/sse';
 import { TabBar } from '@/components/TabBar';
 import { PathBar } from '@/components/PathBar';
@@ -52,11 +53,13 @@ class PaneErrorBoundary extends React.Component<{ children: React.ReactNode }, {
 }
 
 function Shell(): React.JSX.Element {
-  const { tabs, activeTabId, openTab, closeTab, paletteOpen, setPalette, updateActiveLocation } = useAppStore();
+  const { tabs, activeTabId, openTab, paletteOpen, setPalette, updateActiveLocation } = useAppStore();
   const { dark, settings } = useSettings();
   const { message } = AntdApp.useApp();
   const [sseState, setSseState] = useState<SseState>('connecting');
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  // Ctrl+W 与标签 × 同一套关闭逻辑（评审：此前 Ctrl+W 对脏标签静默拦截无反馈）
+  const closeTabConfirmed = useCloseTab();
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);
@@ -106,7 +109,8 @@ function Shell(): React.JSX.Element {
         setPalette(!paletteOpen);
       } else if (mod && e.key.toLowerCase() === 'w') {
         e.preventDefault();
-        if (activeTabId !== null) closeTab(activeTabId);
+        const tab = tabs.find((t) => t.id === activeTabId);
+        if (tab !== undefined) closeTabConfirmed(tab);
       } else if (mod && e.key === 'Tab') {
         e.preventDefault();
         const idx = tabs.findIndex((t) => t.id === activeTabId);
@@ -134,7 +138,7 @@ function Shell(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [paletteOpen, setPalette, tabs, activeTabId, activeTab, closeTab, updateActiveLocation, openTab, message, setDetail]);
+  }, [paletteOpen, setPalette, tabs, activeTabId, activeTab, closeTabConfirmed, updateActiveLocation, openTab, message, setDetail]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

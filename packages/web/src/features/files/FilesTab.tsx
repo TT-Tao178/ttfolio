@@ -242,15 +242,22 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     return () => document.removeEventListener('contextmenu', onCtx);
   }, [projectId]);
 
-  // 右键菜单打开时，点击任意其它位置关闭（菜单容器 onMouseDown 已阻止冒泡，内部点击不受影响）
+  // 右键菜单打开时，点击任意其它位置/滚动/Esc 关闭（菜单容器 onMouseDown 已阻止冒泡，内部点击不受影响）
   useEffect(() => {
     if (ctxMenu === null) return;
     const close = (): void => setCtxMenu(null);
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close();
+    };
     document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', close, true);
     window.addEventListener('blur', close);
+    window.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', close);
+      document.removeEventListener('scroll', close, true);
       window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', onKey);
     };
   }, [ctxMenu]);
 

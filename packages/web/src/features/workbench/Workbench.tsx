@@ -135,15 +135,18 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   useEffect(() => {
     if (ctxMenu === null) return;
     const close = (): void => setCtxMenu(null);
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') close();
+    };
     document.addEventListener('mousedown', close);
     document.addEventListener('scroll', close, true);
     window.addEventListener('blur', close);
-    window.addEventListener('keydown', close);
+    window.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', close);
       document.removeEventListener('scroll', close, true);
       window.removeEventListener('blur', close);
-      window.removeEventListener('keydown', close);
+      window.removeEventListener('keydown', onKey);
     };
   }, [ctxMenu]);
 
