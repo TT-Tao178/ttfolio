@@ -63,6 +63,13 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
 
   // 菜单定义为纯数据（key/label/icon），动作集中 handleMenuAction 分发——
   // 受控右键菜单与「…」图标 Dropdown 两处触发共用，行为保持一致
+  // 「打开项目」跟随默认页签设置（onOpen）；「打开文件页」必须强制 files
+  // （评审：此前两者同调 onOpen，默认页签=总览时菜单言不符实）
+  const openFiles = (): void => {
+    useAppStore.getState().requestAutoOpenProject(p.id);
+    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
+    void api.post(`/api/projects/${p.id}/open`);
+  };
   const menuItems: MenuProps['items'] = [
     ...(p.pathOk === false
       ? [
@@ -88,8 +95,8 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   const handleMenuAction = (key: string): void => {
     switch (key) {
       case 'relocate': setRelocateOpen(true); break;
-      case 'open':
-      case 'files': onOpen(); break;
+      case 'open': onOpen(); break;
+      case 'files': openFiles(); break;
       case 'git': useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName); break;
       case 'copy': void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); break;
       case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
