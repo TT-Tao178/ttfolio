@@ -18,6 +18,11 @@ import { langColor, SEMANTIC } from '@/theme/tokens';
 /** 总览项目卡片的每页数量：1440 宽下约 3 列，12 个 = 4 屏内可翻完 */
 const PAGE_SIZE = 12;
 
+/** 本地时区的 YYYY-MM-DD（评审：用 UTC 的 toISOString 比对「今天」，东八区每天 0-8 点算成昨天） */
+function localDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 
 export function Dashboard(): React.JSX.Element {
   const { settings } = useSettings();
@@ -33,7 +38,8 @@ export function Dashboard(): React.JSX.Element {
   const dirty = list.filter((p) => p.gitIsRepo && p.gitDirty).length;
   const noDocs = list.filter((p) => !p.hasDocs).length;
   const noArch = list.filter((p) => !p.hasArch).length;
-  const openedToday = list.filter((p) => p.lastOpenedAt !== null && String(p.lastOpenedAt).slice(0, 10) === new Date().toISOString().slice(0, 10)).length;
+  const todayKey = localDateKey(new Date());
+  const openedToday = list.filter((p) => p.lastOpenedAt !== null && localDateKey(new Date(String(p.lastOpenedAt))) === todayKey).length;
   const avgMs = (() => {
     const vals = list.map((p) => p.analyzeMs ?? 0).filter((v) => v > 0);
     return vals.length === 0 ? 0 : Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
