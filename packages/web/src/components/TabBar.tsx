@@ -2,13 +2,14 @@
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Dropdown, Modal } from 'antd';
+import { App as AntdApp, Dropdown } from 'antd';
 import {
   CloseOutlined, PushpinOutlined, FileTextOutlined, FolderOutlined, SearchOutlined,
   SettingOutlined, DeleteOutlined, PictureOutlined, BookOutlined, AppstoreOutlined, BranchesOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useRef } from 'react';
 import { useAppStore, type Tab } from '@/app/store';
+import { useCloseTab } from '@/app/useCloseTab';
 import { SEMANTIC } from '@/theme/tokens';
 
 function kindIcon(t: Tab): React.JSX.Element {
@@ -71,27 +72,25 @@ function SortableTab({ tab, active, onActivate, onClose }: {
 }
 
 export function TabBar(): React.JSX.Element {
-  const { tabs, activeTabId, activateTab, closeTab, moveTab, togglePin, dirty } = useAppStore();
+  const { tabs, activeTabId, activateTab, moveTab, togglePin, dirty, closedTabs, reopenLastClosed } = useAppStore();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [modal, contextHolder] = Modal.useModal();
+  const { message } = AntdApp.useApp();
+  // 关闭逻辑抽到 useCloseTab 共享（× / Ctrl+W / 右键菜单同一套未保存确认）
+  const closeTabConfirmed = useCloseTab();
 
-  const onClose = (tab: Tab): void => {
-    const dirtyKey = tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
-    if (dirtyKey !== null && dirty.has(dirtyKey)) {
-      void modal.confirm({
-        title: '标签内有未保存的改动',
-        content: '关闭前请先保存（Ctrl+S），或放弃改动。',
-        okText: '放弃改动并关闭',
-        okButtonProps: { danger: true },
-        cancelText: '取消',
-        onOk: () => {
-          useAppStore.getState().clearDirty(dirtyKey);
-          closeTab(tab.id);
-        }
-      });
-      return;
-    }
-    closeTab(tab.id);
+  /** 批量关闭（关闭其他/右侧/全部）：固定标签保留；含未保存改动的跳过并提示数量 */
+  const closeMany = (pred: (t: Tab, index: number) => boolean): void => {
+    let skipped = 0;
+    tabs.forEach((t, index) => {
+      if (t.isPinned || !pred(t, index)) return;
+      const key = t.projectId !== null && t.targetPath !== null ? `${t.projectId}|${t.targetPath}` : null;
+      if (key !== null && dirty.has(key)) {
+        skipped++;
+        return;
+      }
+      useAppStore.getState().closeTab(t.id);
+    });
+    if (skipped > 0) void message.info(`${skipped} 个含未保存改动的标签未关闭`);
   };
 
   const onDragEnd = (e: DragEndEvent): void => {
@@ -126,8 +125,21 @@ export function TabBar(): React.JSX.Element {
               trigger={['contextMenu']}
               menu={{
                 items: [
+                  { key: 'reopen', label: '恢复已关闭标签', disabled: closedTabs.length === 0, onClick: () => reopenLastClosed() },
+                  { type: 'divider' as const },
                   { key: 'pin', label: tab.isPinned ? '取消固定' : '固定标签', onClick: () => togglePin(tab.id) },
-                  { key: 'close', label: '关闭', onClick: () => onClose(tab) }
+                  { key: 'close', label: '关闭', onClick: () => closeTabConfirmed(tab) },
+                  { type: 'divider' as const },
+                  { key: 'closeOthers', label: '关闭其他标签（保留固定）', onClick: () => closeMany((t) => t.id !== tab.id) },
+                  {
+                    key: 'closeRight',
+                    label: '关闭右侧标签',
+                    onClick: () => {
+                      const idx = tabs.findIndex((t) => t.id === tab.id);
+                      closeMany((t, i) => i > idx);
+                    }
+                  },
+                  { key: 'closeAll', label: '关闭全部标签（保留固定）', onClick: () => closeMany(() => true) }
                 ]
               }}
             >
@@ -136,14 +148,13 @@ export function TabBar(): React.JSX.Element {
                   tab={tab}
                   active={tab.id === activeTabId}
                   onActivate={() => activateTab(tab.id)}
-                  onClose={() => onClose(tab)}
+                  onClose={() => closeTabConfirmed(tab)}
                 />
               </div>
             </Dropdown>
           ))}
         </div>
       </SortableContext>
-      {contextHolder}
     </DndContext>
   );
 }

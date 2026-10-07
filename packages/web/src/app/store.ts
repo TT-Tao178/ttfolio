@@ -32,9 +32,12 @@ interface AppState {
   dirty: Map<string, true>;
   settingsPaletteOpen: boolean;
   paletteOpen: boolean;
+  /** 已关闭标签栈（评审：缺「恢复已关闭」）——closeTab 压栈（上限 10），reopenLastClosed 弹出重开 */
+  closedTabs: Array<{ loc: TabLocation; title: string }>;
 
   openTab: (loc: TabLocation, title: string) => void;
   closeTab: (id: string) => string | null;
+  reopenLastClosed: () => void;
   activateTab: (id: string) => void;
   moveTab: (from: number, to: number) => void;
   togglePin: (id: string) => void;
@@ -81,6 +84,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dirty: new Map(),
   settingsPaletteOpen: false,
   paletteOpen: false,
+  closedTabs: [],
 
   openTab: (loc, title) => {
     const { tabs } = get();
@@ -113,6 +117,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabDirtyKey = tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
     if (tabDirtyKey !== null && dirty.has(tabDirtyKey)) return id;
     const idx = tabs.findIndex((t) => t.id === id);
+    // 记入已关闭栈（供「恢复已关闭标签」；脏标签被拦截的不记）
+    set({ closedTabs: [...get().closedTabs, { loc: { kind: tab.kind, projectId: tab.projectId, targetPath: tab.targetPath, subTab: tab.subTab, scroll: tab.scroll }, title: tab.title }].slice(-10) });
     const next = tabs.filter((t) => t.id !== id);
     const nextActive =
       activeTabId === id ? (next[Math.min(idx, next.length - 1)]?.id ?? null) : activeTabId;
@@ -120,15 +126,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     return null;
   },
 
+  reopenLastClosed: () => {
+    const { closedTabs } = get();
+    const last = closedTabs[closedTabs.length - 1];
+    if (last === undefined) return;
+    set({ closedTabs: closedTabs.slice(0, -1) });
+    get().openTab(last.loc, last.title);
+  },
+
   activateTab: (id) => set({ activeTabId: id }),
 
   moveTab: (from, to) => {
     const { tabs } = get();
     if (from === to || from < 0 || to < 0 || from >= tabs.length || to >= tabs.length) return;
-    const next = [...tabs];
-    const [moved] = next.splice(from, 1);
+    const moved = tabs[from];
     if (moved === undefined) return;
-    next.splice(to, 0, moved);
+    // 固定标签恒居最左（浏览器惯例，评审一.7）：非固定标签拖不进固定区、固定标签拖不出固定区
+    const pinCount = tabs.filter((t) => t.isPinned).length;
+    const lo = moved.isPinned ? 0 : pinCount;
+    const hi = moved.isPinned ? Math.max(pinCount - 1, 0) : tabs.length - 1;
+    const clamped = Math.min(Math.max(to, lo), hi);
+    if (clamped === from) return;
+    const next = [...tabs];
+    const [taken] = next.splice(from, 1);
+    if (taken === undefined) return;
+    next.splice(clamped, 0, taken);
     set({ tabs: next });
   },
 
