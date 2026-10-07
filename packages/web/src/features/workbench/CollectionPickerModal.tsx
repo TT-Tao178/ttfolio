@@ -1,10 +1,11 @@
 /**
- * 归属集合弹窗（第 28 轮）：把项目加入/移出集合。
- * 背景：集合成员此前完全没有 UI——设置页只能创建/删除集合本身，
- * 后端 /api/collections/:id/members 齐全但前端零调用，项目无法归入集合。
+ * 归属集合弹窗（第 28 轮新增；第 31 轮评审后修正）：把项目加入/移出集合。
  * 交互：勾选列表（勾选态=当前所属）+ 底部快捷新建；保存时只对发生变化的集合调接口——
  * 加入走 members 追加语义（replace 缺省 false，不动已有成员），
- * 移出走全量替换语义（replace:true，成员列表为原成员减去本项目）。
+ * 移出走专用 DELETE /api/collections/:id/members/:projectId（单成员删除，
+ * 不再以弹窗快照全量替换——多窗口并发编辑不再互相覆盖）。
+ * 竞态修复：弹窗内新建的集合在 ['collections'] 缓存刷新完成前不在列表里，
+ * 立即点保存会漏发成员请求——新建结果额外保存在本地 createdCols 并参与保存循环。
  * 用法：父组件条件渲染并带 key={project.id}，每次打开都是全新挂载，
  * 勾选态取打开瞬间的 project.collections 快照，保存 diff 与之对齐。
  */
@@ -23,10 +24,15 @@ export function CollectionPickerModal({ project, onClose }: {
   const queryClient = useQueryClient();
   const [checked, setChecked] = useState<Set<string>>(() => new Set(project.collections));
   const [newName, setNewName] = useState('');
+  /** 弹窗内新建的集合：缓存刷新完成前也参与勾选展示与保存 diff（评审竞态修复） */
+  const [createdCols, setCreatedCols] = useState<CollectionInfo[]>([]);
   const { data: collections } = useQuery({
     queryKey: ['collections'],
     queryFn: () => api.get<CollectionInfo[]>('/api/collections')
   });
+  const fetched = collections ?? [];
+  // 展示与保存统一用合并视图：服务端列表 + 本地新建（去重，刷新落地后自然收敛）
+  const cols = [...fetched, ...createdCols.filter((c) => !fetched.some((x) => x.id === c.id))];
   const invalidate = async (): Promise<void> => {
     await queryClient.invalidateQueries({ queryKey: ['projects'] });
     await queryClient.invalidateQueries({ queryKey: ['collections'] });
@@ -35,19 +41,14 @@ export function CollectionPickerModal({ project, onClose }: {
   const save = useMutation({
     mutationFn: async (): Promise<void> => {
       const calls: Promise<unknown>[] = [];
-      for (const c of collections ?? []) {
+      for (const c of cols) {
         const was = project.collections.includes(c.id);
         const now = checked.has(c.id);
         if (was === now) continue;
         if (now) {
           calls.push(api.post(`/api/collections/${c.id}/members`, { projectIds: [project.id] }));
         } else {
-          calls.push(
-            api.post(`/api/collections/${c.id}/members`, {
-              projectIds: c.projectIds.filter((x) => x !== project.id),
-              replace: true
-            })
-          );
+          calls.push(api.del(`/api/collections/${c.id}/members/${project.id}`));
         }
       }
       await Promise.all(calls);
@@ -63,7 +64,10 @@ export function CollectionPickerModal({ project, onClose }: {
   const create = useMutation({
     mutationFn: () => api.post<CollectionInfo>('/api/collections', { name: newName.trim() }),
     onSuccess: (c) => {
-      if (c !== null) setChecked((prev) => new Set(prev).add(c.id));
+      if (c !== null) {
+        setCreatedCols((prev) => [...prev, c]);
+        setChecked((prev) => new Set(prev).add(c.id));
+      }
       setNewName('');
       void queryClient.invalidateQueries({ queryKey: ['collections'] });
       void message.success(`已创建集合「${c?.name ?? ''}」并勾选`);
@@ -76,7 +80,6 @@ export function CollectionPickerModal({ project, onClose }: {
     onClose();
   };
 
-  const cols = collections ?? [];
   const changed = cols.some((c) => project.collections.includes(c.id) !== checked.has(c.id));
 
   return (

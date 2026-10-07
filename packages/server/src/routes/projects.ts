@@ -363,6 +363,14 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
+  // 从集合移除单个项目：专用删除语义——此前前端用「全量替换成员列表」（replace:true +
+  // 打开弹窗时的快照减自己）实现移除，两个窗口同时编辑同一集合时后保存者会覆盖先保存者的修改
+  app.delete('/api/collections/:id/members/:projectId', async (req) => {
+    const { id, projectId } = req.params as { id: string; projectId: string };
+    ctx.db().prepare('DELETE FROM collection_members WHERE collection_id = ? AND project_id = ?').run(id, projectId);
+    return ok(listCollections(ctx.db()).find((c) => c.id === id) ?? null);
+  });
+
   // ---- 标签 ----
   app.get('/api/tags', async () => {
     const db = ctx.db();
