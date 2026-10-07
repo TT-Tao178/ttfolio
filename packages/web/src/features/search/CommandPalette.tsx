@@ -13,6 +13,17 @@ interface CommandItem {
   run: () => void;
 }
 
+/**
+ * FTS snippet 渲染前转义：snippet 是文件内容原文（SQLite snippet() 只加 [ ] 高亮标记），
+ * 不转义直接 dangerouslySetInnerHTML 会把文件里的 HTML 当标签执行（评审定级的 P0）；
+ * 转义后再把 [ ] 标记转 <mark> 做高亮。文件内容自带的字面方括号也可能被转成 mark，
+ * 只是视觉瑕疵无安全问题（浏览器自动闭合未配对标签）。
+ */
+function escapeSnippet(s: string): string {
+  const esc = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return esc.replace(/\[/g, '<mark>').replace(/\]/g, '</mark>');
+}
+
 export function CommandPalette(): React.JSX.Element {
   const { paletteOpen, setPalette, openTab, tabs, activeTabId } = useAppStore();
   const { message } = App.useApp();
@@ -88,7 +99,7 @@ export function CommandPalette(): React.JSX.Element {
       title: (
         <span>
           <Tag color="purple">内容</Tag> <span className="tt-mono" style={{ fontSize: 12 }}>{c.relPath}</span>
-          <div style={{ fontSize: 12, opacity: 0.75 }} dangerouslySetInnerHTML={{ __html: c.snippet }} />
+          <div style={{ fontSize: 12, opacity: 0.75 }} dangerouslySetInnerHTML={{ __html: escapeSnippet(c.snippet) }} />
         </span>
       ),
       run: () => openTab({ kind: 'project', projectId: c.projectId, targetPath: c.relPath, subTab: 'files', scroll: 0 }, c.relPath.split('/').pop() ?? c.relPath)
