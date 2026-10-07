@@ -270,6 +270,34 @@
 - **实测**：每个提交 typecheck/lint/test 真实退出码 0（62 条全绿）；界面行为交
   用户装包手测。
 
+### 检查更新轮（0.2.12，74f5828 + 8914147 + 6aea8f2 + 928b29c）
+
+- **需求**：用户要「手动从 GitHub 检查更新」。评审 C10 的轻方案：完整 electron-updater
+  需走 github.com 下载域（用户加速器精确拦截，不可行），退为「查 Releases 元数据
+  （api.github.com，api 域正常）+ 一键打开下载页 + 手动下载」，与现行手动拖传
+  Release 资产的惯例一致。
+- **后端（74f5828/6aea8f2/928b29c）**：shared 常量 GITHUB_REPO/GITHUB_RELEASES_URL
+  + SETTING_KEYS.githubToken；openExternal.openUrlInBrowser（仅 https，rundll32）；
+  system 路由四端点——status（版本/Token 是否已设置，不回显本体）/token（宽松校验
+  ghp_/gho_/github_pat_ 前缀，空串清除；**刻意不进 PATCH settings 通用通道**，
+  杜绝 GET /api/settings 回显密钥）/check（8s 超时查 releases/latest，语义化版本
+  比较，404 双情形文案）/open-release（L1 日志）。
+- **前端（8914147）**：UpdateCheck 组件挂「关于」卡——当前版本 + 检查更新
+  （新版本/已最新/无 Release 三态 + 安装包资产缺失提示）+ 打开下载页 + Token
+  配置（Password 输入，tokenSet 状态 Tag）。
+- **过程取证（本轮最有价值的发现）**：冒烟时 fetch 直连 api.github.com 报
+  **UNABLE_TO_VERIFY_LEAF_SIGNATURE**——加速器对 github 域做 TLS 中间人（出包
+  NODE_USE_SYSTEM_CA=1 的根因同源）；同 URL curl 直连 404/0.6s 正常（系统证书库
+  信任加速器 CA）。而打包版 server 进程内跑在 Electron 里，NODE_USE_SYSTEM_CA
+  启动期 env 注入不可靠 → **代码级回退**：fetch 异常一律回退系统 curl.exe
+  （Schannel 走系统证书库；-w 附加状态码；C-21 executable+args 口径）。
+- **冒烟（隔离数据目录 TTFOLIO_DATA_DIR，零触碰真实数据）**：status→tokenSet:false；
+  token 格式坏值→400；存假 Token→tokenSet:true；check 假 Token→PERMISSION_DENIED
+  （curl 回退真实走通）；清 Token→tokenSet:false；check 无 Token→404 分支双情形
+  文案。收口按 CommandLine 清 3 个 dev 进程 + 删冒烟目录零残留。
+- **实测**：typecheck/lint/test 真实退出码 0；「检查更新」全链路待用户装包配
+  Token 手测（前端三态 UI）。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
