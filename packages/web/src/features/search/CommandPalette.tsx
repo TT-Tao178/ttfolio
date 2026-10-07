@@ -59,7 +59,9 @@ export function CommandPalette(): React.JSX.Element {
   const commands = useMemo<CommandItem[]>(() => {
     const list: CommandItem[] = [
       { id: 'cmd.workbench', title: '打开工作台总览', run: () => openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台') },
-      { id: 'cmd.add', title: '添加项目', run: () => { openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'); } },
+      // 与顶栏「导入」按钮同款两步：切到工作台 + 打开添加弹窗（评审：此前只切标签不开弹窗，
+      // 命令名叫「添加项目」点了却像没反应）
+      { id: 'cmd.add', title: '添加项目', run: () => { openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'); useAppStore.getState().requestAddProject(); } },
       { id: 'cmd.settings', title: '打开设置 (Ctrl+,)', run: () => openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置') },
       { id: 'cmd.trash', title: '打开回收站', run: () => openTab({ kind: 'trash', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '回收站') },
       { id: 'cmd.git-overview', title: '跨项目 Git 总览', run: () => openTab({ kind: 'search', projectId: null, targetPath: null, subTab: 'git-overview', scroll: 0 }, 'Git 总览') }
@@ -166,6 +168,10 @@ export function CommandPalette(): React.JSX.Element {
               options={[{ label: '全部', value: 'all' }, { label: '当前项目', value: 'project' }]}
             />
           </Space>
+          {/* 当前没有活动项目时「当前项目」作用域会静默回落为全库搜索——明示，不让用户以为过滤生效 */}
+          {scope === 'project' && activeProjectId === null && (
+            <div style={{ fontSize: 12, opacity: 0.6, padding: '0 8px' }}>当前没有打开的项目，正在搜索全部项目</div>
+          )}
           <div style={{ maxHeight: 420, overflow: 'auto' }}>
             {rows.length === 0 && q.trim() !== '' && (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无结果" style={{ padding: 24 }} />

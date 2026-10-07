@@ -275,7 +275,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
           )}
         </div>
         <div style={{ fontSize: 12, opacity: 0.65 }}>
-          提示：从系统资源管理器拖拽文件夹到本窗口也可添加（浏览器安全限制下会先按名称定位，请确认路径后登记）。
+          提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，拖拽添加暂不可用——请用上方三种入口（粘贴路径 / 系统对话框 / 父目录批量登记）。
         </div>
       </div>
     </Modal>
