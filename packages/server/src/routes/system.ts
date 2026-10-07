@@ -154,7 +154,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       return fail('PERMISSION_DENIED', 'GitHub 返回无权限：Token 无效/过期，或触发 API 限流（私有仓库需要能读本仓库的 Token）。', res.status === 401 ? 401 : 429);
     }
     if (res.status === 404) {
-      return ok({ currentVersion: ctx.version, latestVersion: null, hasUpdate: false, releaseUrl: GITHUB_RELEASES_URL, assets: [] as string[], note: '该仓库还没有任何 Release' });
+      return ok({ currentVersion: ctx.version, latestVersion: null, hasUpdate: false, releaseUrl: GITHUB_RELEASES_URL, assets: [] as string[], note: '没有查到 Release：可能是还没有发布过，或仓库为私有且未配置（或配置了无权限的）Token' });
     }
     if (!res.ok) {
       return fail('IO_ERROR', `GitHub 返回 ${res.status}`, 502);
