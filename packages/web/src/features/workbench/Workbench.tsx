@@ -1,9 +1,9 @@
 /** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图 + 添加项目。 */
 import {
-  Button, Empty, Input, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
+  Button, Dropdown, Empty, Input, Menu, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
 } from 'antd';
 import {
-  PlusOutlined, ReloadOutlined
+  MoreOutlined, PlusOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,9 @@ import { ProjectCard } from './ProjectCard';
 import { StateView } from '@/components/StateView';
 import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
+import { RelocateModal } from './RelocateModal';
+import { CollectionPickerModal } from './CollectionPickerModal';
+import { buildProjectMenu } from './projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 /** 已消费过的「添加项目」信号值：跨挂载保留，避免重新挂载时重复弹窗。 */
@@ -33,7 +36,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   }, [settings.cardSort]);
   const [addOpen, setAddOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { message } = App.useApp();
 
   // 顶栏/总览「添加项目」信号：nonce 变化即打开弹窗（模块级 lastAddNonce 保证"只消费一次"——
   // 若用组件内 ref，切到项目页再回总览会因 nonce 仍 >0 而弹出上次的弹窗）。
@@ -44,6 +46,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       setAddOpen(true);
     }
   }, [addProjectNonce]);
+
+  // ---- 表格视图的项目操作（评审 P2：此前操作列只有「打开」、行无右键，与卡片不对等）----
+  // 菜单定义/分发与卡片共用 buildProjectMenu；确认类动作在此注入（确认弹窗与请求归本组件）
+  const { message, modal } = App.useApp();
+  const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
+  const [relocateProject, setRelocateProject] = useState<ProjectSummary | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
 
   const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab);
@@ -75,6 +84,69 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     onSuccess: () => void message.success('已开始重新分析')
   });
 
+  // 移除登记/移除并删除（与 ProjectCard 同款语义；确认弹窗在 confirmXxx 内）
+  const remove = useMutation({
+    mutationFn: ({ p, mode }: { p: ProjectSummary; mode: string }) =>
+      api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
+    onSuccess: () => {
+      void message.success('已移除');
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败')
+  });
+  const confirmUnregister = (p: ProjectSummary): void => {
+    modal.confirm({
+      title: `仅移除「${p.alias ?? p.diskName}」的登记？`,
+      content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
+      okText: '移除登记',
+      okButtonProps: { danger: true },
+      onOk: () => remove.mutateAsync({ p, mode: 'unregister' })
+    });
+  };
+  const confirmDelete = (p: ProjectSummary): void => {
+    modal.confirm({
+      title: `移除登记并删除「${p.alias ?? p.diskName}」的文件？`,
+      content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
+      okText: '移入回收站',
+      okButtonProps: { danger: true },
+      onOk: () => remove.mutateAsync({ p, mode: 'delete' })
+    });
+  };
+
+  const openFilesTab = (p: ProjectSummary): void => {
+    useAppStore.getState().requestAutoOpenProject(p.id);
+    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
+    void api.post(`/api/projects/${p.id}/open`);
+  };
+  const menuFor = (p: ProjectSummary): ReturnType<typeof buildProjectMenu> =>
+    buildProjectMenu(p, {
+      onOpen: () => openProjectTab(p),
+      onOpenFiles: () => openFilesTab(p),
+      onPin: () => pin.mutate(p),
+      onAnalyze: () => analyze.mutate([p.id]),
+      onCollections: () => setPickerProject(p),
+      onRelocate: () => setRelocateProject(p),
+      onUnregister: () => confirmUnregister(p),
+      onDelete: () => confirmDelete(p),
+      message
+    });
+
+  // 行右键菜单打开时，点击其它位置/滚动/Esc 关闭（与卡片受控菜单同款口径）
+  useEffect(() => {
+    if (ctxMenu === null) return;
+    const close = (): void => setCtxMenu(null);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', close, true);
+    window.addEventListener('blur', close);
+    window.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('scroll', close, true);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', close);
+    };
+  }, [ctxMenu]);
+
   const columns = [
     { title: '名称', dataIndex: 'diskName', render: (_: unknown, p: ProjectSummary) => (p.alias ?? p.diskName) + (p.alias !== null ? '（别名）' : '') },
     { title: '类型', dataIndex: 'type', render: (t: string) => typeLabel(t) },
@@ -82,7 +154,20 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     { title: '规模', dataIndex: 'sizeBytes', render: (v: number, p: ProjectSummary) => `${p.fileCount} / ${fmtBytes(v)}` },
     { title: 'Git', render: (_: unknown, p: ProjectSummary) => (p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' *' : ''}` : '—') },
     { title: '最近打开', dataIndex: 'lastOpenedAt', render: (v: string | null) => relTime(v) },
-    { title: '操作', render: (_: unknown, p: ProjectSummary) => <a onClick={() => openProjectTab(p)}>打开</a> }
+    {
+      title: '操作',
+      render: (_: unknown, p: ProjectSummary) => {
+        const menu = menuFor(p);
+        return (
+          <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+            <a onClick={() => openProjectTab(p)}>打开</a>
+            <Dropdown menu={{ items: menu.items, onClick: ({ key }) => menu.onAction(key) }} trigger={['click']}>
+              <MoreOutlined style={{ cursor: 'pointer' }} />
+            </Dropdown>
+          </span>
+        );
+      }
+    }
   ];
 
   return (
@@ -128,10 +213,62 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             ))}
           </div>
         ) : (
-          <Table rowKey="id" columns={columns} dataSource={projects ?? []} size="middle" pagination={{ pageSize: 30 }} />
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={projects ?? []}
+            size="middle"
+            pagination={{ pageSize: 30 }}
+            onRow={(p) => ({
+              onContextMenu: (e) => {
+                e.preventDefault();
+                setCtxMenu({
+                  x: Math.min(e.clientX, window.innerWidth - 232),
+                  y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520)),
+                  projectId: p.id
+                });
+              }
+            })}
+          />
         )}
       </StateView>
       <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+      {pickerProject !== null && (
+        <CollectionPickerModal key={pickerProject.id} project={pickerProject} onClose={() => setPickerProject(null)} />
+      )}
+      {relocateProject !== null && (
+        <RelocateModal
+          projectId={relocateProject.id}
+          name={relocateProject.alias ?? relocateProject.diskName}
+          dirPath={relocateProject.dirPath}
+          open
+          onClose={() => setRelocateProject(null)}
+        />
+      )}
+      {/* 表格行受控右键菜单：与卡片菜单同一份定义（projectMenu） */}
+      {ctxMenu !== null && (() => {
+        const p = (projects ?? []).find((x) => x.id === ctxMenu.projectId);
+        if (p === undefined) return null;
+        const menu = menuFor(p);
+        return (
+          <div
+            data-testid="table-row-ctx-menu"
+            style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <Menu
+              selectable={false}
+              style={{ border: 'none', background: 'transparent' }}
+              items={menu.items}
+              onClick={({ key }) => {
+                setCtxMenu(null);
+                menu.onAction(key);
+              }}
+            />
+          </div>
+        );
+      })()}
         </>
       )}
     </div>

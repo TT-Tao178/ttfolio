@@ -4,11 +4,7 @@
  * 若 Dashboard 反向 import Workbench 会形成循环依赖。
  */
 import { App, Avatar, Card, Dropdown, Menu, Tag } from 'antd';
-import type { MenuProps } from 'antd';
-import {
-  AimOutlined, AppstoreOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined, MoreOutlined,
-  ReloadOutlined, StarFilled, StarOutlined, WarningOutlined
-} from '@ant-design/icons';
+import { MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -19,6 +15,7 @@ import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from '@/features/workbench/RelocateModal';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
+import { buildProjectMenu } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
@@ -61,53 +58,24 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     });
   };
 
-  // 菜单定义为纯数据（key/label/icon），动作集中 handleMenuAction 分发——
-  // 受控右键菜单与「…」图标 Dropdown 两处触发共用，行为保持一致
-  // 「打开项目」跟随默认页签设置（onOpen）；「打开文件页」必须强制 files
-  // （评审：此前两者同调 onOpen，默认页签=总览时菜单言不符实）
+  // 「打开文件页」强制 files；「打开项目」跟随默认页签设置（onOpen）
   const openFiles = (): void => {
     useAppStore.getState().requestAutoOpenProject(p.id);
     useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
     void api.post(`/api/projects/${p.id}/open`);
   };
-  const menuItems: MenuProps['items'] = [
-    ...(p.pathOk === false
-      ? [
-          { key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined /> },
-          { type: 'divider' as const }
-        ]
-      : []),
-    { key: 'open', label: '打开项目', icon: <FolderOpenOutlined /> },
-    { key: 'files', label: '打开文件页', icon: <FileTextOutlined /> },
-    { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !p.gitIsRepo },
-    { type: 'divider' as const },
-    { key: 'copy', label: '复制路径', icon: <CopyOutlined /> },
-    { key: 'explorer', label: '在资源管理器中显示', disabled: p.pathOk === false },
-    { key: 'terminal', label: '在此打开终端', disabled: p.pathOk === false },
-    { type: 'divider' as const },
-    { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false },
-    { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined /> },
-    { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
-    { type: 'divider' as const },
-    { key: 'unregister', label: '仅从 ttFolio 移除登记' },
-    { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false }
-  ];
-  const handleMenuAction = (key: string): void => {
-    switch (key) {
-      case 'relocate': setRelocateOpen(true); break;
-      case 'open': onOpen(); break;
-      case 'files': openFiles(); break;
-      case 'git': useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName); break;
-      case 'copy': void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); break;
-      case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
-      case 'terminal': void api.post('/api/open', { target: 'terminal', projectId: p.id }); break;
-      case 'analyze': onAnalyze(); break;
-      case 'pin': onPin(); break;
-      case 'collections': setPickerOpen(true); break;
-      case 'unregister': confirmUnregister(); break;
-      case 'delete': confirmDelete(); break;
-    }
-  };
+  // 菜单定义与分发收敛到共享模块（与表格视图共用一份，评审 P2）：确认类动作注入
+  const menu = buildProjectMenu(p, {
+    onOpen,
+    onOpenFiles: openFiles,
+    onPin,
+    onAnalyze,
+    onCollections: () => setPickerOpen(true),
+    onRelocate: () => setRelocateOpen(true),
+    onUnregister: confirmUnregister,
+    onDelete: confirmDelete,
+    message
+  });
 
   // 右键菜单打开时，点击任意其它位置关闭（菜单容器 onMouseDown 已阻止冒泡，菜单内点击不受影响）
   useEffect(() => {
@@ -161,7 +129,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       }
       extra={
         // 卡片主体右键已由受控菜单接管，这里收窄为纯点击触发，避免两种右键菜单并存
-        <Dropdown menu={{ items: menuItems, onClick: ({ key }) => handleMenuAction(key) }} trigger={['click']}>
+        <Dropdown menu={{ items: menu.items, onClick: ({ key }) => menu.onAction(key) }} trigger={['click']}>
           <MoreOutlined onClick={(e) => e.stopPropagation()} />
         </Dropdown>
       }
@@ -221,10 +189,10 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
           <Menu
             selectable={false}
             style={{ border: 'none', background: 'transparent' }}
-            items={menuItems}
+            items={menu.items}
             onClick={({ key }) => {
               setCtxMenu(null);
-              handleMenuAction(key);
+              menu.onAction(key);
             }}
           />
         </div>
