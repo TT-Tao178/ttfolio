@@ -342,9 +342,16 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                   key={r.path}
                   style={{ padding: '2px 4px', cursor: 'pointer', borderRadius: 4 }}
                   onClick={() => {
-                    if (r.kind !== 'file') return;
-                    setSelectedPath(r.path);
-                    useAppStore.getState().updateActiveLocation({ targetPath: r.path }, true);
+                    if (r.kind === 'file') {
+                      setSelectedPath(r.path);
+                      useAppStore.getState().updateActiveLocation({ targetPath: r.path }, true);
+                    } else {
+                      // 目录结果此前点击零反馈（评审）：清搜索回树视图，复用面包屑的
+                      // treeLocate 通道逐层懒加载展开到该目录并选中
+                      setFilter('');
+                      setSelectedPath(r.path);
+                      useAppStore.getState().setTreeLocate({ projectId, path: r.path });
+                    }
                   }}
                 >
                   <FileOutlined /> {r.path}
