@@ -8,6 +8,7 @@ import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/shared';
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
+import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
 
@@ -337,8 +338,9 @@ function CollectionsCard({ collections, name, setName, onChange }: {
   collections: CollectionInfo[]; name: string; setName: (v: string) => void; onChange: () => void;
 }): React.JSX.Element {
   // 删除集合是级联操作（collection_members ON DELETE CASCADE，成员关系一并清掉），
-  // 必须二次确认——评审发现此前 × 一次误点即删
+  // 必须二次确认；编辑（重命名/备注）走 PATCH——评审发现两者此前均缺失（× 直删、无法改名）
   const { modal } = App.useApp();
+  const [editing, setEditing] = useState<CollectionInfo | null>(null);
   return (
     <div>
       <Space.Compact style={{ width: '100%', margin: '6px 0' }}>
@@ -352,24 +354,31 @@ function CollectionsCard({ collections, name, setName, onChange }: {
         }}>创建</Button>
       </Space.Compact>
       {(collections ?? []).map((c) => (
-        <Tag
-          key={c.id}
-          closable
-          onClose={(e) => {
-            e.preventDefault();
-            modal.confirm({
-              title: `删除集合「${c.name}」？`,
-              content: `集合下 ${c.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响，之后可重新归属。`,
-              okText: '删除集合',
-              okButtonProps: { danger: true },
-              cancelText: '取消',
-              onOk: () => void api.del(`/api/collections/${c.id}`).then(onChange)
-            });
-          }}
-        >
-          {c.name}（{c.memberCount}）
-        </Tag>
+        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0' }}>
+          <span className="tt-ellipsis" style={{ flex: 1, minWidth: 0 }}>
+            {c.name}（{c.memberCount}）
+            {c.note !== null && <span style={{ opacity: 0.5, fontSize: 12 }}> · {c.note}</span>}
+          </span>
+          <Button size="small" onClick={() => setEditing(c)}>编辑</Button>
+          <Button
+            size="small"
+            danger
+            onClick={() =>
+              modal.confirm({
+                title: `删除集合「${c.name}」？`,
+                content: `集合下 ${c.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响，之后可重新归属。`,
+                okText: '删除集合',
+                okButtonProps: { danger: true },
+                cancelText: '取消',
+                onOk: () => void api.del(`/api/collections/${c.id}`).then(onChange)
+              })
+            }
+          >
+            删除
+          </Button>
+        </div>
       ))}
+      <CollectionEditModal collection={editing} onClose={() => setEditing(null)} />
       <p style={{ fontSize: 12, opacity: 0.6 }}>集合预留「多根打开」能力，当前仅作分组。</p>
     </div>
   );

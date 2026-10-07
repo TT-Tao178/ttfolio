@@ -2,7 +2,7 @@
 import { App as AntdApp, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  AppstoreOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined,
+  AppstoreOutlined, BranchesOutlined, CopyOutlined, DeleteOutlined, EditOutlined, FileTextOutlined, FolderOpenOutlined,
   StarFilled, StarOutlined
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
+import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { SEMANTIC } from '@/theme/tokens';
 
 
@@ -27,7 +28,7 @@ type SidebarItem = {
 export function Sidebar(): React.JSX.Element {
   const { domain, openTab, activeTabId } = useAppStore();
   const queryClient = useQueryClient();
-  const { message } = AntdApp.useApp();
+  const { message, modal } = AntdApp.useApp();
 
   const { data: projects } = useQuery({
     queryKey: ['projects', 'sidebar'],
@@ -59,9 +60,12 @@ export function Sidebar(): React.JSX.Element {
   // 项目右键菜单（第 29 轮）：document 级原生 contextmenu 监听 + 受控固定定位菜单——
   // 文件树 0.2.3 / 项目卡片 0.2.8 同款定稿模式（React 合成事件与渲染时序竞争的历史教训，
   // 见 PROGRESS 右键菜单两次返工记录）。用户点名「左侧项目那一列」要有右键菜单。
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+  // 第 31 轮扩展为双类型：集合条目（data-collection-id）右键可 编辑/删除/打开视图。
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; kind: 'project' | 'collection'; id: string } | null>(null);
   // 归属集合弹窗：条件渲染 + key=项目 id，每次打开全新挂载（勾选态取打开瞬间快照）
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
+  // 集合编辑弹窗（重命名/备注）
+  const [editingCol, setEditingCol] = useState<CollectionEditTarget | null>(null);
   const pin = useMutation({
     mutationFn: (p: ProjectSummary) => api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
     onSuccess: () => {
@@ -74,15 +78,22 @@ export function Sidebar(): React.JSX.Element {
     const onCtx = (e: MouseEvent): void => {
       const t = e.target as HTMLElement;
       if (t.closest?.('[data-testid="sidebar-ctx-menu"]') !== null) return;
-      // 项目行任意位置（含行内空白）可识别：优先带标记的 label，回退到所在 Menu 行内查找
-      const el = t.closest('[data-project-id]') ?? t.closest('.ant-menu-item')?.querySelector('[data-project-id]') ?? null;
-      if (el === null) return;
+      // 项目行任意位置（含行内空白）：优先带标记的 label，回退到所在 Menu 行内查找
+      const projEl = t.closest('[data-project-id]') ?? t.closest('.ant-menu-item')?.querySelector('[data-project-id]') ?? null;
+      // 集合子菜单标题：label 带 data-collection-id，行内空白回退 submenu 标题内查找
+      const colEl = projEl === null
+        ? (t.closest('[data-collection-id]') ?? t.closest('.ant-menu-submenu-title')?.querySelector('[data-collection-id]') ?? null)
+        : null;
+      if (projEl === null && colEl === null) return;
       e.preventDefault();
+      const kind = projEl !== null ? 'project' : 'collection';
+      const id = (projEl ?? colEl)?.getAttribute(kind === 'project' ? 'data-project-id' : 'data-collection-id') ?? '';
       // 10 行菜单（8 项 + 2 分隔）：贴右边留菜单宽度、贴底下留菜单高度，小窗口保底 8px
       setCtxMenu({
         x: Math.min(e.clientX, window.innerWidth - 232),
         y: Math.min(e.clientY, Math.max(8, window.innerHeight - 360)),
-        projectId: el.getAttribute('data-project-id') ?? ''
+        kind,
+        id
       });
     };
     document.addEventListener('contextmenu', onCtx);
@@ -108,32 +119,78 @@ export function Sidebar(): React.JSX.Element {
     };
   }, [ctxMenu]);
 
-  const ctxProject = ctxMenu !== null ? (projects ?? []).find((x) => x.id === ctxMenu.projectId) : undefined;
-  const ctxItems: MenuProps['items'] = ctxProject === undefined ? [] : [
-    { key: 'open', label: '打开项目', icon: <FolderOpenOutlined /> },
-    { key: 'files', label: '打开文件页', icon: <FileTextOutlined /> },
-    { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !ctxProject.gitIsRepo },
-    { type: 'divider' as const },
-    { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
-    { key: 'pin', label: ctxProject.isPinned ? '取消固定' : '固定', icon: ctxProject.isPinned ? <StarFilled /> : <StarOutlined /> },
-    { type: 'divider' as const },
-    { key: 'copy', label: '复制路径', icon: <CopyOutlined /> },
-    { key: 'explorer', label: '在资源管理器中显示', disabled: ctxProject.pathOk === false },
-    { key: 'analyze', label: '重新分析', disabled: ctxProject.pathOk === false }
-  ];
+  const ctxProject = ctxMenu?.kind === 'project' ? (projects ?? []).find((x) => x.id === ctxMenu.id) : undefined;
+  const ctxCollection = ctxMenu?.kind === 'collection' ? (collections ?? []).find((c) => c.id === ctxMenu.id) : undefined;
+  const ctxItems: MenuProps['items'] = ctxProject !== undefined
+    ? [
+        { key: 'open', label: '打开项目', icon: <FolderOpenOutlined /> },
+        { key: 'files', label: '打开文件页', icon: <FileTextOutlined /> },
+        { key: 'git', label: '查看 Git', icon: <BranchesOutlined />, disabled: !ctxProject.gitIsRepo },
+        { type: 'divider' as const },
+        { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
+        { key: 'pin', label: ctxProject.isPinned ? '取消固定' : '固定', icon: ctxProject.isPinned ? <StarFilled /> : <StarOutlined /> },
+        { type: 'divider' as const },
+        { key: 'copy', label: '复制路径', icon: <CopyOutlined /> },
+        { key: 'explorer', label: '在资源管理器中显示', disabled: ctxProject.pathOk === false },
+        { key: 'analyze', label: '重新分析', disabled: ctxProject.pathOk === false }
+      ]
+    : ctxCollection !== undefined
+      ? [
+          { key: 'openview', label: '打开集合视图', icon: <FolderOpenOutlined /> },
+          { type: 'divider' as const },
+          { key: 'editcol', label: '编辑名称 / 备注…', icon: <EditOutlined /> },
+          { key: 'delcol', label: '删除集合…', icon: <DeleteOutlined />, danger: true }
+        ]
+      : [];
+  const openCollectionView = (cid: string): void => {
+    const col = (collections ?? []).find((c) => c.id === cid);
+    void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: `col:${cid}`, scroll: 0 }, col?.name ?? '集合');
+  };
+  const confirmDeleteCollection = (cid: string): void => {
+    const col = (collections ?? []).find((c) => c.id === cid);
+    if (col === undefined) return;
+    modal.confirm({
+      title: `删除集合「${col.name}」？`,
+      content: `集合下 ${col.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响。`,
+      okText: '删除集合',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        void api
+          .del(`/api/collections/${cid}`)
+          .then(async () => {
+            void message.success('已删除集合');
+            await queryClient.invalidateQueries({ queryKey: ['collections'] });
+            await queryClient.invalidateQueries({ queryKey: ['projects'] });
+          })
+          .catch((e: unknown) => void message.error(e instanceof ApiClientError ? e.message : '删除失败'));
+      }
+    });
+  };
   const handleCtxAction = (key: string): void => {
     const p = ctxProject;
+    const col = ctxCollection;
     setCtxMenu(null);
-    if (p === undefined) return;
-    switch (key) {
-      case 'open':
-      case 'files': openProject(p, 'files'); break;
-      case 'git': openProject(p, 'git'); break;
-      case 'collections': setPickerProject(p); break;
-      case 'pin': pin.mutate(p); break;
-      case 'copy': void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); break;
-      case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
-      case 'analyze': void api.post('/api/projects/analyze', { projectIds: [p.id] }); void message.success('已开始重新分析'); break;
+    if (p !== undefined) {
+      switch (key) {
+        case 'open':
+        case 'files': openProject(p, 'files'); break;
+        case 'git': openProject(p, 'git'); break;
+        case 'collections': setPickerProject(p); break;
+        case 'pin': pin.mutate(p); break;
+        case 'copy': void navigator.clipboard.writeText(p.dirPath); void message.success('已复制路径'); break;
+        case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
+        case 'analyze': void api.post('/api/projects/analyze', { projectIds: [p.id] }); void message.success('已开始重新分析'); break;
+      }
+      return;
+    }
+    if (col !== undefined) {
+      switch (key) {
+        case 'openview': openCollectionView(col.id); break;
+        case 'editcol': setEditingCol({ id: col.id, name: col.name, note: col.note }); break;
+        case 'delcol': confirmDeleteCollection(col.id); break;
+      }
     }
   };
 
@@ -156,7 +213,8 @@ export function Sidebar(): React.JSX.Element {
         .filter((p): p is ProjectSummary => p !== undefined);
       items.push({
         key: `col:${c.id}`,
-        label: `${c.name}（${c.memberCount}）`,
+        // data-collection-id 供 document 级右键委托定位集合（第 31 轮：集合可右键编辑/删除）
+        label: <span data-collection-id={c.id}>{`${c.name}（${c.memberCount}）`}</span>,
         children: [
           { key: `colview:${c.id}`, label: '打开集合视图' },
           ...members.map((p) => ({
@@ -266,10 +324,7 @@ export function Sidebar(): React.JSX.Element {
       return;
     }
     if (key.startsWith('colview:')) {
-      const cid = key.slice(8);
-      const col = (collections ?? []).find((c) => c.id === cid);
-      void queryClient.invalidateQueries({ queryKey: ['projects'] });
-      openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: `col:${cid}`, scroll: 0 }, col?.name ?? '集合');
+      openCollectionView(key.slice(8));
       return;
     }
     if (key.startsWith('colproj:')) {
@@ -296,9 +351,9 @@ export function Sidebar(): React.JSX.Element {
         onClick={onClick}
         style={{ height: '100%', borderInlineEnd: 'none' }}
       />
-      {/* 受控右键菜单（第 29 轮，文件树/项目卡片同款）：固定定位 + document mousedown 关闭，
+      {/* 受控右键菜单（第 29 轮项目 / 第 31 轮集合，文件树/项目卡片同款）：固定定位 + document mousedown 关闭，
           容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行 */}
-      {ctxMenu !== null && ctxProject !== undefined && (
+      {ctxMenu !== null && (ctxProject !== undefined || ctxCollection !== undefined) && (
         <div
           data-testid="sidebar-ctx-menu"
           style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
@@ -316,6 +371,7 @@ export function Sidebar(): React.JSX.Element {
       {pickerProject !== null && (
         <CollectionPickerModal key={pickerProject.id} project={pickerProject} onClose={() => setPickerProject(null)} />
       )}
+      <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />
     </>
   );
 }
