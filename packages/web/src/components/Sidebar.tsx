@@ -47,6 +47,9 @@ export function Sidebar(): React.JSX.Element {
     if (subTab === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
     const loc: TabLocation = { kind: 'project', projectId: p.id, targetPath: null, subTab, scroll: 0 };
     openTab(loc, p.alias ?? p.diskName);
+    // 打开计数/最近打开（评审：卡片与命令面板都上报，侧栏漏报——导致「继续上次」
+    // 与总览「今天动过」漏掉从侧栏打开的项目）
+    void api.post(`/api/projects/${p.id}/open`);
   };
 
   const openView = (key: string): void => {
@@ -128,8 +131,10 @@ export function Sidebar(): React.JSX.Element {
   };
 
   const items: SidebarItem[] = [];
-  let selected: string = '';
-
+  // 选中态（评审：原实现对 proj:/col: 键恒为空，点项目/集合后侧栏无任何高亮；
+  // 还有 subTab.replace('view:','view:') 无操作死代码——一并重写）
+  const activeTab = activeTabId !== null ? useAppStore.getState().tabs.find((t) => t.id === activeTabId) : undefined;
+  let selected = '';
   if (domain === 'projects') {
     // 用户要求移除「已固定/有未提交改动/缺文档/缺架构图/未分析/30 天没打开/已归档」侧栏项。
     // 这些"我的视图"本身仍保留：工作台总览的「需要处理」卡片会直接跳到对应卡片墙（viewTitle 映射保留）。
@@ -158,10 +163,21 @@ export function Sidebar(): React.JSX.Element {
         ]
       });
     }
-    selected = activeTabId !== null ? (useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.subTab?.replace('view:', 'view:') ?? '') : '';
+    if (activeTab !== undefined) {
+      if (activeTab.kind === 'overview') {
+        // 总览屏（subTab=null）→ 工作台总览；卡片墙视图 → view:*；集合卡片墙 → 高亮对应集合子菜单标题
+        if (activeTab.subTab === null) selected = 'view:all';
+        else if (activeTab.subTab.startsWith('view:') || activeTab.subTab.startsWith('col:')) selected = activeTab.subTab;
+      } else if (activeTab.kind === 'project' && activeTab.projectId !== null) {
+        selected = `proj:${activeTab.projectId}:files`;
+      } else if (activeTab.kind === 'settings' && activeTab.subTab !== null) {
+        selected = `set:${activeTab.subTab}`;
+      }
+    }
   } else if (domain === 'git') {
     items.push({ key: 'git-overview', label: '跨项目 Git 总览' });
-    selected = '';
+    if (activeTab?.kind === 'project' && activeTab.projectId !== null) selected = `proj:${activeTab.projectId}:git`;
+    else if (activeTab?.kind === 'search' && activeTab.subTab === 'git-overview') selected = 'git-overview';
   } else if (domain === 'search') {
     items.push({ key: 'search-all', label: '全局搜索（Ctrl+K）' });
     items.push({ key: 'search-current', label: '在当前项目内搜索' });
@@ -200,9 +216,11 @@ export function Sidebar(): React.JSX.Element {
   } else if (domain === 'archives') {
     items.push({ key: 'sep-projects', label: '项目架构图' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
+    if (activeTab?.kind === 'project' && activeTab.projectId !== null) selected = `proj:${activeTab.projectId}:archives`;
   } else if (domain === 'docs') {
     items.push({ key: 'sep-projects', label: '项目文档' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
+    if (activeTab?.kind === 'project' && activeTab.projectId !== null) selected = `proj:${activeTab.projectId}:docs`;
   }
 
   const onClick = (e: { key: string }): void => {
