@@ -6,9 +6,9 @@
 import { App, Avatar, Card, Dropdown, Menu, Tag } from 'antd';
 import { MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { ProjectSummary } from '@ttfolio/shared';
+import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { LanguageBar } from '@/components/LanguageBar';
 import { relTime } from '@/lib/format';
@@ -24,6 +24,13 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   const { message, modal } = App.useApp();
   const queryClient2 = useQueryClient();
   const [relocateOpen, setRelocateOpen] = useState(false);
+  // 归属集合徽标（评审：归属结果不可见——加完集合必须去侧栏/集合视图才能确认）。
+  // p.collections 只有 id，集合名走共享的 ['collections'] 缓存映射；最多展示 2 个 + 溢出计数。
+  const { data: collections } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => api.get<CollectionInfo[]>('/api/collections')
+  });
+  const collectionNames = (collections ?? []).filter((c) => p.collections.includes(c.id)).map((c) => c.name);
   // 右键菜单（第 28 轮）：受控固定定位菜单——「…」图标的 Dropdown 只覆盖图标本身，
   // 卡片主体右键此前弹的是浏览器默认菜单。菜单 items 与「…」Dropdown 共用一份。
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -156,7 +163,11 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
           <span>{p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' ⚠有改动' : ' ✓干净'}` : '非 git'}</span>
           <span>{relTime(p.gitLastCommitAt)}</span>
         </div>
-        <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {collectionNames.slice(0, 2).map((n) => (
+            <Tag key={n} color="purple" style={{ marginRight: 0 }}>📁{n}</Tag>
+          ))}
+          {collectionNames.length > 2 && <Tag style={{ marginRight: 0 }}>+{collectionNames.length - 2} 集合</Tag>}
           <Tag color={p.hasDocs ? 'success' : 'default'}>文档{p.hasDocs ? ' ✓' : ' ✗'}</Tag>
           <Tag color={p.hasArch ? 'success' : 'default'}>架构图{p.hasArch ? ' ✓' : ' ✗'}</Tag>
           {p.pathOk === false && <Tag color="error" icon={<WarningOutlined />}>路径失效</Tag>}
