@@ -12,6 +12,7 @@ import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js'
 import { AppError } from '../core/errors.js';
 import { SETTING_KEYS, TRASH_RETENTION_DAYS, GITHUB_REPO, GITHUB_RELEASES_URL } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
+import { runCommand } from '../core/exec.js';
 import { join } from 'node:path';
 import { listProjects } from '../db/repo/projectsRepo.js';
 
@@ -132,21 +133,49 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     return ok({ saved: true, tokenSet: token !== '' });
   });
 
-  app.get('/api/update/check', async () => {
-    const db = ctx.db();
-    const token = getSetting(db, SETTING_KEYS.githubToken);
+  /**
+   * 取 Releases 元数据：先 Node fetch（无加速器的干净网络直连即成）；
+   * 失败（实测加速器对 github 域做 TLS 中间人，Node 报 UNABLE_TO_VERIFY_LEAF_SIGNATURE）
+   * 回退系统 curl——curl.exe 走 Schannel 系统证书库，与用户浏览器/git 同一信任源。
+   * 打包版 server 进程内跑在 Electron 里，NODE_USE_SYSTEM_CA 这类启动期 env 不可靠，
+   * 故回退必须在代码层做。
+   */
+  async function githubGetLatestRelease(token: string | null): Promise<{ status: number; data: unknown }> {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'ttFolio-update-check',
       'X-GitHub-Api-Version': '2022-11-28'
     };
     if (token !== null && token !== '') headers.Authorization = `Bearer ${token}`;
-    let res: Response;
     try {
-      res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-        headers,
-        signal: AbortSignal.timeout(8000)
-      });
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+      const data: unknown = await res.json().catch(() => null);
+      return { status: res.status, data };
+    } catch {
+      /* 落到 curl 回退 */
+    }
+    const args = ['-sS', '--max-time', '10', '-w', '\n%{http_code}', '-H', 'Accept: application/vnd.github+json', '-H', 'User-Agent: ttFolio-update-check'];
+    if (token !== null && token !== '') args.push('-H', `Authorization: Bearer ${token}`);
+    args.push(url);
+    const r = await runCommand(process.platform === 'win32' ? 'curl.exe' : 'curl', args, { timeoutMs: 15000 });
+    const idx = r.stdout.lastIndexOf('\n');
+    const code = parseInt(r.stdout.slice(idx + 1).trim(), 10) || 0;
+    let data: unknown = null;
+    try {
+      data = JSON.parse(idx >= 0 ? r.stdout.slice(0, idx) : r.stdout) as unknown;
+    } catch {
+      /* 非 JSON（错误页/空响应），按 status 走错误分支 */
+    }
+    return { status: code, data };
+  }
+
+  app.get('/api/update/check', async () => {
+    const db = ctx.db();
+    const token = getSetting(db, SETTING_KEYS.githubToken);
+    let res: { status: number; data: unknown };
+    try {
+      res = await githubGetLatestRelease(token !== null && token !== '' ? token : null);
     } catch {
       return fail('IO_ERROR', '访问 GitHub 失败（网络/加速器原因）。可稍后重试，或直接打开 Releases 页面查看。', 502);
     }
@@ -156,10 +185,10 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     if (res.status === 404) {
       return ok({ currentVersion: ctx.version, latestVersion: null, hasUpdate: false, releaseUrl: GITHUB_RELEASES_URL, assets: [] as string[], note: '没有查到 Release：可能是还没有发布过，或仓库为私有且未配置（或配置了无权限的）Token' });
     }
-    if (!res.ok) {
-      return fail('IO_ERROR', `GitHub 返回 ${res.status}`, 502);
+    if (res.status === 0 || res.status >= 500) {
+      return fail('IO_ERROR', `访问 GitHub 失败（状态 ${res.status}）。可稍后重试，或直接打开 Releases 页面查看。`, 502);
     }
-    const data = (await res.json()) as { tag_name?: string; html_url?: string; assets?: Array<{ name: string }> };
+    const data = (res.data ?? {}) as { tag_name?: string; html_url?: string; assets?: Array<{ name: string }> };
     const latestVersion = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/i, '') : '';
     const hasUpdate = latestVersion !== '' && semverNewer(latestVersion, ctx.version);
     return ok({
