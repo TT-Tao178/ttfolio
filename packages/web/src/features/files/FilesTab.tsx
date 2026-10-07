@@ -13,7 +13,7 @@
 import { Alert, Button, Empty, Input, Menu, Modal, Space, Switch, Tree, App } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
-  CopyOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined, ReloadOutlined, ScissorOutlined, SearchOutlined,
+  CopyOutlined, DeleteOutlined, EditOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined, ReloadOutlined, ScissorOutlined, SearchOutlined,
   FileAddOutlined, FolderAddOutlined, LinkOutlined
 } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -264,6 +264,31 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '删除失败')
   });
 
+  /** 删除确认（顶部按钮 / Delete 键 / 右键菜单三处共用，评审前只有按钮一处） */
+  const confirmDelete = (path: string): void => {
+    modal.confirm({
+      title: `删除 ${path}？`,
+      content: '将移入回收站，可在回收站恢复。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => del.mutate([path])
+    });
+  };
+
+  // F2 重命名 / Delete 删除（评审：帮助文案承诺了这两个键但无任何监听）。
+  // 挂在树容器上，焦点在树内时生效；与顶部「删除」按钮共用确认逻辑。
+  const onTreeKeyDown = (e: React.KeyboardEvent): void => {
+    if (selectedPath === null) return;
+    if (e.key === 'F2') {
+      e.preventDefault();
+      setRenameTarget(selectedPath);
+    } else if (e.key === 'Delete') {
+      e.preventDefault();
+      confirmDelete(selectedPath);
+    }
+  };
+
   const selKind = selectedPath === null ? null : findKind(treeData, selectedPath);
   /** 「新建」落点：选中目录→该目录；选中文件→其所在目录；未选→项目根 */
   const newParent = selectedPath === null ? '' : selKind === 'dir' ? selectedPath : dirnameOf(selectedPath);
@@ -287,18 +312,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             size="small"
             danger
             disabled={selectedPath === null}
-            onClick={() => {
-              if (selectedPath !== null) {
-                modal.confirm({
-                  title: `删除 ${selectedPath}？`,
-                  content: '将移入回收站，可在回收站恢复。',
-                  okText: '删除',
-                  okButtonProps: { danger: true },
-                  cancelText: '取消',
-                  onOk: () => del.mutate([selectedPath])
-                });
-              }
-            }}
+            onClick={() => { if (selectedPath !== null) confirmDelete(selectedPath); }}
           >
             删除
           </Button>
@@ -317,6 +331,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         <div
           style={{ flex: 1, overflow: 'auto' }}
           data-testid="file-tree"
+          onKeyDown={onTreeKeyDown}
         >
           {filter.length > 0 ? (
             (searchData?.results ?? []).length === 0 ? (
@@ -440,7 +455,9 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             onClick={({ key }) => {
               const path = ctxMenu.path;
               setCtxMenu(null);
-              if (key === 'copy-to') setMcTarget({ items: [path], mode: 'copy' });
+              if (key === 'rename') setRenameTarget(path);
+              else if (key === 'delete') confirmDelete(path);
+              else if (key === 'copy-to') setMcTarget({ items: [path], mode: 'copy' });
               else if (key === 'move-to') setMcTarget({ items: [path], mode: 'move' });
               else if (key === 'explorer') void api.post('/api/open', { target: 'explorer', projectId, path });
               else if (key === 'copy-rel') writeClipboard(path, `已复制相对路径：${path}`);
@@ -452,6 +469,9 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               }
             }}
             items={[
+              { key: 'rename', label: '重命名…', icon: <EditOutlined /> },
+              { key: 'delete', label: '删除（进回收站）', icon: <DeleteOutlined />, danger: true },
+              { type: 'divider' as const },
               { key: 'copy-to', label: '复制到…', icon: <CopyOutlined /> },
               { key: 'move-to', label: '移动到…', icon: <ScissorOutlined /> },
               { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined /> },
