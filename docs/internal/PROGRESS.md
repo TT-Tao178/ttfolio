@@ -234,6 +234,42 @@
   dist-electron 共 21 个安装包；出包后照例 `npm rebuild better-sqlite3` 翻回
   Node ABI（62 条复绿）再交还用户 dev。
 
+### 第三十一轮：全项目评审与 remediation（0.2.11，20 个提交）
+
+> 用户要求对项目做全面评审（点击不一致/设计不合理/bug/缺失设计），评审完毕
+> 文字报告过目后一次性处置全部问题；流程=计划→评审核实→执行，细粒度提交。
+
+- **评审报告要点**（已单独成文交用户）：1 个安全级问题（命令面板 snippet XSS）、
+  4 个"后端就绪前端断头"死功能（文件重命名/标签/备注/归档）、9 类点击不一致、
+  若干确认标准不统一与文案失实。KNOWN-GAPS #2（树右键菜单）就此闭合、#7 文案
+  矛盾修正，新增 #8（按标签过滤视图）/#9（集合手动排序）两个延期项。
+- **P0**：f9cbf46 snippet 转义+[ ]→\<mark\>；645e1de 删集合/清超期回收站补确认。
+- **P1**：8eab3d4 文件重命名/删除入口（树右键+F2/Delete 实装，RenameModal 从死代码
+  复活）；fd0e535 搜索目录结果可点（treeLocate 通道）；d936767 卡片「打开文件页」
+  强制 files；2448059 三处失实文案/命令（拖拽提示/cmd.add/作用域回落说明）；
+  510c51e 侧栏补 /open 计数 + selected 高亮重算（四域映射，删无操作 replace）。
+- **P2**：a83ce43 项目菜单抽 projectMenu 共享模块 + 表格视图操作列/行右键补齐
+  （卡片与表格从此共用一份菜单定义）；9adb0ba 卡片集合徽标（最多 2 个+溢出计数）；
+  85fe2c1 集合移出改专用 DELETE /api/collections/:id/members/:projectId（弃快照
+  全量替换）+ 弹窗新建竞态修复（createdCols 本地并入保存 diff）；87020b4 标签栏
+  菜单扩 7 项（恢复已关闭/关闭其他/右侧/全部，closedTabs 栈 + moveTab 固定区钳制
+  + useCloseTab 共享 hook）；3387608 Ctrl+W 关脏标签补确认 + 四处右键菜单
+  Esc/滚动关闭（仅 Esc，避免吞菜单键盘导航）。
+- **P3**：8f591ad 归档/取消归档入口（useArchiveProject + 卡片墙工具栏「已归档」
+  按钮——归档找回入口，已归档侧栏项按用户此前要求不加回）；967b4fb「今天动过」
+  本地时区；c4a57d5 回收站恢复指定目录（后端 targetDir/TRASH_PATH_TAKEN 本就
+  支持，前端接 pick-folder 重试）；815ce41 详情栏标签+备注编辑（标签按名 diff、
+  删除经 id 映射；备注失焦保存）；cef8776 集合管理（CollectionEditModal 重命名/
+  备注 + 设置卡行式布局 + 侧栏集合右键 4 项菜单，ctx 扩展双类型）。
+- **过程事故（已修）**：①gitignore `trash/` 无根锚定误伤 features/trash 源码目录
+  （TrashPage.tsx 因先跟踪才幸免）——5d6ea4b 加根锚定；②门禁管道 `| tail` 吞掉
+  typecheck 退出码，ArchiveOutlined（不存在的图标）带着编译错误进了 6067abe——
+  改 InboxOutlined 后 amend 为 8f591ad，此后门禁一律真实退出码判定。
+- **延期（入 KNOWN-GAPS #8/#9）**：按标签过滤视图（ListFilters 需加 tag 参数）；
+  集合手动排序（PATCH 需加 sort_order）。
+- **实测**：每个提交 typecheck/lint/test 真实退出码 0（62 条全绿）；界面行为交
+  用户装包手测。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
