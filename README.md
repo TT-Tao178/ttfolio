@@ -28,6 +28,14 @@ ttFolio 把硬盘上的项目文件夹登记进同一个界面：浏览代码、
 - **工作台总览** —— KPI 一览、需要关注的项目、聚合语言构成、跨项目最近提交
 - **桌面版** —— Electron + NSIS 安装包，进程内服务端，原生文件对话框，内置检查更新
 
+## 界面
+
+![工作台总览](docs/images/overview.png)
+
+![项目文件](docs/images/project-files.png)
+
+![命令面板](docs/images/command-palette.png)
+
 ## 下载
 
 从 [Releases](../../releases) 下载 `ttFolio-Setup-x.y.z.exe`。

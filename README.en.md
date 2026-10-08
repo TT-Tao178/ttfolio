@@ -28,6 +28,14 @@ ttFolio brings the project folders on your disk into a single workspace: browse 
 - **Dashboard** — KPIs, projects needing attention, aggregated language breakdown, cross-project recent commits
 - **Desktop** — Electron + NSIS installer, in-process server, native dialogs, built-in update check
 
+## Screenshots
+
+![Dashboard](docs/images/overview.png)
+
+![Project files](docs/images/project-files.png)
+
+![Command palette](docs/images/command-palette.png)
+
 ## Download
 
 Grab `ttFolio-Setup-x.y.z.exe` from [Releases](../../releases).
