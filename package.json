@@ -16,6 +16,8 @@
     "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p packages/server/tsconfig.json --noEmit && tsc -p packages/web/tsconfig.json --noEmit",
     "lint": "eslint packages/shared/src packages/server/src packages/web/src --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"electron/**/*.cjs\"",
+    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"electron/**/*.cjs\"",
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
     "migrate": "node scripts/migrate.mjs",
