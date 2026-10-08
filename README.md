@@ -2,7 +2,7 @@
 
 # ttFolio
 
-**本地优先的项目工作台** · a local project workbench
+**本地的项目工作台** · a local project workbench
 
 [简体中文](README.md) | English
 

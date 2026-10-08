@@ -2,7 +2,7 @@
 
 # ttFolio
 
-**A local-first project workbench**
+**A local project workbench**
 
 [简体中文](README.md) | English
 
