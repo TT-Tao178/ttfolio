@@ -21,10 +21,11 @@
     "pretest:e2e": "npm run build",
     "test:e2e": "playwright test",
     "migrate": "node scripts/migrate.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "doctor": "node scripts/doctor.mjs",
     "verify": "node scripts/verify.mjs",
     "build:server": "node scripts/build-server.mjs",
-    "dist:win": "npm run build && npm run build:server && electron-rebuild -f -w better-sqlite3 && electron-builder --win nsis && node scripts/verify-dist-electron.mjs"
+    "dist:win": "npm run audit:prod && npm run build && npm run build:server && electron-rebuild -f -w better-sqlite3 && electron-builder --win nsis && node scripts/verify-dist-electron.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
