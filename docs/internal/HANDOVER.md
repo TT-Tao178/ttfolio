@@ -33,17 +33,18 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：0.2.12 发布（手动检查更新 5 个提交 74f5828..ed92c47 + dist:win 连续
-  第三次一次过、自检 7 项全绿，ttFolio-Setup-0.2.12.exe 已入 dist-electron 共
-  23 个）；其上是 0.2.11 发布（第三十一轮评审 remediation 20 个提交）；再上是
+- 最新提交：0.2.13 发布（第三十三轮工程补强 14 个提交 + 8 tag，af15ae3 + 台账；
+  dist:win 连续第四次一次过且 audit:prod 前置首次实战，ttFolio-Setup-0.2.13.exe
+  已入 dist-electron 共 24 个）；其上是 0.2.12 发布（手动检查更新 5 个提交）；
+  其上是 0.2.11 发布（第三十一轮评审 remediation 20 个提交）；再上是
   0.2.10 发布（侧栏集合折叠列表）；再上是 0.2.9 发布（侧栏项目右键菜单）；再上
   是 0.2.8 发布
   （卡片右键菜单 + 集合归属 + 集合视图过滤）；再上是 0.2.7 收口 e598e84、
   0.2.7 树缩略图 / 0.2.7 版本 / 0.2.6 图片缩放
   查看器 / 0.2.5 顶栏品牌区去除 / 0.2.4 开源规范化（元数据/双语 README/安装包名
   ttFolio-Setup）；桌面版功能逐轮台账见 PROGRESS（精确哈希看 `git log --oneline`）
-- 桌面版版本 **0.2.12**；`dist-electron/` 下共二十三个安装包（0.1.0~0.2.3 中文名 +
-  ttFolio-Setup-0.2.4~0.2.12 新名），
+- 桌面版版本 **0.2.13**；`dist-electron/` 下共二十四个安装包（0.1.0~0.2.3 中文名 +
+  ttFolio-Setup-0.2.4~0.2.13 新名），
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过两次；出包前必须
   停 dev 并清 ttfolio 相关 node 进程（按命令行过滤）——进程锁 .node 文件会让
@@ -56,6 +57,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   文本走同源接口 /api/archives/:id/file，三重只读约束）；文件树右键菜单
   5 项（document 级委托 + 受控定位菜单，0.2.3 重构后真实右键稳定可用；复制到/移动到
   走 MoveCopyModal + fs/move，资源管理器显式传 path）
+- 第三十三轮（0.2.13，已出包待手测）：**工程补强**（按入库的 PLAN-第33轮 执行）
+  ——删死依赖 @fastify/static（audit 清零）/ KNOWN-GAPS 三决策入册 / 补 tag
+  v0.2.5~v0.2.12 / Release 备忘稿 / parseSubTab+semverNewer 抽纯函数并补 30 条
+  测试（62→92）/ format script + 全仓 prettier / audit:prod 入 dist:win 链头 /
+  窗口状态记忆 / 渲染层异常落盘+主进程崩溃兜底 / 迁移 0004 索引 / 社区文件
+  四件套 / README 三截图 / 磁盘卫生。待用户拍板：删三个脏 tag、HANDOVER-GLM.md 处置
 - 第三十二轮（0.2.12，已出包待手测）：**手动检查更新**（评审 C10 轻方案——
   api.github.com 元数据 + 引导手动下载，完整 updater 因下载域被加速器拦不可行）。
   设置→关于：检查更新三态 + Token 配置（github_token 设置键只写不回显）+
@@ -102,14 +109,19 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   建连但 POST 被 301 重定向到主站），用户选择浏览器手动拖（dist-electron 下
   文件名与 Release 版本号一一对应）；v0.2.4 Release 页面：
   https://github.com/TT-Tao178/ttfolio/releases/tag/v0.2.4
-- **待用户验证/待查（第 32 轮收口时）**：
+- **待用户验证/待查（第 33 轮收口时）**：
   1. ~~右键菜单在安装版是否弹出~~ ✅ 用户装 0.2.7 实测**能弹**（0.2.3 起的修复在
      安装版生效，闭案）
-  2. 安装版 Electron 实例登记接口返回 ok 却不落库（elec-verify 测试库 0 行，
+  2. 安装版 Electron 实例登记接口返回 ok 却不落库
+  2b. **待用户拍板两件**：删 v0.1.0-p0 / v0.3.0-p2 / v1.0.0 三个脏 tag（远端不可逆）；
+     根目录 HANDOVER-GLM.md 归档进 docs/internal 还是删除（elec-verify 测试库 0 行，
      原因未定位）——仅影响测试数据目录，用户真实库未复现，待查
-  3. dist-electron-tmp / tmp2~tmp6 目录被杀软/残留进程锁，留在磁盘可稍后手动删
   4. dev.mjs 已根治 runtime.json 旧端口竞态（起 server 前清旧文件）
-  5. 第 28~31 轮全部界面改动——装 ttFolio-Setup-0.2.12.exe 手测（0.2.12 已含全部）
+  5. 第 28~32 轮全部改动——装 ttFolio-Setup-0.2.13.exe 手测（0.2.13 已含全部；
+     新增：窗口状态记忆 / 崩溃落盘（开发者工具 throw 后看打开日志）/ 集合回归 /
+     file→Git→后退导航回归（92 条测试覆盖））
+  6. **检查更新全链路**——先按 docs/internal/RELEASE-NOTES-0.2.5~0.2.12.md 建页
+     拖资产，之后 0.2.13 点检查应显示已最新 v0.2.13
   6. **检查更新全链路**（0.2.12 新增）——设置→关于：配一个能读本仓库的 GitHub
      Token → 检查更新（当前 0.2.12 即最新，应提示已最新；下次出包后应报新版本）；
      Token 未配/无效应有对应提示；「打开下载页」应开系统浏览器

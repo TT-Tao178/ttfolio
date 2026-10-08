@@ -298,6 +298,43 @@
 - **实测**：typecheck/lint/test 真实退出码 0；「检查更新」全链路待用户装包配
   Token 手测（前端三态 UI）。
 
+### 第三十三轮：工程补强（0.2.13，14 个提交 + 8 tag）
+
+> 按用户批准的 PLAN-第33轮-工程补强.md 执行（该文档本轮入库）。M3 删脏 tag、
+> M13 HANDOVER-GLM.md 处置两项按约定留待用户单独确认。
+
+- **M1（da25fc2）**：删除未使用的 @fastify/static——第二份评审误判其为静态服务
+  组件，本轮核准全仓零引用（前端 app.ts 手写 readFile、7817 走 userContent.ts
+  PathGuard），删除即消除四条 high 通告，audit 清零。
+- **M2（ec24e51）**：KNOWN-GAPS 入册三条决策——Token 明文取舍（#10）/ i18n
+  明确不做 / e2e 冻结资产。
+- **M3**：补 tag v0.2.5~v0.2.12（哈希逐条核准）并推送；删 v0.1.0-p0/v0.3.0-p2/
+  v1.0.0 三个脏 tag 待用户确认（远端删除不可逆）。
+- **M4（629705d）**：Release 备忘稿 0.2.5~0.2.12（Title/Notes/安装包名，浏览器
+  建页拖资产用）；拖传完成后「检查更新」数据面闭环。
+- **M5（45f0906 + ca85b3d）**：parseSubTab / semverNewer 抽纯函数 + 三份测试
+  30 条（store 全家桶 / parseSubTab 全分支 / semver 进位与脏输入）——
+  62→92 条，一次全绿。
+- **M6（2d12677 + 6cf169b）**：format/format:check script 接线 + 全仓 prettier
+  规范化（110 文件，纯格式，门禁全绿可证行为不变）。
+- **M7（3588eb0）**：audit:prod 入 dist:win 链头（high 即 fail-fast）——本轮
+  dist:win 首次实战通过。
+- **M8（09ec35b）**：窗口状态记忆（userData/window-state.json + 上屏校验 +
+  最大化还原 + 尺寸下限）。
+- **M9（2f0aa5e）**：渲染层异常落盘（前端监听 → POST /api/log/client-error →
+  pino + 活动 L2，10 秒节流、静默 200）+ 主进程 render-process-gone 追加
+  renderer-crash.log。
+- **M10（03ebbb4）**：迁移 0004——collection_members(project_id) 索引；隔离
+  目录实测 user_version 3→4、索引就位。
+- **M11（df20dae）**：CONTRIBUTING / SECURITY / issue×2 与 PR 模板。
+- **M12（1273c1c）**：README 三张界面截图（隔离目录 + 演示项目 demo-web/
+  demo-api + 探针 shot-readme.mjs；逐张目检，无真实路径泄漏；演示数据零残留）。
+- **M13**：dist-electron-tmp~tmp6 六目录与 test-results 清空（杀软本次未锁）；
+  HANDOVER-GLM.md 处置待用户选择（归档 or 删除）。
+- **发布（af15ae3 起）**：0.2.13 dist:win 连续第四次一次过——audit:prod 前置
+  首次实战、自检 7 项全绿、24 个安装包；出包后 better-sqlite3 翻回 Node ABI
+  （92 条复绿）。
+
 ## 第二十四轮：失效项目的「重新定位 + 移除登记」闭环（0.1.8，已修，待用户手测）
 
 - **用户报障**：目录被移动/删除后只提示「项目目录失效：杂-一些可爱的表情」，没有
