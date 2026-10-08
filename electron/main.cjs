@@ -129,18 +129,90 @@ async function boot() {
     if (!healthy) await new Promise((r) => setTimeout(r, 400));
   }
 
-  win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    autoHideMenuBar: true,
-    title: 'TT项目管理工作台',
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  const state = loadWindowState({ width: 1440, height: 900 });
+  win = new BrowserWindow(withRememberedBounds(state));
+  if (state.maximized === true) win.maximize();
+  // 'close'（而非 'closed'）时保存——此时 win 引用仍在，getNormalBounds 可读
+  win.on('close', () => {
+    if (win !== null) rememberWindowBounds(win);
   });
   win.on('closed', () => {
     win = null;
   });
   process.stdout.write(`[ttfolio-electron] server ready on 127.0.0.1:${appPort}, loading window\n`);
   await win.loadURL(`http://127.0.0.1:${appPort}/`);
+}
+
+// ---- 窗口状态记忆（第 33 轮 M8）：尺寸/位置/最大化存 userData/window-state.json
+// （userData 已随 TTFOLIO_DATA_DIR 隔离，main.cjs 顶部）。恢复前做上屏校验：
+// bounds 必须与任一显示器工作区有交集，否则回落默认并居中——防外接屏拔除后
+// 窗口恢复到不存在的坐标（经典坑）。----
+
+function windowStateFile() {
+  return path.join(app.getPath('userData'), 'window-state.json');
+}
+
+const WINDOW_MIN = { width: 960, height: 600 };
+
+function loadWindowState(fallback) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const raw = require('node:fs').readFileSync(windowStateFile(), 'utf8');
+    const s = JSON.parse(raw);
+    if (
+      typeof s !== 'object' ||
+      s === null ||
+      typeof s.width !== 'number' ||
+      typeof s.height !== 'number'
+    ) {
+      return { ...fallback };
+    }
+    const width = Math.max(WINDOW_MIN.width, Math.floor(s.width));
+    const height = Math.max(WINDOW_MIN.height, Math.floor(s.height));
+    const x = Number.isFinite(s.x) ? Math.floor(s.x) : undefined;
+    const y = Number.isFinite(s.y) ? Math.floor(s.y) : undefined;
+    // 上屏校验：无坐标或坐标不在任何显示器工作区内 → 居中
+    const { screen } = require('electron');
+    const onScreen =
+      x === undefined ||
+      y === undefined ||
+      screen.getAllDisplays().some((d) => {
+        const a = d.workArea;
+        return x < a.x + a.width && x + width > a.x && y < a.y + a.height && y + height > a.y;
+      });
+    if (!onScreen) return { ...fallback, center: true };
+    return { width, height, x, y, maximized: s.maximized === true };
+  } catch {
+    return { ...fallback };
+  }
+}
+
+function withRememberedBounds(state) {
+  const opts = {
+    width: state.width,
+    height: state.height,
+    autoHideMenuBar: true,
+    title: 'TT项目管理工作台',
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  };
+  if (state.x !== undefined && state.y !== undefined) {
+    opts.x = state.x;
+    opts.y = state.y;
+  } else {
+    opts.center = true;
+  }
+  return opts;
+}
+
+function rememberWindowBounds(win) {
+  try {
+    // 最大化时存还原后的尺寸（getNormalBounds），下次先还原尺寸再最大化
+    const b = win.getNormalBounds();
+    const payload = { width: b.width, height: b.height, x: b.x, y: b.y, maximized: win.isMaximized() };
+    require('node:fs').writeFileSync(windowStateFile(), JSON.stringify(payload));
+  } catch {
+    /* 状态保存失败不阻断退出 */
+  }
 }
 
 app.on('second-instance', () => {
