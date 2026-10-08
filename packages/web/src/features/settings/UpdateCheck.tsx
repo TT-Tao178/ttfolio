@@ -126,9 +126,10 @@ export function UpdateCheck(): React.JSX.Element {
             type="info"
             showIcon
             message={
-              result.latestVersion === null
+              result.note ??
+              (result.latestVersion === null
                 ? 'GitHub 上还没有任何 Release'
-                : `已是最新版本（最新 Release：v${result.latestVersion}）`
+                : `已是最新版本（最新 Release：v${result.latestVersion}）`)
             }
             data-testid="update-result"
           />

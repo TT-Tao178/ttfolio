@@ -253,6 +253,8 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     };
     const latestVersion = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/i, '') : '';
     const hasUpdate = latestVersion !== '' && semverNewer(latestVersion, ctx.version);
+    const leading =
+      !hasUpdate && latestVersion !== '' && semverNewer(ctx.version, latestVersion);
     return ok({
       currentVersion: ctx.version,
       latestVersion: latestVersion === '' ? null : latestVersion,
@@ -260,8 +262,9 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       releaseUrl:
         typeof data.html_url === 'string' && data.html_url !== '' ? data.html_url : GITHUB_RELEASES_URL,
       assets: (data.assets ?? []).map((a) => a.name),
-      note:
-        hasUpdate && !(data.assets ?? []).some((a) => a.name.endsWith('.exe'))
+      note: leading
+        ? `当前版本 v${ctx.version} 比已发布的最新版 v${latestVersion} 更新——之后的 Release 可能尚未发布或未补全安装包`
+        : hasUpdate && !(data.assets ?? []).some((a) => a.name.endsWith('.exe'))
           ? '新版本尚未上传安装包资产（ Releases 页可能只有源码）'
           : null,
     });
