@@ -7,19 +7,30 @@ export function DiffView({ patch, truncated }: { patch: string; truncated: boole
   const lines = patch.split('\n').slice(0, 500);
   return (
     <div>
-      {truncated && <Alert type="warning" message="diff 过大，已截断显示前 500 行" style={{ marginBottom: 6 }} />}
+      {truncated && (
+        <Alert type="warning" message="diff 过大，已截断显示前 500 行" style={{ marginBottom: 6 }} />
+      )}
       <pre
         className="tt-mono"
-        style={{ fontSize: 12, lineHeight: 1.5, overflow: 'auto', borderRadius: 6, padding: 8, background: SEMANTIC.layoutBg, margin: 0 }}
+        style={{
+          fontSize: 12,
+          lineHeight: 1.5,
+          overflow: 'auto',
+          borderRadius: 6,
+          padding: 8,
+          background: SEMANTIC.layoutBg,
+          margin: 0,
+        }}
       >
         {lines.map((line, i) => {
-          const cls = line.startsWith('+') && !line.startsWith('+++')
-            ? 'tt-diff-add'
-            : line.startsWith('-') && !line.startsWith('---')
-              ? 'tt-diff-del'
-              : line.startsWith('@@')
-                ? 'tt-diff-hunk'
-                : '';
+          const cls =
+            line.startsWith('+') && !line.startsWith('+++')
+              ? 'tt-diff-add'
+              : line.startsWith('-') && !line.startsWith('---')
+                ? 'tt-diff-del'
+                : line.startsWith('@@')
+                  ? 'tt-diff-hunk'
+                  : '';
           return (
             <div key={i} className={cls} style={{ whiteSpace: 'pre-wrap' }}>
               {line === '' ? ' ' : line}

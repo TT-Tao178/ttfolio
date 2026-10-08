@@ -20,7 +20,7 @@ async function bridgeDialog(kind: 'folder' | 'file'): Promise<string[] | null> {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-ttfolio-bridge': token },
       body: JSON.stringify({ kind }),
-      signal: AbortSignal.timeout(300000)
+      signal: AbortSignal.timeout(300000),
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { paths?: unknown };
@@ -54,7 +54,7 @@ public class FgHelper {
 
 const PS_DIALOG_OWNER = [
   'Add-Type -AssemblyName System.Drawing | Out-Null;',
-  "$owner = New-Object System.Windows.Forms.Form;",
+  '$owner = New-Object System.Windows.Forms.Form;',
   "$owner.StartPosition = 'Manual';",
   '$owner.Location = New-Object System.Drawing.Point(-32000, -32000);',
   '$owner.ShowInTaskbar = $false;',
@@ -63,7 +63,7 @@ const PS_DIALOG_OWNER = [
   '$fg = [FgHelper]::GetForegroundWindow();',
   '$fgThread = [FgHelper]::GetWindowThreadProcessId($fg, [IntPtr]::Zero);',
   '$myThread = [FgHelper]::GetCurrentThreadId();',
-  'if ($fgThread -ne 0 -and $fgThread -ne $myThread) { [void][FgHelper]::AttachThreadInput($myThread, $fgThread, $true); [void][FgHelper]::SetForegroundWindow($owner.Handle); [void][FgHelper]::AttachThreadInput($myThread, $fgThread, $false); }'
+  'if ($fgThread -ne 0 -and $fgThread -ne $myThread) { [void][FgHelper]::AttachThreadInput($myThread, $fgThread, $true); [void][FgHelper]::SetForegroundWindow($owner.Handle); [void][FgHelper]::AttachThreadInput($myThread, $fgThread, $false); }',
 ].join('\n');
 
 const PS_FOLDER_FIXED = [
@@ -71,7 +71,7 @@ const PS_FOLDER_FIXED = [
   PS_DIALOG_OWNER,
   '$d = New-Object System.Windows.Forms.FolderBrowserDialog;',
   "if ($d.ShowDialog($owner) -eq 'OK') { Write-Output $d.SelectedPath }",
-  '$owner.Dispose()'
+  '$owner.Dispose()',
 ].join('\n');
 
 const PS_FILE = [
@@ -79,24 +79,22 @@ const PS_FILE = [
   PS_DIALOG_OWNER,
   '$d = New-Object System.Windows.Forms.OpenFileDialog;',
   '$d.Multiselect = $true;',
-  "$d.CheckFileExists = $true;",
+  '$d.CheckFileExists = $true;',
   "if ($d.ShowDialog($owner) -eq 'OK') { $d.FileNames | ForEach-Object { Write-Output $_ } }",
-  '$owner.Dispose()'
+  '$owner.Dispose()',
 ].join('\n');
 
 export async function pickFolder(timeoutMs = 300000): Promise<string[]> {
   const bridged = await bridgeDialog('folder');
   if (bridged !== null) return bridged;
   if (process.platform === 'win32') {
-    const r = await runCommand('powershell', ['-NoProfile', '-STA', '-Command', PS_FOLDER_FIXED], { timeoutMs });
+    const r = await runCommand('powershell', ['-NoProfile', '-STA', '-Command', PS_FOLDER_FIXED], {
+      timeoutMs,
+    });
     return parseLines(r.stdout);
   }
   if (process.platform === 'darwin') {
-    const r = await runCommand(
-      'osascript',
-      ['-e', 'POSIX path of (choose folder)'],
-      { timeoutMs }
-    );
+    const r = await runCommand('osascript', ['-e', 'POSIX path of (choose folder)'], { timeoutMs });
     return parseLines(r.stdout);
   }
   const r = await runCommand('zenity', ['--file-selection', '--directory'], { timeoutMs });

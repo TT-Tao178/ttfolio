@@ -128,10 +128,7 @@ export async function guardPath(req: PathGuardRequest, opts: { mustExist: boolea
   return { real, relToRoot, root: hit.root };
 }
 
-function inRoots(
-  allowedRoots: string[],
-  real: string
-): { root: string } | null {
+function inRoots(allowedRoots: string[], real: string): { root: string } | null {
   for (const root of allowedRoots) {
     if (isInsideOrEqual(root, real)) return { root };
   }
@@ -176,7 +173,8 @@ export async function validateRegistrableRoot(userPath: string): Promise<string>
   try {
     assertNoWindowsPathHazards(abs);
   } catch (err) {
-    if (err instanceof AppError) throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
+    if (err instanceof AppError)
+      throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
     throw err;
   }
   let real: string;
@@ -188,7 +186,8 @@ export async function validateRegistrableRoot(userPath: string): Promise<string>
   try {
     assertNoWindowsPathHazards(real);
   } catch (err) {
-    if (err instanceof AppError) throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
+    if (err instanceof AppError)
+      throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
     throw err;
   }
   return real;

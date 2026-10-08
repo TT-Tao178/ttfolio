@@ -26,7 +26,9 @@ const startedAt = Date.now();
 /** 真正的 SQLite 库损坏（才会走"改名自愈"）；native 模块加载失败等启动期错误不算。 */
 function isRealDbCorruption(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /file is not a database|database disk image is malformed|file is encrypted or is not a database|unsupported file format/i.test(msg);
+  return /file is not a database|database disk image is malformed|file is encrypted or is not a database|unsupported file format/i.test(
+    msg,
+  );
 }
 
 async function main(): Promise<void> {
@@ -50,7 +52,9 @@ async function main(): Promise<void> {
   } catch (err) {
     logger.error({ mod: 'boot', msg: `库打开失败：${err instanceof Error ? err.message : String(err)}` });
     if (!isRealDbCorruption(err)) {
-      process.stdout.write(`索引库打开失败，但不是库损坏，服务退出且未触碰库文件：${err instanceof Error ? err.message : String(err)}\n`);
+      process.stdout.write(
+        `索引库打开失败，但不是库损坏，服务退出且未触碰库文件：${err instanceof Error ? err.message : String(err)}\n`,
+      );
       process.exit(1);
     }
     // 损坏自愈：坏库另存，新建空库（登记与索引丢失，项目文件不受影响）
@@ -114,7 +118,7 @@ async function main(): Promise<void> {
       ? [path.resolve(process.env['TTFOLIO_WEB_DIST'])]
       : []),
     path.resolve(process.cwd(), 'packages', 'web', 'dist'),
-    path.resolve(process.cwd(), 'dist')
+    path.resolve(process.cwd(), 'dist'),
   ];
   const webDist = webDistCandidates.find((d) => existsSync(path.join(d, 'index.html'))) ?? null;
 
@@ -139,7 +143,7 @@ async function main(): Promise<void> {
       } catch {
         return 0;
       }
-    }
+    },
   };
 
   const app = buildApp(ctx);
@@ -152,7 +156,7 @@ async function main(): Promise<void> {
     userContentPort,
     token,
     version,
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
   });
 
   // ---- 路径失效检测（启动一次） ----
@@ -165,7 +169,10 @@ async function main(): Promise<void> {
       return existsSync(p);
     });
     if (missing > 0) {
-      logger.warn({ mod: 'boot', msg: `${missing} 个项目目录不可访问（缺失或路径不合规），卡片将标红并提供重新定位` });
+      logger.warn({
+        mod: 'boot',
+        msg: `${missing} 个项目目录不可访问（缺失或路径不合规），卡片将标红并提供重新定位`,
+      });
     }
   } catch {
     /* 首次启动无项目 */
@@ -174,7 +181,10 @@ async function main(): Promise<void> {
   // ---- Watcher（默认全项目，忽略规则生效；设置可关） ----
   const watchEnabled = getSetting(db, 'watch_enabled') !== '0';
   if (watchEnabled) {
-    const rows = getAll<{ id: string; dir_path: string }>(db, 'SELECT id, dir_path FROM projects WHERE deleted_at IS NULL');
+    const rows = getAll<{ id: string; dir_path: string }>(
+      db,
+      'SELECT id, dir_path FROM projects WHERE deleted_at IS NULL',
+    );
     const rules = listIgnoreRules(db);
     const matcher = compileIgnore(rules);
     const stability = Number(getSetting(db, 'watch_stability_ms') ?? '300');
@@ -182,7 +192,10 @@ async function main(): Promise<void> {
       try {
         watcher.watch(r.id, r.dir_path, matcher, stability);
       } catch (err) {
-        logger.warn({ mod: 'boot', msg: `watcher failed for ${r.dir_path}: ${err instanceof Error ? err.message : String(err)}` });
+        logger.warn({
+          mod: 'boot',
+          msg: `watcher failed for ${r.dir_path}: ${err instanceof Error ? err.message : String(err)}`,
+        });
       }
     }
   }
@@ -207,7 +220,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  process.stdout.write(`启动失败：${err instanceof Error ? err.stack ?? err.message : String(err)}
+  process.stdout.write(`启动失败：${err instanceof Error ? (err.stack ?? err.message) : String(err)}
 `);
   process.exit(1);
 });

@@ -13,7 +13,7 @@ const loc = (over: Partial<TabLocation> = {}): TabLocation => ({
   targetPath: null,
   subTab: 'files',
   scroll: 0,
-  ...over
+  ...over,
 });
 
 function reset(): void {
@@ -35,7 +35,10 @@ describe('tabKey 标识规则', () => {
   it('overview 按 subTab 区分——工作台总览与最近打开是不同标签', () => {
     const s = useAppStore.getState();
     s.openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
-    s.openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: 'view:recent', scroll: 0 }, '最近打开');
+    s.openTab(
+      { kind: 'overview', projectId: null, targetPath: null, subTab: 'view:recent', scroll: 0 },
+      '最近打开',
+    );
     expect(useAppStore.getState().tabs).toHaveLength(2);
   });
 
@@ -92,7 +95,10 @@ describe('closeTab 与 closedTabs 栈', () => {
   it('正常关闭进栈；上限 10', () => {
     const s = useAppStore.getState();
     for (let i = 0; i < 12; i++) {
-      s.openTab({ kind: 'file', projectId: `p${i}`, targetPath: `f${i}.ts`, subTab: null, scroll: 0 }, `t${i}`);
+      s.openTab(
+        { kind: 'file', projectId: `p${i}`, targetPath: `f${i}.ts`, subTab: null, scroll: 0 },
+        `t${i}`,
+      );
     }
     for (let i = 0; i < 12; i++) {
       const t = useAppStore.getState().tabs[0];
@@ -167,12 +173,22 @@ describe('parseNavHistory / serializeSession 往返', () => {
     const s = useAppStore.getState();
     s.openTab(loc(), 'proj');
     useAppStore.setState({
-      tabs: useAppStore.getState().tabs.map((t) => ({ ...t, history: [], historyIndex: -1 }))
+      tabs: useAppStore.getState().tabs.map((t) => ({ ...t, history: [], historyIndex: -1 })),
     });
     // syncFromServer 走 parseNavHistory：navHistoryJson 脏数据 → 单点回落
     s.syncFromServer(
-      [{ id: 't1', kind: 'project', projectId: 'p1', targetPath: null, subTab: 'files', navHistoryJson: '{broken', navIndex: 0 }],
-      't1'
+      [
+        {
+          id: 't1',
+          kind: 'project',
+          projectId: 'p1',
+          targetPath: null,
+          subTab: 'files',
+          navHistoryJson: '{broken',
+          navIndex: 0,
+        },
+      ],
+      't1',
     );
     const t = useAppStore.getState().tabs[0];
     expect(t?.history).toHaveLength(1);
@@ -194,7 +210,10 @@ describe('parseNavHistory / serializeSession 往返', () => {
 
   it('syncFromServer：activeTabId 悬空时回落第一个标签（不出现空白内容区）', () => {
     const s = useAppStore.getState();
-    s.syncFromServer([{ id: 't1', kind: 'project', projectId: 'p1', targetPath: null, subTab: 'files' }], 'missing-id');
+    s.syncFromServer(
+      [{ id: 't1', kind: 'project', projectId: 'p1', targetPath: null, subTab: 'files' }],
+      'missing-id',
+    );
     expect(useAppStore.getState().activeTabId).toBe('t1');
   });
 });

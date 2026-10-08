@@ -15,7 +15,9 @@ const db = store.open();
 process.stdout.write('ttFolio doctor 报告');
 process.stdout.write('='.repeat(50));
 process.stdout.write(`数据目录: ${layout.dataDir}`);
-process.stdout.write(`库文件:   ${layout.dbFile} (${((statSync(layout.dbFile).size) / 1024 / 1024).toFixed(2)} MB)`);
+process.stdout.write(
+  `库文件:   ${layout.dbFile} (${(statSync(layout.dbFile).size / 1024 / 1024).toFixed(2)} MB)`,
+);
 
 const ic = integrityCheck(db);
 process.stdout.write(`\n[完整性] ${ic.ok ? 'OK' : '异常: ' + ic.message}`);
@@ -30,7 +32,9 @@ if (missing.length > 0) {
 const unanalyzed = projects.filter((p) => p.analyzedAt === null);
 if (unanalyzed.length > 0) process.stdout.write(`  未分析 ${unanalyzed.length} 个`);
 
-process.stdout.write(`\n[挂载] 共 ${projects.length > 0 ? projects.reduce((acc, p) => acc + listMounts(db, p.id).length, 0) : 0} 条`);
+process.stdout.write(
+  `\n[挂载] 共 ${projects.length > 0 ? projects.reduce((acc, p) => acc + listMounts(db, p.id).length, 0) : 0} 条`,
+);
 for (const p of projects) {
   for (const m of listMounts(db, p.id)) {
     if (!existsSync(m.path)) process.stdout.write(`  失效挂载: 项目 ${p.diskName} -> ${m.path}`);

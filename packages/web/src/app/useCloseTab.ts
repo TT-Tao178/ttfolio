@@ -9,7 +9,8 @@ import { useAppStore, type Tab } from './store';
 export function useCloseTab(): (tab: Tab) => void {
   const { modal } = AntdApp.useApp();
   return (tab: Tab): void => {
-    const key = tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
+    const key =
+      tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
     if (key !== null && useAppStore.getState().dirty.has(key)) {
       modal.confirm({
         title: '标签内有未保存的改动',
@@ -20,7 +21,7 @@ export function useCloseTab(): (tab: Tab) => void {
         onOk: () => {
           useAppStore.getState().clearDirty(key);
           useAppStore.getState().closeTab(tab.id);
-        }
+        },
       });
       return;
     }

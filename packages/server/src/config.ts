@@ -16,7 +16,8 @@ export function resolveDataDir(): string {
   if (process.platform === 'win32' && process.env['APPDATA']) {
     return path.join(process.env['APPDATA'], 'ttFolio');
   }
-  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'ttFolio');
+  if (process.platform === 'darwin')
+    return path.join(os.homedir(), 'Library', 'Application Support', 'ttFolio');
   const xdg = process.env['XDG_DATA_HOME'];
   if (xdg) return path.join(xdg, 'ttfolio');
   const fallback = path.join(os.homedir(), '.local', 'share', 'ttfolio');
@@ -42,7 +43,7 @@ export function ensureDataDirs(dataDir: string): DataDirLayout {
     trashDir: path.join(dataDir, 'trash'),
     thumbsDir: path.join(dataDir, 'thumbs'),
     logDir: path.join(dataDir, 'logs'),
-    runtimeFile: path.join(dataDir, 'runtime.json')
+    runtimeFile: path.join(dataDir, 'runtime.json'),
   };
   for (const dir of [dataDir, layout.backupDir, layout.trashDir, layout.thumbsDir, layout.logDir]) {
     mkdirSync(dir, { recursive: true });
@@ -63,7 +64,7 @@ export function writeRuntime(file: string, payload: Record<string, unknown>): vo
 export function readRuntime(file: string): Record<string, unknown> | null {
   if (!existsSync(file)) return null;
   try {
-        const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
     return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;

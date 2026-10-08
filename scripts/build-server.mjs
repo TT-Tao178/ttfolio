@@ -12,5 +12,5 @@ await build({
   external: ['better-sqlite3'],
   sourcemap: false,
   logLevel: 'info',
-  legalComments: 'none'
+  legalComments: 'none',
 });

@@ -5,7 +5,12 @@
  * 接口不回显本体）；仓库转公开后无 Token 也能查。
  */
 import { Alert, App as AntdApp, Button, Input, Space, Tag, Typography } from 'antd';
-import { CheckCircleOutlined, CloudDownloadOutlined, GithubOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  CheckCircleOutlined,
+  CloudDownloadOutlined,
+  GithubOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
@@ -33,7 +38,7 @@ export function UpdateCheck(): React.JSX.Element {
   const [result, setResult] = useState<CheckResult | null>(null);
   const { data: status } = useQuery({
     queryKey: ['update-status'],
-    queryFn: () => api.get<UpdateStatus>('/api/update/status')
+    queryFn: () => api.get<UpdateStatus>('/api/update/status'),
   });
 
   const saveToken = useMutation({
@@ -43,7 +48,7 @@ export function UpdateCheck(): React.JSX.Element {
       setToken('');
       void queryClient.invalidateQueries({ queryKey: ['update-status'] });
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败'),
   });
   const clearToken = useMutation({
     mutationFn: () => api.post('/api/update/token', { token: '' }),
@@ -51,7 +56,7 @@ export function UpdateCheck(): React.JSX.Element {
       void message.success('已清除 Token');
       void queryClient.invalidateQueries({ queryKey: ['update-status'] });
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '清除失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '清除失败'),
   });
   const check = useMutation({
     mutationFn: () => api.get<CheckResult>('/api/update/check'),
@@ -59,17 +64,20 @@ export function UpdateCheck(): React.JSX.Element {
     onError: (e) => {
       setResult(null);
       void message.error(e instanceof ApiClientError ? e.message : '检查失败');
-    }
+    },
   });
   const openRelease = useMutation({
     mutationFn: () => api.post('/api/update/open-release'),
-    onSuccess: () => void message.info('已在系统浏览器打开 Releases 页面（若被挡住请 Alt+Tab）')
+    onSuccess: () => void message.info('已在系统浏览器打开 Releases 页面（若被挡住请 Alt+Tab）'),
   });
 
   const hasExe = result !== null && result.assets.some((a) => a.endsWith('.exe'));
 
   return (
-    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="update-check">
+    <div
+      style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}
+      data-testid="update-check"
+    >
       <Space size={8} wrap>
         <Typography.Text>当前版本：v{status?.currentVersion ?? '…'}</Typography.Text>
         <Button
@@ -85,8 +93,8 @@ export function UpdateCheck(): React.JSX.Element {
           打开下载页
         </Button>
       </Space>
-      {result !== null && (
-        result.hasUpdate ? (
+      {result !== null &&
+        (result.hasUpdate ? (
           <Alert
             type="success"
             showIcon
@@ -95,10 +103,18 @@ export function UpdateCheck(): React.JSX.Element {
             description={
               <div style={{ fontSize: 12 }}>
                 <div>
-                  {hasExe ? `安装包：${result.assets.filter((a) => a.endsWith('.exe')).join('、')}` : '该 Release 暂无 .exe 安装包资产（可能只有源码）'}
+                  {hasExe
+                    ? `安装包：${result.assets.filter((a) => a.endsWith('.exe')).join('、')}`
+                    : '该 Release 暂无 .exe 安装包资产（可能只有源码）'}
                 </div>
                 {result.note != null && <div style={{ opacity: 0.6 }}>{result.note}</div>}
-                <Button size="small" type="primary" style={{ marginTop: 6 }} icon={<GithubOutlined />} onClick={() => openRelease.mutate()}>
+                <Button
+                  size="small"
+                  type="primary"
+                  style={{ marginTop: 6 }}
+                  icon={<GithubOutlined />}
+                  onClick={() => openRelease.mutate()}
+                >
                   前往 Releases 页下载
                 </Button>
               </div>
@@ -109,11 +125,14 @@ export function UpdateCheck(): React.JSX.Element {
           <Alert
             type="info"
             showIcon
-            message={result.latestVersion === null ? 'GitHub 上还没有任何 Release' : `已是最新版本（最新 Release：v${result.latestVersion}）`}
+            message={
+              result.latestVersion === null
+                ? 'GitHub 上还没有任何 Release'
+                : `已是最新版本（最新 Release：v${result.latestVersion}）`
+            }
             data-testid="update-result"
           />
-        )
-      )}
+        ))}
       <div style={{ fontSize: 12, opacity: 0.75 }}>
         <div style={{ marginBottom: 4 }}>
           GitHub Token：
@@ -124,7 +143,9 @@ export function UpdateCheck(): React.JSX.Element {
           ) : (
             <Tag color="warning">未配置</Tag>
           )}
-          <span style={{ opacity: 0.6 }}>仓库私有，检查更新需要能读取 {status?.repo ?? '本仓库'} 的 Token；转公开后可留空</span>
+          <span style={{ opacity: 0.6 }}>
+            仓库私有，检查更新需要能读取 {status?.repo ?? '本仓库'} 的 Token；转公开后可留空
+          </span>
         </div>
         <Space.Compact style={{ width: '100%', maxWidth: 460 }}>
           <Input.Password
@@ -132,10 +153,17 @@ export function UpdateCheck(): React.JSX.Element {
             value={token}
             placeholder="ghp_… / github_pat_…（粘贴后保存，只存本机）"
             onChange={(e) => setToken(e.target.value)}
-            onPressEnter={() => { if (token.trim() !== '') saveToken.mutate(); }}
+            onPressEnter={() => {
+              if (token.trim() !== '') saveToken.mutate();
+            }}
             data-testid="update-token-input"
           />
-          <Button size="small" disabled={token.trim() === ''} loading={saveToken.isPending} onClick={() => saveToken.mutate()}>
+          <Button
+            size="small"
+            disabled={token.trim() === ''}
+            loading={saveToken.isPending}
+            onClick={() => saveToken.mutate()}
+          >
             保存
           </Button>
           {status?.tokenSet === true && (

@@ -11,7 +11,11 @@ import { MAX_GIT_STATUS_ITEMS } from '@ttfolio/shared';
 import { AppError } from './errors.js';
 
 export class GitError extends AppError {
-  constructor(code: 'GIT_UNAVAILABLE' | 'NOT_A_REPO' | 'GIT_IN_PROGRESS' | 'GIT_DIRTY' | 'IO_ERROR', message: string, detail?: unknown) {
+  constructor(
+    code: 'GIT_UNAVAILABLE' | 'NOT_A_REPO' | 'GIT_IN_PROGRESS' | 'GIT_DIRTY' | 'IO_ERROR',
+    message: string,
+    detail?: unknown,
+  ) {
     super(code, message, detail);
   }
 }
@@ -35,8 +39,16 @@ export async function assertGitAvailable(): Promise<void> {
   }
 }
 
-async function git(dir: string, args: string[], opts: { input?: string; timeoutMs?: number } = {}): Promise<string> {
-  const r = await runCommand('git', args, { cwd: dir, input: opts.input, timeoutMs: opts.timeoutMs ?? 30000 });
+async function git(
+  dir: string,
+  args: string[],
+  opts: { input?: string; timeoutMs?: number } = {},
+): Promise<string> {
+  const r = await runCommand('git', args, {
+    cwd: dir,
+    input: opts.input,
+    timeoutMs: opts.timeoutMs ?? 30000,
+  });
   if (r.code !== 0) {
     const msg = r.stderr.trim().slice(0, 500) || r.stdout.trim().slice(0, 500) || 'git 命令失败';
     if (msg.includes('not a git repository')) throw new GitError('NOT_A_REPO', '该目录不是 git 仓库');
@@ -142,7 +154,7 @@ export function parseStatusV2(buf: string): ParsedV2 {
 }
 
 function classify(x: string, y: string): GitStatusEntry['state'] {
-  if (x === 'U' || y === 'U' || x === 'A' && y === 'A' || x === 'D' && y === 'D') return 'conflicted';
+  if (x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D')) return 'conflicted';
   if (x !== '.') return 'staged';
   if (y !== '.') return 'unstaged';
   return 'unstaged';
@@ -162,7 +174,7 @@ export async function status(dir: string): Promise<GitStatus> {
       inProgress: null,
       identity: null,
       truncated: false,
-      detached: false
+      detached: false,
     };
   }
   const out = await git(dir, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all']);
@@ -191,7 +203,7 @@ export async function status(dir: string): Promise<GitStatus> {
     inProgress: prog,
     identity: id,
     truncated: parsed.truncated,
-    detached: (headerOrNull(parsed.header, 'branch.head') ?? '') === '(detached)'
+    detached: (headerOrNull(parsed.header, 'branch.head') ?? '') === '(detached)',
   };
 }
 
@@ -203,11 +215,12 @@ function headerOrNull(h: Record<string, string>, key: string): string | null {
 
 export async function diff(dir: string, relPath: string, staged: boolean, ref?: string): Promise<GitDiff> {
   await assertGitAvailable();
-  const numArgs = ref !== undefined
-    ? ['diff', '--numstat', '--no-color', ref]
-    : staged
-      ? ['diff', '--numstat', '--no-color', '--cached']
-      : ['diff', '--numstat', '--no-color'];
+  const numArgs =
+    ref !== undefined
+      ? ['diff', '--numstat', '--no-color', ref]
+      : staged
+        ? ['diff', '--numstat', '--no-color', '--cached']
+        : ['diff', '--numstat', '--no-color'];
   const numOut = await git(dir, ref !== undefined ? numArgs.slice(1) : numArgs.slice(1));
   let binary = false;
   let additions = 0;
@@ -238,7 +251,7 @@ export async function diff(dir: string, relPath: string, staged: boolean, ref?: 
     truncated,
     patch: truncated ? patch.slice(0, MAX) : patch,
     additions,
-    deletions
+    deletions,
   };
 }
 
@@ -276,7 +289,10 @@ export async function commit(dir: string, message: string): Promise<{ short: str
   return { short: out };
 }
 
-export async function log(dir: string, opts: { limit: number; skip?: number; path?: string; author?: string }): Promise<GitLogEntry[]> {
+export async function log(
+  dir: string,
+  opts: { limit: number; skip?: number; path?: string; author?: string },
+): Promise<GitLogEntry[]> {
   await assertGitAvailable();
   const args = ['log', `--pretty=format:%H%x1f%h%x1f%an%x1f%aI%x1f%s%x1e`, `--max-count=${opts.limit}`];
   if (opts.skip !== undefined && opts.skip > 0) appendEntry(args, `--skip=${opts.skip}`);
@@ -294,7 +310,7 @@ export async function log(dir: string, opts: { limit: number; skip?: number; pat
         short: fields[1] ?? '',
         author: fields[2] ?? '',
         date: fields[3] ?? '',
-        subject: fields[4] ?? ''
+        subject: fields[4] ?? '',
       });
     }
   }
@@ -308,7 +324,13 @@ export interface CommitDetail {
 
 export async function commitDetail(dir: string, hash: string): Promise<CommitDetail> {
   await assertGitAvailable();
-  const out = await git(dir, ['show', '--numstat', '--no-color', '--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s', hash]);
+  const out = await git(dir, [
+    'show',
+    '--numstat',
+    '--no-color',
+    '--format=%H%x1f%h%x1f%an%x1f%aI%x1f%s',
+    hash,
+  ]);
   const lines = out.split('\n');
   const header = (lines[0] ?? '').split('\x1f');
   const entry: GitLogEntry = {
@@ -316,7 +338,7 @@ export async function commitDetail(dir: string, hash: string): Promise<CommitDet
     short: header[1] ?? '',
     author: header[2] ?? '',
     date: header[3] ?? '',
-    subject: header[4] ?? ''
+    subject: header[4] ?? '',
   };
   const files: Array<{ path: string; status: string }> = [];
   for (const line of lines.slice(1)) {
@@ -331,7 +353,11 @@ export async function commitDetail(dir: string, hash: string): Promise<CommitDet
 
 export async function branches(dir: string): Promise<GitBranch[]> {
   await assertGitAvailable();
-  const out = await git(dir, ['branch', '--list', '--format=%(HEAD)%00%(refname:short)%00%(objectname:short)%00%(contents:subject)']);
+  const out = await git(dir, [
+    'branch',
+    '--list',
+    '--format=%(HEAD)%00%(refname:short)%00%(objectname:short)%00%(contents:subject)',
+  ]);
   const result: GitBranch[] = [];
   for (const line of out.split('\n')) {
     if (line.trim() === '') continue;
@@ -342,7 +368,7 @@ export async function branches(dir: string): Promise<GitBranch[]> {
       name,
       current: cols[0] === '*',
       headShort: cols[2] ?? null,
-      subject: cols[3] ?? null
+      subject: cols[3] ?? null,
     });
   }
   return result;
@@ -369,11 +395,23 @@ export async function summaryForAnalyze(dir: string): Promise<{
   headShort: string | null;
   partial: boolean;
 }> {
-  const empty = { isRepo: false, branch: null, dirty: false, untracked: 0, lastCommitAt: null, lastCommitAuthor: null, lastCommitSubject: null, headShort: null, partial: false };
+  const empty = {
+    isRepo: false,
+    branch: null,
+    dirty: false,
+    untracked: 0,
+    lastCommitAt: null,
+    lastCommitAuthor: null,
+    lastCommitSubject: null,
+    headShort: null,
+    partial: false,
+  };
   if (!(await gitAvailable())) return { ...empty, partial: true };
   try {
     if (!(await isRepo(dir))) return empty;
-    const out = await git(dir, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=normal'], { timeoutMs: 15000 });
+    const out = await git(dir, ['status', '--porcelain=v2', '-z', '--branch', '--untracked-files=normal'], {
+      timeoutMs: 15000,
+    });
     const parsed = parseStatusV2(out);
     const dirty = parsed.entries.some((e) => e.state !== 'untracked');
     const untracked = parsed.entries.filter((e) => e.state === 'untracked').length;
@@ -404,7 +442,7 @@ export async function summaryForAnalyze(dir: string): Promise<{
       lastCommitAuthor,
       lastCommitSubject,
       headShort,
-      partial: false
+      partial: false,
     };
   } catch {
     return { ...empty, partial: true };

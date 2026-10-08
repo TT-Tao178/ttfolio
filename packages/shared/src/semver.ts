@@ -4,7 +4,12 @@
  * 返回 true 表示 a 严格大于 b。
  */
 export function semverNewer(a: string, b: string): boolean {
-  const p = (s: string): number[] => s.replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
+  const p = (s: string): number[] =>
+    s
+      .replace(/^v/i, '')
+      .split(/[.+-]/)
+      .slice(0, 3)
+      .map((x) => parseInt(x, 10) || 0);
   const [a1 = 0, a2 = 0, a3 = 0] = p(a);
   const [b1 = 0, b2 = 0, b3 = 0] = p(b);
   return a1 !== b1 ? a1 > b1 : a2 !== b2 ? a2 > b2 : a3 > b3;

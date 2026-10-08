@@ -9,8 +9,16 @@
 import type { MenuProps } from 'antd';
 import { App as AntdApp } from 'antd';
 import {
-  AimOutlined, AppstoreOutlined, InboxOutlined, BranchesOutlined, CopyOutlined, FileTextOutlined, FolderOpenOutlined,
-  ReloadOutlined, StarFilled, StarOutlined
+  AimOutlined,
+  AppstoreOutlined,
+  InboxOutlined,
+  BranchesOutlined,
+  CopyOutlined,
+  FileTextOutlined,
+  FolderOpenOutlined,
+  ReloadOutlined,
+  StarFilled,
+  StarOutlined,
 } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
@@ -28,7 +36,8 @@ export function useArchiveProject(): (p: ProjectSummary) => void {
   return (p: ProjectSummary): void => {
     const archiving = p.status !== 'archived';
     const run = (): Promise<unknown> =>
-      api.patch(`/api/projects/${p.id}`, { rev: p.rev, status: archiving ? 'archived' : 'active' })
+      api
+        .patch(`/api/projects/${p.id}`, { rev: p.rev, status: archiving ? 'archived' : 'active' })
         .then(() => {
           void message.success(archiving ? '已归档（卡片墙工具栏「已归档」可找回）' : '已取消归档');
           return queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -37,9 +46,10 @@ export function useArchiveProject(): (p: ProjectSummary) => void {
     if (archiving) {
       modal.confirm({
         title: `归档「${p.alias ?? p.diskName}」？`,
-        content: '归档后从工作台总览与卡片墙隐藏（磁盘文件不受影响）；卡片墙工具栏的「已归档」按钮可查看与恢复。',
+        content:
+          '归档后从工作台总览与卡片墙隐藏（磁盘文件不受影响）；卡片墙工具栏的「已归档」按钮可查看与恢复。',
         okText: '归档',
-        onOk: () => run()
+        onOk: () => run(),
       });
     } else {
       void run();
@@ -67,16 +77,16 @@ export interface ProjectMenuHandlers {
   message: { success: (msg: string) => void };
 }
 
-export function buildProjectMenu(p: ProjectSummary, h: ProjectMenuHandlers): {
+export function buildProjectMenu(
+  p: ProjectSummary,
+  h: ProjectMenuHandlers,
+): {
   items: MenuProps['items'];
   onAction: (key: string) => void;
 } {
   const items: MenuProps['items'] = [
     ...(p.pathOk === false
-      ? [
-          { key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined /> },
-          { type: 'divider' as const }
-        ]
+      ? [{ key: 'relocate', label: '重新定位到新目录…', icon: <AimOutlined /> }, { type: 'divider' as const }]
       : []),
     { key: 'open', label: '打开项目', icon: <FolderOpenOutlined /> },
     { key: 'files', label: '打开文件页', icon: <FileTextOutlined /> },
@@ -87,28 +97,64 @@ export function buildProjectMenu(p: ProjectSummary, h: ProjectMenuHandlers): {
     { key: 'terminal', label: '在此打开终端', disabled: p.pathOk === false },
     { type: 'divider' as const },
     { key: 'analyze', label: '重新分析', icon: <ReloadOutlined />, disabled: p.pathOk === false },
-    { key: 'pin', label: p.isPinned ? '取消固定' : '固定', icon: p.isPinned ? <StarFilled /> : <StarOutlined /> },
+    {
+      key: 'pin',
+      label: p.isPinned ? '取消固定' : '固定',
+      icon: p.isPinned ? <StarFilled /> : <StarOutlined />,
+    },
     { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
     { key: 'archive', label: p.status === 'archived' ? '取消归档' : '归档…', icon: <InboxOutlined /> },
     { type: 'divider' as const },
     { key: 'unregister', label: '仅从 ttFolio 移除登记' },
-    { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false }
+    { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false },
   ];
   const onAction = (key: string): void => {
     switch (key) {
-      case 'relocate': h.onRelocate(); break;
-      case 'open': h.onOpen(); break;
-      case 'files': h.onOpenFiles(); break;
-      case 'git': useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName); break;
-      case 'copy': void navigator.clipboard.writeText(p.dirPath); h.message.success('已复制路径'); break;
-      case 'explorer': void api.post('/api/open', { target: 'explorer', projectId: p.id }); break;
-      case 'terminal': void api.post('/api/open', { target: 'terminal', projectId: p.id }); break;
-      case 'analyze': h.onAnalyze(); break;
-      case 'pin': h.onPin(); break;
-      case 'collections': h.onCollections(); break;
-      case 'archive': h.onArchive(); break;
-      case 'unregister': h.onUnregister(); break;
-      case 'delete': h.onDelete(); break;
+      case 'relocate':
+        h.onRelocate();
+        break;
+      case 'open':
+        h.onOpen();
+        break;
+      case 'files':
+        h.onOpenFiles();
+        break;
+      case 'git':
+        useAppStore
+          .getState()
+          .openTab(
+            { kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 },
+            p.alias ?? p.diskName,
+          );
+        break;
+      case 'copy':
+        void navigator.clipboard.writeText(p.dirPath);
+        h.message.success('已复制路径');
+        break;
+      case 'explorer':
+        void api.post('/api/open', { target: 'explorer', projectId: p.id });
+        break;
+      case 'terminal':
+        void api.post('/api/open', { target: 'terminal', projectId: p.id });
+        break;
+      case 'analyze':
+        h.onAnalyze();
+        break;
+      case 'pin':
+        h.onPin();
+        break;
+      case 'collections':
+        h.onCollections();
+        break;
+      case 'archive':
+        h.onArchive();
+        break;
+      case 'unregister':
+        h.onUnregister();
+        break;
+      case 'delete':
+        h.onDelete();
+        break;
     }
   };
   return { items, onAction };

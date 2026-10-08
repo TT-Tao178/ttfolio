@@ -19,7 +19,10 @@ export function validateTemplateArgs(args: string[], isBuiltin: boolean): void {
     return false;
   });
   if (!hasPlaceholder) {
-    throw new AppError('INVALID_NAME', '命令模板参数至少要包含一个占位符：{path} / {file} / {project} / {paths}');
+    throw new AppError(
+      'INVALID_NAME',
+      '命令模板参数至少要包含一个占位符：{path} / {file} / {project} / {paths}',
+    );
   }
 }
 
@@ -82,7 +85,10 @@ export async function openUrlInBrowser(url: string): Promise<void> {
   fireAndForget('xdg-open', [url]);
 }
 
-export function renderTemplateArgs(args: string[], values: { path: string; file: string; project: string; paths: string }): string[] {
+export function renderTemplateArgs(
+  args: string[],
+  values: { path: string; file: string; project: string; paths: string },
+): string[] {
   return args.map((a) =>
     a
       .split('{path}')
@@ -92,7 +98,7 @@ export function renderTemplateArgs(args: string[], values: { path: string; file:
       .split('{project}')
       .join(values.project)
       .split('{paths}')
-      .join(values.paths)
+      .join(values.paths),
   );
 }
 

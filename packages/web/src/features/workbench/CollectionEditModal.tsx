@@ -14,8 +14,12 @@ export interface CollectionEditTarget {
   note: string | null;
 }
 
-export function CollectionEditModal({ collection, onClose }: {
-  collection: CollectionEditTarget | null; onClose: () => void;
+export function CollectionEditModal({
+  collection,
+  onClose,
+}: {
+  collection: CollectionEditTarget | null;
+  onClose: () => void;
 }): React.JSX.Element | null {
   const { message } = AntdApp.useApp();
   const queryClient = useQueryClient();
@@ -27,13 +31,17 @@ export function CollectionEditModal({ collection, onClose }: {
     setNote(collection?.note ?? '');
   }, [collection]);
   const save = useMutation({
-    mutationFn: () => api.patch(`/api/collections/${collection?.id}`, { name: name.trim(), note: note.trim() === '' ? null : note }),
+    mutationFn: () =>
+      api.patch(`/api/collections/${collection?.id}`, {
+        name: name.trim(),
+        note: note.trim() === '' ? null : note,
+      }),
     onSuccess: () => {
       void message.success('已保存');
       void queryClient.invalidateQueries({ queryKey: ['collections'] });
       onClose();
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败'),
   });
   if (collection === null) return null;
   return (
@@ -50,7 +58,12 @@ export function CollectionEditModal({ collection, onClose }: {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="集合名称" autoFocus />
-        <Input.TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="备注（可选，展示在设置页）" />
+        <Input.TextArea
+          rows={2}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="备注（可选，展示在设置页）"
+        />
       </div>
     </Modal>
   );

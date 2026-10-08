@@ -15,7 +15,7 @@ export class ApiClientError extends Error {
     public readonly code: string,
     message: string,
     public readonly detail?: unknown,
-    public readonly status: number = 500
+    public readonly status: number = 500,
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -46,7 +46,12 @@ function base(): string {
   return '';
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  query?: Record<string, string>,
+): Promise<T> {
   const url = new URL(base() + path, window.location.origin);
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== '') url.searchParams.set(k, v);
@@ -56,7 +61,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   const res = await fetch(url.toString(), {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   let payload: ApiResponse<T> | null = null;
   try {
@@ -70,7 +75,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
     err?.code ?? `HTTP_${res.status}`,
     err?.message ?? `请求失败（HTTP ${res.status}）`,
     err?.detail,
-    res.status
+    res.status,
   );
 }
 
@@ -79,7 +84,7 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
-  del: <T>(path: string, query?: Record<string, string>) => request<T>('DELETE', path, undefined, query)
+  del: <T>(path: string, query?: Record<string, string>) => request<T>('DELETE', path, undefined, query),
 };
 
 /** 用户内容端口（架构图/原始文件），与应用同 host 不同端口（C-13 跨源隔离）。 */

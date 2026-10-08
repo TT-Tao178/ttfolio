@@ -23,7 +23,7 @@ export class WatcherManager {
 
   constructor(
     private readonly sse: SseHub,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   /** 为项目启动监听（幂等）。enabled=false 时忽略。 */
@@ -52,7 +52,7 @@ export class WatcherManager {
         projectId,
         paths: paths.slice(0, 200),
         kind,
-        modified: openedModified.slice(0, 50).map((p) => path.relative(root, p).split(path.sep).join('/'))
+        modified: openedModified.slice(0, 50).map((p) => path.relative(root, p).split(path.sep).join('/')),
       });
       // Git 信号 1s 去抖
       if (gitTimer !== null) clearTimeout(gitTimer);
@@ -71,7 +71,7 @@ export class WatcherManager {
         const rel = path.relative(root, absPath);
         if (rel === '') return false;
         return matcher.isHidden(rel.split(path.sep).join('/'));
-      }
+      },
     });
 
     const record = (evt: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir') => (absPath: string) => {
@@ -88,7 +88,10 @@ export class WatcherManager {
       .on('addDir', record('addDir'))
       .on('unlinkDir', record('unlinkDir'))
       .on('error', (err) => {
-        this.logger.warn({ mod: 'watcher', msg: `watcher error: ${err instanceof Error ? err.message : String(err)}` });
+        this.logger.warn({
+          mod: 'watcher',
+          msg: `watcher error: ${err instanceof Error ? err.message : String(err)}`,
+        });
       });
 
     this.watches.set(projectId, { projectId, root, watcher, pending, timer: null, gitTimer: null });

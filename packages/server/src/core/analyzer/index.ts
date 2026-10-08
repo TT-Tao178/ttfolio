@@ -7,7 +7,12 @@ import type Database from 'better-sqlite3';
 import * as fsx from '../fsx.js';
 import { languageForFile, topLanguages, type LangAccum } from './languages.js';
 import { extractFromManifest, mergeTechStack } from './techStack.js';
-import { detectProjectType, isFrontendDirName, isBackendDirName, type TypeDetectInput } from './typeDetect.js';
+import {
+  detectProjectType,
+  isFrontendDirName,
+  isBackendDirName,
+  type TypeDetectInput,
+} from './typeDetect.js';
 import { summaryForAnalyze } from '../git.js';
 import type { TaskContext } from '../tasks.js';
 import { buildMatcher } from '../search.js';
@@ -17,8 +22,25 @@ import { upsertArchive } from '../../db/repo/docsRepo.js';
 
 const SCRIPT_EXTS = new Set(['ps1', 'sh', 'bat', 'cmd', 'py']);
 const ASSET_EXTS = new Set([
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'mp3', 'wav', 'psd', 'ai', 'fig', 'sketch', 'blend',
-  'avi', 'mkv', 'flac', 'tif', 'bmp'
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'mp4',
+  'mov',
+  'mp3',
+  'wav',
+  'psd',
+  'ai',
+  'fig',
+  'sketch',
+  'blend',
+  'avi',
+  'mkv',
+  'flac',
+  'tif',
+  'bmp',
 ]);
 
 export interface AnalyzeRunResult {
@@ -42,7 +64,7 @@ export async function analyzeProject(
   db: Database.Database,
   project: { id: string; dirPath: string; typeSource: string; defaultArchDir: string },
   sse: SseHub,
-  ctx: TaskContext
+  ctx: TaskContext,
 ): Promise<AnalyzeRunResult> {
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
@@ -130,7 +152,8 @@ export async function analyzeProject(
         if (cur.depth === 1) manifestSubDirs.add(cur.rel);
         if (cur.depth === 0) {
           if (lower === 'package.json') rootPackageJson = rel;
-          if (lower === 'pom.xml' || lower === 'build.gradle' || lower === 'go.mod' || lower === 'cargo.toml') backendFramework = true;
+          if (lower === 'pom.xml' || lower === 'build.gradle' || lower === 'go.mod' || lower === 'cargo.toml')
+            backendFramework = true;
         }
         if (cur.depth === 1 && cur.rel !== '') {
           const parentName = cur.rel.split('/').pop() ?? '';
@@ -179,7 +202,9 @@ export async function analyzeProject(
     // 根 package.json 存在但没提取到框架 —— 静态站判断在类型识别里做
   }
   frontendFramework = techStack.some((t) =>
-    ['React', 'Vue', 'Vue 3', 'Nuxt', 'Next.js', 'Angular', 'Svelte', 'SvelteKit', 'Vite', 'Tauri'].includes(t)
+    ['React', 'Vue', 'Vue 3', 'Nuxt', 'Next.js', 'Angular', 'Svelte', 'SvelteKit', 'Vite', 'Tauri'].includes(
+      t,
+    ),
   );
   if (rootPackageJson !== null) {
     try {
@@ -196,7 +221,9 @@ export async function analyzeProject(
   // ---- 类型 ----
   let type: string;
   if (project.typeSource === 'manual') {
-    const row = db.prepare<[string], { type: string }>('SELECT type FROM projects WHERE id = ?').get(project.id);
+    const row = db
+      .prepare<[string], { type: string }>('SELECT type FROM projects WHERE id = ?')
+      .get(project.id);
     type = row?.type ?? 'unknown';
   } else {
     const input: TypeDetectInput = {
@@ -211,7 +238,7 @@ export async function analyzeProject(
       hasIndexHtmlWithPackageJson: hasIndexHtml && rootPackageJson !== null,
       scriptBytes,
       totalBytes,
-      assetBytes
+      assetBytes,
     };
     type = detectProjectType(input);
   }
@@ -240,7 +267,7 @@ export async function analyzeProject(
       htmlCount: info.htmlFiles.length,
       totalBytes: info.totalBytes,
       entryRel: info.entryRel,
-      entrySource: info.entrySource
+      entrySource: info.entrySource,
     });
   }
 
@@ -252,7 +279,7 @@ export async function analyzeProject(
     db.prepare('UPDATE projects SET has_docs = ?, has_arch = ? WHERE id = ?').run(
       hasDocs ? 1 : 0,
       hasArch ? 1 : 0,
-      project.id
+      project.id,
     );
     patchProject(db, project.id, {
       type,
@@ -273,17 +300,26 @@ export async function analyzeProject(
       analyze_partial: partial ? 1 : 0,
       analyze_error: partial ? partialReason : null,
       path_ok: 1,
-      path_checked_at: finishedAt
+      path_checked_at: finishedAt,
     });
     db.prepare('DELETE FROM language_stats WHERE project_id = ?').run(project.id);
     const insLang = db.prepare(
-      'INSERT INTO language_stats (project_id, language, bytes, file_count) VALUES (?, ?, ?, ?)'
+      'INSERT INTO language_stats (project_id, language, bytes, file_count) VALUES (?, ?, ?, ?)',
     );
     for (const l of langs) insLang.run(project.id, l.language, l.bytes, l.files);
     db.prepare(
       `INSERT INTO analysis_runs (project_id, started_at, finished_at, ok, scanned_files, scanned_bytes, duration_ms, error)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(project.id, startedAt, finishedAt, partial ? 1 : 0, fileCount, totalBytes, durationMs, partial ? partialReason : null);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      project.id,
+      startedAt,
+      finishedAt,
+      partial ? 1 : 0,
+      fileCount,
+      totalBytes,
+      durationMs,
+      partial ? partialReason : null,
+    );
   });
   tx();
 
@@ -295,14 +331,24 @@ export async function analyzeProject(
     error: partial ? partialReason : null,
     durationMs,
     scannedFiles: fileCount,
-    scannedBytes: totalBytes
+    scannedBytes: totalBytes,
   };
 }
 
 const MANIFEST_FILES = new Set([
-  'package.json', 'pom.xml', 'build.gradle', 'go.mod', 'cargo.toml',
-  'requirements.txt', 'pyproject.toml', 'composer.json', 'gemfile',
-  'docker-compose.yml', 'docker-compose.yaml', 'dockerfile', 'tauri.conf.json'
+  'package.json',
+  'pom.xml',
+  'build.gradle',
+  'go.mod',
+  'cargo.toml',
+  'requirements.txt',
+  'pyproject.toml',
+  'composer.json',
+  'gemfile',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'dockerfile',
+  'tauri.conf.json',
 ]);
 
 function countComposeServices(text: string): number {
@@ -366,7 +412,7 @@ export function computeArchiveMeta(dirAbs: string, manualEntry?: string | null):
           rel,
           mtime: st.mtimeIso,
           size: st.size,
-          hasSourceJson: fsx.exists(abs.replace(/\.html?$/i, '.architecture.json'))
+          hasSourceJson: fsx.exists(abs.replace(/\.html?$/i, '.architecture.json')),
         };
       } else if (IMAGE_RE.test(lower)) {
         imageFiles[imageFiles.length] = { rel, mtime: st.mtimeIso, size: st.size, hasSourceJson: false };

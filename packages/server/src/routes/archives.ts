@@ -6,7 +6,14 @@ import { ok, fail } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { archiveCreateSchema, archivePatchSchema } from '@ttfolio/shared';
 import { toApiError } from './helpers.js';
-import { listArchives, upsertArchive, patchArchive, deleteArchive, setArchiveViewed, toArchiveInfo } from '../db/repo/docsRepo.js';
+import {
+  listArchives,
+  upsertArchive,
+  patchArchive,
+  deleteArchive,
+  setArchiveViewed,
+  toArchiveInfo,
+} from '../db/repo/docsRepo.js';
 import { getProjectRow } from '../db/repo/projectsRepo.js';
 import { computeArchiveMeta } from '../core/analyzer/index.js';
 import { logActivity } from '../db/repo/metaRepo.js';
@@ -23,7 +30,8 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
     const infos = [];
     for (const a of listArchives(db, id)) {
       const meta = computeArchiveMeta(a.dir_path, a.entry_source === 'manual' ? a.entry_rel : null);
-      const countChanged = meta.htmlFiles.length !== a.html_count || Math.abs(meta.totalBytes - a.total_bytes) > 512;
+      const countChanged =
+        meta.htmlFiles.length !== a.html_count || Math.abs(meta.totalBytes - a.total_bytes) > 512;
       const entryMtimeChanged =
         a.entry_rel !== null &&
         (() => {
@@ -35,11 +43,13 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
         toArchiveInfo(
           a,
           meta.htmlFiles,
-          meta.htmlFiles.filter((f) => f.hasSourceJson).map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
+          meta.htmlFiles
+            .filter((f) => f.hasSourceJson)
+            .map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
           countChanged || entryMtimeChanged,
           meta.imageFiles,
-          meta.textFiles
-        )
+          meta.textFiles,
+        ),
       );
     }
     return ok(infos);
@@ -64,10 +74,16 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
       htmlCount: meta.htmlFiles.length,
       totalBytes: meta.totalBytes,
       entryRel: meta.entryRel,
-      entrySource: meta.entrySource
+      entrySource: meta.entrySource,
     });
     db.prepare('UPDATE projects SET has_arch = 1 WHERE id = ?').run(id);
-    logActivity(db, { kind: 'archive.register', level: 'L1', projectId: id, targetPath: abs, actor: currentActor().actor });
+    logActivity(db, {
+      kind: 'archive.register',
+      level: 'L1',
+      projectId: id,
+      targetPath: abs,
+      actor: currentActor().actor,
+    });
     ctx.sse.publish('project.updated', { projectId: id });
     return ok(archive);
   });
@@ -85,7 +101,7 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
       entryRel: b.entryRel,
       entrySource,
       isDefault: b.isDefault,
-      label: b.label
+      label: b.label,
     });
     if (!found) return fail('NOT_FOUND', '架构图目录不存在', 404);
     ctx.sse.publish('project.updated', { projectId: getArchiveProjectId(db, id) });
@@ -125,13 +141,20 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
     const abs = path.resolve(row.dir_path, q.rel);
     const dirAbs = path.resolve(row.dir_path);
     const relCheck = path.relative(dirAbs, abs);
-    if (relCheck.indexOf('..') === 0 || path.isAbsolute(relCheck)) return fail('PATH_OUT_OF_SCOPE', '路径越界');
+    if (relCheck.indexOf('..') === 0 || path.isAbsolute(relCheck))
+      return fail('PATH_OUT_OF_SCOPE', '路径越界');
     const st = fsx.statSafe(abs);
     if (st === null || st.isDir) return fail('NOT_FOUND', '文件不存在', 404);
     if (st.size > 2 * 1024 * 1024) return fail('BAD_REQUEST', '文件超过 2MB，请用系统工具查看');
     try {
       const content = fsx.readTextFile(abs, st.size).content;
-      logActivity(db, { kind: 'archive.read_text', level: 'L1', projectId: pid, targetPath: abs, actor: currentActor().actor });
+      logActivity(db, {
+        kind: 'archive.read_text',
+        level: 'L1',
+        projectId: pid,
+        targetPath: abs,
+        actor: currentActor().actor,
+      });
       return ok({ content });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -140,7 +163,9 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
 };
 
 function getArchiveProjectId(db: import('better-sqlite3').Database, id: string): string | null {
-  const row = db.prepare<[string], { project_id: string }>('SELECT project_id FROM archives WHERE id = ?').get(id);
+  const row = db
+    .prepare<[string], { project_id: string }>('SELECT project_id FROM archives WHERE id = ?')
+    .get(id);
   return row?.project_id ?? null;
 }
 

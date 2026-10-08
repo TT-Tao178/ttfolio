@@ -45,26 +45,60 @@ export function CommandPalette(): React.JSX.Element {
       api.get<SearchResults>('/api/search', {
         q,
         projectId: scope === 'project' && activeProjectId !== null ? activeProjectId : '',
-        limit: '8'
+        limit: '8',
       }),
-    enabled: paletteOpen && q.trim().length > 0
+    enabled: paletteOpen && q.trim().length > 0,
   });
 
   const { data: quick } = useQuery({
     queryKey: ['palette-quick', q],
-    queryFn: () => api.get<Array<{ projectId: string; name: string; dirPath: string; score: number }>>('/api/search/quick', { q }),
-    enabled: paletteOpen
+    queryFn: () =>
+      api.get<Array<{ projectId: string; name: string; dirPath: string; score: number }>>(
+        '/api/search/quick',
+        { q },
+      ),
+    enabled: paletteOpen,
   });
 
   const commands = useMemo<CommandItem[]>(() => {
     const list: CommandItem[] = [
-      { id: 'cmd.workbench', title: '打开工作台总览', run: () => openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台') },
+      {
+        id: 'cmd.workbench',
+        title: '打开工作台总览',
+        run: () =>
+          openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'),
+      },
       // 与顶栏「导入」按钮同款两步：切到工作台 + 打开添加弹窗（评审：此前只切标签不开弹窗，
       // 命令名叫「添加项目」点了却像没反应）
-      { id: 'cmd.add', title: '添加项目', run: () => { openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'); useAppStore.getState().requestAddProject(); } },
-      { id: 'cmd.settings', title: '打开设置 (Ctrl+,)', run: () => openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置') },
-      { id: 'cmd.trash', title: '打开回收站', run: () => openTab({ kind: 'trash', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '回收站') },
-      { id: 'cmd.git-overview', title: '跨项目 Git 总览', run: () => openTab({ kind: 'search', projectId: null, targetPath: null, subTab: 'git-overview', scroll: 0 }, 'Git 总览') }
+      {
+        id: 'cmd.add',
+        title: '添加项目',
+        run: () => {
+          openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
+          useAppStore.getState().requestAddProject();
+        },
+      },
+      {
+        id: 'cmd.settings',
+        title: '打开设置 (Ctrl+,)',
+        run: () =>
+          openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置'),
+      },
+      {
+        id: 'cmd.trash',
+        title: '打开回收站',
+        run: () =>
+          openTab({ kind: 'trash', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '回收站'),
+      },
+      {
+        id: 'cmd.git-overview',
+        title: '跨项目 Git 总览',
+        run: () =>
+          openTab(
+            { kind: 'search', projectId: null, targetPath: null, subTab: 'git-overview', scroll: 0 },
+            'Git 总览',
+          ),
+      },
     ];
     if (q.trim() !== '') {
       return list.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()));
@@ -73,39 +107,83 @@ export function CommandPalette(): React.JSX.Element {
   }, [q, openTab]);
 
   // 合并列表：命令 + 项目 + 文件 + 内容
-  const projectHits = (search?.projects ?? []).length > 0 ? search?.projects ?? [] : (q.trim() === '' ? (quick ?? []).map((x) => ({ projectId: x.projectId, name: x.name, alias: null, dirPath: x.dirPath, matched: x.name })) : []);
+  const projectHits =
+    (search?.projects ?? []).length > 0
+      ? (search?.projects ?? [])
+      : q.trim() === ''
+        ? (quick ?? []).map((x) => ({
+            projectId: x.projectId,
+            name: x.name,
+            alias: null,
+            dirPath: x.dirPath,
+            matched: x.name,
+          }))
+        : [];
   const fileHits = search?.files ?? [];
   const contentHits = search?.contents ?? [];
 
-  interface Row { key: string; kind: 'command' | 'project' | 'file' | 'content'; title: React.ReactNode; run: () => void }
+  interface Row {
+    key: string;
+    kind: 'command' | 'project' | 'file' | 'content';
+    title: React.ReactNode;
+    run: () => void;
+  }
   const rows: Row[] = [
     ...commands.map((c) => ({ key: c.id, kind: 'command' as const, title: c.title, run: c.run })),
     ...projectHits.map((p) => ({
       key: `p:${p.projectId}`,
       kind: 'project' as const,
-      title: <span>{p.name} <Tag>项目</Tag> <span style={{ opacity: 0.6, fontSize: 12 }}>{p.dirPath}</span></span>,
+      title: (
+        <span>
+          {p.name} <Tag>项目</Tag> <span style={{ opacity: 0.6, fontSize: 12 }}>{p.dirPath}</span>
+        </span>
+      ),
       run: () => {
         void api.post(`/api/projects/${p.projectId}/open`);
-        openTab({ kind: 'project', projectId: p.projectId, targetPath: null, subTab: 'files', scroll: 0 }, p.name);
-      }
+        openTab(
+          { kind: 'project', projectId: p.projectId, targetPath: null, subTab: 'files', scroll: 0 },
+          p.name,
+        );
+      },
     })),
     ...fileHits.map((f) => ({
       key: `f:${f.projectId}:${f.relPath}`,
       kind: 'file' as const,
-      title: <span><Tag>文件</Tag> <span className="tt-mono" style={{ fontSize: 12 }}>{f.relPath}</span></span>,
-      run: () => openTab({ kind: 'project', projectId: f.projectId, targetPath: f.relPath, subTab: 'files', scroll: 0 }, f.name)
+      title: (
+        <span>
+          <Tag>文件</Tag>{' '}
+          <span className="tt-mono" style={{ fontSize: 12 }}>
+            {f.relPath}
+          </span>
+        </span>
+      ),
+      run: () =>
+        openTab(
+          { kind: 'project', projectId: f.projectId, targetPath: f.relPath, subTab: 'files', scroll: 0 },
+          f.name,
+        ),
     })),
     ...contentHits.map((c, i) => ({
       key: `c:${c.projectId}:${c.relPath}:${i}`,
       kind: 'content' as const,
       title: (
         <span>
-          <Tag color="purple">内容</Tag> <span className="tt-mono" style={{ fontSize: 12 }}>{c.relPath}</span>
-          <div style={{ fontSize: 12, opacity: 0.75 }} dangerouslySetInnerHTML={{ __html: escapeSnippet(c.snippet) }} />
+          <Tag color="purple">内容</Tag>{' '}
+          <span className="tt-mono" style={{ fontSize: 12 }}>
+            {c.relPath}
+          </span>
+          <div
+            style={{ fontSize: 12, opacity: 0.75 }}
+            dangerouslySetInnerHTML={{ __html: escapeSnippet(c.snippet) }}
+          />
         </span>
       ),
-      run: () => openTab({ kind: 'project', projectId: c.projectId, targetPath: c.relPath, subTab: 'files', scroll: 0 }, c.relPath.split('/').pop() ?? c.relPath)
-    }))
+      run: () =>
+        openTab(
+          { kind: 'project', projectId: c.projectId, targetPath: c.relPath, subTab: 'files', scroll: 0 },
+          c.relPath.split('/').pop() ?? c.relPath,
+        ),
+    })),
   ];
 
   const buildIndex = useMutation({
@@ -113,7 +191,7 @@ export function CommandPalette(): React.JSX.Element {
     onSuccess: () => {
       void message.info('已开始建立内容索引（可在状态栏查看进度）');
       void queryClient.invalidateQueries({ queryKey: ['index-status'] });
-    }
+    },
   });
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
@@ -165,12 +243,17 @@ export function CommandPalette(): React.JSX.Element {
               size="small"
               value={scope}
               onChange={(v) => setScope(v as 'all' | 'project')}
-              options={[{ label: '全部', value: 'all' }, { label: '当前项目', value: 'project' }]}
+              options={[
+                { label: '全部', value: 'all' },
+                { label: '当前项目', value: 'project' },
+              ]}
             />
           </Space>
           {/* 当前没有活动项目时「当前项目」作用域会静默回落为全库搜索——明示，不让用户以为过滤生效 */}
           {scope === 'project' && activeProjectId === null && (
-            <div style={{ fontSize: 12, opacity: 0.6, padding: '0 8px' }}>当前没有打开的项目，正在搜索全部项目</div>
+            <div style={{ fontSize: 12, opacity: 0.6, padding: '0 8px' }}>
+              当前没有打开的项目，正在搜索全部项目
+            </div>
           )}
           <div style={{ maxHeight: 420, overflow: 'auto' }}>
             {rows.length === 0 && q.trim() !== '' && (
@@ -182,7 +265,12 @@ export function CommandPalette(): React.JSX.Element {
                 {search?.unindexedProjects.slice(0, 5).map((pid) => {
                   const name = projectHits.find((p) => p.projectId === pid)?.name ?? pid;
                   return (
-                    <Tag key={pid} color="blue" style={{ cursor: 'pointer' }} onClick={() => buildIndex.mutate(pid)}>
+                    <Tag
+                      key={pid}
+                      color="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => buildIndex.mutate(pid)}
+                    >
                       {name}：建立索引
                     </Tag>
                   );
@@ -200,7 +288,7 @@ export function CommandPalette(): React.JSX.Element {
                   padding: '6px 10px',
                   borderRadius: 6,
                   cursor: 'pointer',
-                  background: i === cursor ? SEMANTIC.primaryBg : 'transparent'
+                  background: i === cursor ? SEMANTIC.primaryBg : 'transparent',
                 }}
                 onMouseEnter={() => setCursor(i)}
               >

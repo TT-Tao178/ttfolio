@@ -6,10 +6,27 @@ import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
 import { assertSafeName, validateRegistrableRoot } from '../core/pathGuard.js';
-import { addProjectsSchema, projectPatchSchema, relocateSchema, renameDiskSchema, collectionCreateSchema, collectionMembersSchema } from '@ttfolio/shared';
 import {
-  listProjects, getProjectRow, getProjectSummary, getProjectByPathKey, getRemovedProjectByPathKey, reviveProject, insertProject,
-  patchProject, softDeleteProject, markOpened, listCollections, type ListFilters
+  addProjectsSchema,
+  projectPatchSchema,
+  relocateSchema,
+  renameDiskSchema,
+  collectionCreateSchema,
+  collectionMembersSchema,
+} from '@ttfolio/shared';
+import {
+  listProjects,
+  getProjectRow,
+  getProjectSummary,
+  getProjectByPathKey,
+  getRemovedProjectByPathKey,
+  reviveProject,
+  insertProject,
+  patchProject,
+  softDeleteProject,
+  markOpened,
+  listCollections,
+  type ListFilters,
 } from '../db/repo/projectsRepo.js';
 import { logActivity, recordRecentFile, listRecentFiles } from '../db/repo/metaRepo.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
@@ -29,14 +46,19 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
       type: q.type as ListFilters['type'],
       collectionId: q.collection,
-      dirty: q.dirty === '1' || q.dirty === 'true' ? true : q.dirty === '0' || q.dirty === 'false' ? false : undefined,
+      dirty:
+        q.dirty === '1' || q.dirty === 'true'
+          ? true
+          : q.dirty === '0' || q.dirty === 'false'
+            ? false
+            : undefined,
       hasDocs: q.hasDocs === '1' ? true : q.hasDocs === '0' ? false : undefined,
       hasArch: q.hasArch === '1' ? true : q.hasArch === '0' ? false : undefined,
       pathOk: q.pathOk === '0' ? false : undefined,
       analyzed: q.analyzed === '0' ? false : undefined,
       staleDays: q.stale === '30' ? 30 : undefined,
       q: q.q,
-      sort: q.sort as ListFilters['sort']
+      sort: q.sort as ListFilters['sort'],
     };
     return ok(listProjects(ctx.db(), filters));
   });
@@ -46,7 +68,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
     const body = parsed.data;
-    const candidates: string[] = 'paths' in body ? body.paths : body.children.map((c) => path.join(body.parentPath, c));
+    const candidates: string[] =
+      'paths' in body ? body.paths : body.children.map((c) => path.join(body.parentPath, c));
     const added: string[] = [];
     const skipped: Array<{ path: string; reason: string }> = [];
     for (const raw of candidates) {
@@ -71,7 +94,10 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
         // 之前"移除登记"过的同一目录：原地复活（保留别名/备注/清单），而不是撞 UNIQUE 约束
         const removed = getRemovedProjectByPathKey(db, key);
         if (removed !== undefined) {
-          const revived = reviveProject(db, removed.id, { dirPath: absReal, diskName: path.basename(absReal) });
+          const revived = reviveProject(db, removed.id, {
+            dirPath: absReal,
+            diskName: path.basename(absReal),
+          });
           if (revived !== undefined) {
             added[added.length] = revived.id;
             logActivity(db, {
@@ -80,7 +106,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
               projectId: revived.id,
               targetPath: absReal,
               detail: { revived: true, alias: revived.alias },
-              actor: currentActor().actor
+              actor: currentActor().actor,
             });
             continue;
           }
@@ -89,10 +115,16 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
           dirPath: absReal,
           dirPathKey: key,
           diskName: path.basename(absReal),
-          defaultArchDir: defaultArchDirName(db)
+          defaultArchDir: defaultArchDirName(db),
         });
         added[added.length] = row.id;
-        logActivity(db, { kind: 'project.add', level: 'L1', projectId: row.id, targetPath: absReal, actor: currentActor().actor });
+        logActivity(db, {
+          kind: 'project.add',
+          level: 'L1',
+          projectId: row.id,
+          targetPath: absReal,
+          actor: currentActor().actor,
+        });
       } catch (err) {
         const e = toApiError(err);
         skipped[skipped.length] = { path: p, reason: e.message };
@@ -113,14 +145,17 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const archives = listArchives(db, id).map((row) => {
       const meta = computeArchiveMeta(row.dir_path, row.entry_source === 'manual' ? row.entry_rel : null);
       const countChanged = meta.htmlFiles.length !== row.html_count;
-      const entryChanged = row.entry_rel !== null && meta.htmlFiles.some((f) => f.rel === row.entry_rel && false);
+      const entryChanged =
+        row.entry_rel !== null && meta.htmlFiles.some((f) => f.rel === row.entry_rel && false);
       return toArchiveInfo(
         row,
         meta.htmlFiles,
-        meta.htmlFiles.filter((f) => f.hasSourceJson).map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
+        meta.htmlFiles
+          .filter((f) => f.hasSourceJson)
+          .map((f) => f.rel.replace(/\.html?$/i, '.architecture.json')),
         countChanged || entryChanged,
         meta.imageFiles,
-        meta.textFiles
+        meta.textFiles,
       );
     });
     return ok({
@@ -128,7 +163,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       defaultArchDir: getProjectRow(db, id)?.default_arch_dir ?? '架构图',
       mounts: listMounts(db, id),
       archives,
-      todoOpenCount: listTodos(db, { projectId: id, includeDone: false }).length
+      todoOpenCount: listTodos(db, { projectId: id, includeDone: false }).length,
     });
   });
 
@@ -184,7 +219,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       kind: mode === 'delete' ? 'project.remove_and_delete' : 'project.unregister',
       level: mode === 'delete' ? 'L3' : 'L1',
       projectId: id,
-      targetPath: row.dir_path
+      targetPath: row.dir_path,
     });
     ctx.sse.publish('project.updated', { projectId: id });
     return ok({ removed: true, mode });
@@ -230,8 +265,19 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const key = pathKey(abs);
     const dup = getProjectByPathKey(db, key);
     if (dup !== undefined && dup.id !== id) return fail('DUPLICATE_PROJECT', '新目录已登记为其他项目', 409);
-    patchProject(db, id, { dir_path: abs, dir_path_key: key, disk_name: path.basename(abs), path_ok: 1, path_checked_at: new Date().toISOString() });
-    logActivity(db, { kind: 'project.relocate', level: 'L1', projectId: id, detail: { from: row.dir_path, to: abs } });
+    patchProject(db, id, {
+      dir_path: abs,
+      dir_path_key: key,
+      disk_name: path.basename(abs),
+      path_ok: 1,
+      path_checked_at: new Date().toISOString(),
+    });
+    logActivity(db, {
+      kind: 'project.relocate',
+      level: 'L1',
+      projectId: id,
+      detail: { from: row.dir_path, to: abs },
+    });
     ctx.sse.publish('project.updated', { projectId: id });
     void analyzeProjects(ctx, [id]);
     return ok({ relocated: true });
@@ -265,13 +311,19 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     // 大小写-only 重命名在 Windows 上需两步；renameSync 同名不同大小写直接成功
     fsx.markSelfWrite(to);
     const abs = await fsxPromised(to);
-    patchProject(db, id, { dir_path: abs, dir_path_key: pathKey(abs), disk_name: newName, path_ok: 1, path_checked_at: new Date().toISOString() });
+    patchProject(db, id, {
+      dir_path: abs,
+      dir_path_key: pathKey(abs),
+      disk_name: newName,
+      path_ok: 1,
+      path_checked_at: new Date().toISOString(),
+    });
     logActivity(db, {
       kind: 'project.rename_disk',
       level: 'L3',
       projectId: id,
       detail: { from, to: abs },
-      targetPath: abs
+      targetPath: abs,
     });
     ctx.sse.publish('project.updated', { projectId: id });
     void analyzeProjects(ctx, [id]);
@@ -302,7 +354,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
           name: e.name,
           path: full,
           registered: registered !== undefined,
-          registeredProjectId: registered?.id ?? null
+          registeredProjectId: registered?.id ?? null,
         };
       });
     return ok({ path: abs, children });
@@ -324,9 +376,9 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const db = ctx.db();
     const id = ulid();
     const now = new Date().toISOString();
-    db.prepare('INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)').run(
-      id, parsed.data.name, parsed.data.note ?? null, now, now
-    );
+    db.prepare(
+      'INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
+    ).run(id, parsed.data.name, parsed.data.note ?? null, now, now);
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
@@ -335,9 +387,9 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionCreateSchema.partial().safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
-    db.prepare('UPDATE collections SET name = COALESCE(?, name), note = COALESCE(?, note), updated_at = ? WHERE id = ?').run(
-      parsed.data.name ?? null, parsed.data.note ?? null, new Date().toISOString(), id
-    );
+    db.prepare(
+      'UPDATE collections SET name = COALESCE(?, name), note = COALESCE(?, note), updated_at = ? WHERE id = ?',
+    ).run(parsed.data.name ?? null, parsed.data.note ?? null, new Date().toISOString(), id);
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
@@ -356,7 +408,9 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       if (parsed.data.replace) {
         db.prepare('DELETE FROM collection_members WHERE collection_id = ?').run(id);
       }
-      const ins = db.prepare('INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)');
+      const ins = db.prepare(
+        'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+      );
       for (const pid of parsed.data.projectIds) ins.run(id, pid);
     });
     tx();
@@ -367,14 +421,21 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
   // 打开弹窗时的快照减自己）实现移除，两个窗口同时编辑同一集合时后保存者会覆盖先保存者的修改
   app.delete('/api/collections/:id/members/:projectId', async (req) => {
     const { id, projectId } = req.params as { id: string; projectId: string };
-    ctx.db().prepare('DELETE FROM collection_members WHERE collection_id = ? AND project_id = ?').run(id, projectId);
+    ctx
+      .db()
+      .prepare('DELETE FROM collection_members WHERE collection_id = ? AND project_id = ?')
+      .run(id, projectId);
     return ok(listCollections(ctx.db()).find((c) => c.id === id) ?? null);
   });
 
   // ---- 标签 ----
   app.get('/api/tags', async () => {
     const db = ctx.db();
-    return ok(db.prepare<[], { id: string; name: string; color: string | null }>('SELECT * FROM tags ORDER BY name').all());
+    return ok(
+      db
+        .prepare<[], { id: string; name: string; color: string | null }>('SELECT * FROM tags ORDER BY name')
+        .all(),
+    );
   });
 
   app.post('/api/projects/:id/tags', async (req) => {
@@ -383,7 +444,11 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     if (b.name === undefined || b.name.trim() === '') return fail('INVALID_NAME', '标签名不能为空');
     const db = ctx.db();
     const name = b.name.trim();
-    let tag = db.prepare<[string], { id: string; name: string; color: string | null }>('SELECT * FROM tags WHERE name = ?').get(name);
+    let tag = db
+      .prepare<[string], { id: string; name: string; color: string | null }>(
+        'SELECT * FROM tags WHERE name = ?',
+      )
+      .get(name);
     if (tag === undefined) {
       const tid = ulid();
       db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)').run(tid, name);
@@ -403,7 +468,9 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
 };
 
 function defaultArchDirName(db: import('better-sqlite3').Database): string {
-  const row = db.prepare<[string], { value: string | null }>('SELECT value FROM settings WHERE key = ?').get('default_arch_dir_name');
+  const row = db
+    .prepare<[string], { value: string | null }>('SELECT value FROM settings WHERE key = ?')
+    .get('default_arch_dir_name');
   return row?.value ?? '架构图';
 }
 

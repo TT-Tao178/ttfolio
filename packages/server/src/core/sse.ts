@@ -14,7 +14,11 @@ export class SseHub {
   private nextClientId = 1;
   private readonly capacity = 500;
 
-  subscribe(send: (chunk: string) => void, close: () => void, lastEventId?: number): { id: number; replay: SseEvent[] } {
+  subscribe(
+    send: (chunk: string) => void,
+    close: () => void,
+    lastEventId?: number,
+  ): { id: number; replay: SseEvent[] } {
     const id = this.nextClientId++;
     this.clients.set(id, { id, send, close });
     const replay = lastEventId !== undefined ? this.buffer.filter((e) => e.id > lastEventId) : [];

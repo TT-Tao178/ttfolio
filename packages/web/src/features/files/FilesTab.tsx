@@ -13,8 +13,18 @@
 import { Alert, Button, Empty, Input, Menu, Modal, Space, Switch, Tree, App } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
-  CopyOutlined, DeleteOutlined, EditOutlined, FileOutlined, FolderOpenOutlined, FolderOutlined, ReloadOutlined, ScissorOutlined, SearchOutlined,
-  FileAddOutlined, FolderAddOutlined, LinkOutlined
+  CopyOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  FileOutlined,
+  FolderOpenOutlined,
+  FolderOutlined,
+  ReloadOutlined,
+  ScissorOutlined,
+  SearchOutlined,
+  FileAddOutlined,
+  FolderAddOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -34,7 +44,7 @@ const GIT_COLORS: Record<string, string> = {
   untracked: SEMANTIC.success,
   deleted: SEMANTIC.error,
   renamed: SEMANTIC.primary,
-  conflicted: SEMANTIC.error
+  conflicted: SEMANTIC.error,
 };
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
@@ -115,26 +125,40 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   const { data: detailData } = useQuery({
     queryKey: ['project', projectId],
-    queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`)
+    queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`),
   });
   const dirPathRef = useRef<string | null>(null);
   dirPathRef.current = detailData?.dirPath ?? null;
   /** 剪贴板写入兜底：非安全上下文或权限拒绝时给出可见提示，不静默失败 */
   const writeClipboard = (text: string, okMsg: string): void => {
     navigator.clipboard.writeText(text).then(
-      () => { void message.success(okMsg); },
-      () => { void message.error('复制失败：浏览器未授权剪贴板，请手动选择路径文本复制'); }
+      () => {
+        void message.success(okMsg);
+      },
+      () => {
+        void message.error('复制失败：浏览器未授权剪贴板，请手动选择路径文本复制');
+      },
     );
   };
 
-  const { data: rootData, isLoading, error, refetch } = useQuery({
+  const {
+    data: rootData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['tree', projectId, '', showIgnored],
-    queryFn: () => api.get<TreeResponse>('/api/fs/tree', { projectId, path: '', showIgnored: showIgnored ? '1' : '0' })
+    queryFn: () =>
+      api.get<TreeResponse>('/api/fs/tree', { projectId, path: '', showIgnored: showIgnored ? '1' : '0' }),
   });
   const { data: searchData } = useQuery({
     queryKey: ['fssearch', projectId, filter],
-    queryFn: () => api.get<{ results: Array<{ name: string; path: string; kind: string }> }>('/api/fs/search', { projectId, q: filter }),
-    enabled: filter.length > 0
+    queryFn: () =>
+      api.get<{ results: Array<{ name: string; path: string; kind: string }> }>('/api/fs/search', {
+        projectId,
+        q: filter,
+      }),
+    enabled: filter.length > 0,
   });
 
   // 根节点 → 树（合并而非重建：保住已展开分支）
@@ -154,8 +178,10 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
     }
     const nodes = rootData?.nodes ?? [];
     if (nodes.length === 0) return; // 树未就绪，等下一轮
-    const textRe = /\.(md|markdown|txt|json|ya?ml|toml|ini|cfg|conf|xml|html?|css|scss|less|styl|vue|svelte|astro|jsx?|tsx?|[cm]js|py|java|kt|go|rs|cs|c|cpp|hpp|php|rb|swift|dart|scala|groovy|sh|bash|ps1|bat|cmd|sql|graphql|gql|proto)$/i;
-    const pick = nodes.find((n) => n.kind === 'file' && textRe.test(n.name)) ?? nodes.find((n) => n.kind === 'file');
+    const textRe =
+      /\.(md|markdown|txt|json|ya?ml|toml|ini|cfg|conf|xml|html?|css|scss|less|styl|vue|svelte|astro|jsx?|tsx?|[cm]js|py|java|kt|go|rs|cs|c|cpp|hpp|php|rb|swift|dart|scala|groovy|sh|bash|ps1|bat|cmd|sql|graphql|gql|proto)$/i;
+    const pick =
+      nodes.find((n) => n.kind === 'file' && textRe.test(n.name)) ?? nodes.find((n) => n.kind === 'file');
     useAppStore.setState({ pendingAutoOpenProject: null });
     if (pick !== undefined) useAppStore.getState().updateActiveLocation({ targetPath: pick.path }, true);
   }, [pendingAuto, projectId, openPath, rootData]);
@@ -172,9 +198,11 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         const r = await api.get<TreeResponse>('/api/fs/tree', {
           projectId,
           path: rel,
-          showIgnored: showIgnored ? '1' : '0'
+          showIgnored: showIgnored ? '1' : '0',
         });
-        setTreeData((prev) => attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current, projectId)));
+        setTreeData((prev) =>
+          attachChildren(prev, rel, toAntdTree(r.nodes ?? [], failedRef.current, projectId)),
+        );
         setFailedPaths((prev) => prev.filter((p) => p !== rel));
       } catch (e) {
         const code = e instanceof ApiClientError ? e.code : '';
@@ -192,7 +220,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         void message.error(`展开「${rel}」失败：${hint}`);
       }
     },
-    [projectId, showIgnored, message]
+    [projectId, showIgnored, message],
   );
 
   // 面包屑目录段点击（第 26 轮）：逐层懒加载展开到目标目录并选中——
@@ -231,7 +259,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       if (t.closest?.('[data-testid="tree-ctx-menu"]') !== null) return;
       const treeEl = t.closest('[data-testid="file-tree"]');
       if (treeEl === null) return;
-      const el = t.closest('[data-path]') ?? t.closest('.ant-tree-treenode')?.querySelector('[data-path]') ?? null;
+      const el =
+        t.closest('[data-path]') ?? t.closest('.ant-tree-treenode')?.querySelector('[data-path]') ?? null;
       if (el === null) return;
       e.preventDefault();
       const x = Math.min(e.clientX, window.innerWidth - 210);
@@ -268,7 +297,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       setSelectedPath(null);
       void refetch();
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '删除失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '删除失败'),
   });
 
   /** 删除确认（顶部按钮 / Delete 键 / 右键菜单三处共用，评审前只有按钮一处） */
@@ -279,7 +308,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
-      onOk: () => del.mutate([path])
+      onOk: () => del.mutate([path]),
     });
   };
 
@@ -311,116 +340,132 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
         testId="split-tree"
         left={
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 8 }}>
-        <Space size={4} style={{ flexWrap: 'wrap' }}>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => void refetch()} title="重新读取目录" />
-          <Button size="small" icon={<FileAddOutlined />} onClick={() => setNewEntry({ kind: 'file' })} title={newParent === '' ? '在项目根新建文件' : `在 ${newParent}/ 新建文件`} />
-          <Button size="small" icon={<FolderAddOutlined />} onClick={() => setNewEntry({ kind: 'dir' })} title={newParent === '' ? '在项目根新建文件夹' : `在 ${newParent}/ 新建文件夹`} />
-          <Button
-            size="small"
-            danger
-            disabled={selectedPath === null}
-            onClick={() => { if (selectedPath !== null) confirmDelete(selectedPath); }}
-          >
-            删除
-          </Button>
-          <span style={{ fontSize: 12 }}>忽略项</span>
-          {/* 忽略项开关走全局设置（原先只有本地 state，设置页里的 show_ignored 是死键） */}
-          <Switch size="small" checked={showIgnored} onChange={(v) => setSetting('showIgnored', v)} />
-        </Space>
-        <Input
-          size="small"
-          allowClear
-          prefix={<SearchOutlined />}
-          placeholder="文件名搜索"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <div
-          style={{ flex: 1, overflow: 'auto' }}
-          data-testid="file-tree"
-          onKeyDown={onTreeKeyDown}
-        >
-          {filter.length > 0 ? (
-            (searchData?.results ?? []).length === 0 ? (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配文件" />
-            ) : (
-              (searchData?.results ?? []).map((r) => (
-                <div
-                  key={r.path}
-                  style={{ padding: '2px 4px', cursor: 'pointer', borderRadius: 4 }}
-                  onClick={() => {
-                    if (r.kind === 'file') {
-                      setSelectedPath(r.path);
-                      useAppStore.getState().updateActiveLocation({ targetPath: r.path }, true);
-                    } else {
-                      // 目录结果此前点击零反馈（评审）：清搜索回树视图，复用面包屑的
-                      // treeLocate 通道逐层懒加载展开到该目录并选中
-                      setFilter('');
-                      setSelectedPath(r.path);
-                      useAppStore.getState().setTreeLocate({ projectId, path: r.path });
+            <Space size={4} style={{ flexWrap: 'wrap' }}>
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                onClick={() => void refetch()}
+                title="重新读取目录"
+              />
+              <Button
+                size="small"
+                icon={<FileAddOutlined />}
+                onClick={() => setNewEntry({ kind: 'file' })}
+                title={newParent === '' ? '在项目根新建文件' : `在 ${newParent}/ 新建文件`}
+              />
+              <Button
+                size="small"
+                icon={<FolderAddOutlined />}
+                onClick={() => setNewEntry({ kind: 'dir' })}
+                title={newParent === '' ? '在项目根新建文件夹' : `在 ${newParent}/ 新建文件夹`}
+              />
+              <Button
+                size="small"
+                danger
+                disabled={selectedPath === null}
+                onClick={() => {
+                  if (selectedPath !== null) confirmDelete(selectedPath);
+                }}
+              >
+                删除
+              </Button>
+              <span style={{ fontSize: 12 }}>忽略项</span>
+              {/* 忽略项开关走全局设置（原先只有本地 state，设置页里的 show_ignored 是死键） */}
+              <Switch size="small" checked={showIgnored} onChange={(v) => setSetting('showIgnored', v)} />
+            </Space>
+            <Input
+              size="small"
+              allowClear
+              prefix={<SearchOutlined />}
+              placeholder="文件名搜索"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+            <div style={{ flex: 1, overflow: 'auto' }} data-testid="file-tree" onKeyDown={onTreeKeyDown}>
+              {filter.length > 0 ? (
+                (searchData?.results ?? []).length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无匹配文件" />
+                ) : (
+                  (searchData?.results ?? []).map((r) => (
+                    <div
+                      key={r.path}
+                      style={{ padding: '2px 4px', cursor: 'pointer', borderRadius: 4 }}
+                      onClick={() => {
+                        if (r.kind === 'file') {
+                          setSelectedPath(r.path);
+                          useAppStore.getState().updateActiveLocation({ targetPath: r.path }, true);
+                        } else {
+                          // 目录结果此前点击零反馈（评审）：清搜索回树视图，复用面包屑的
+                          // treeLocate 通道逐层懒加载展开到该目录并选中
+                          setFilter('');
+                          setSelectedPath(r.path);
+                          useAppStore.getState().setTreeLocate({ projectId, path: r.path });
+                        }
+                      }}
+                    >
+                      <FileOutlined /> {r.path}
+                    </div>
+                  ))
+                )
+              ) : isLoading ? (
+                <div style={{ padding: 12, opacity: 0.6 }}>加载中…</div>
+              ) : error !== undefined && error !== null ? (
+                <Alert type="error" message={error instanceof Error ? error.message : '加载失败'} />
+              ) : treeData.length === 0 ? (
+                // 空态必须区分两种情形（原先两者都只剩一片空白，用户无法判断"是空的"还是"坏了"）
+                (rootData?.hiddenCount ?? 0) > 0 ? (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={`内容被忽略规则隐藏（${rootData?.hiddenCount ?? 0} 项，如 node_modules / dist）`}
+                    data-testid="tree-empty-hidden"
+                  >
+                    <Button size="small" type="primary" onClick={() => setSetting('showIgnored', true)}>
+                      显示忽略项
+                    </Button>
+                  </Empty>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="这个目录里还没有文件"
+                    data-testid="tree-empty"
+                  >
+                    <Button size="small" onClick={() => setNewEntry({ kind: 'file' })}>
+                      新建文件
+                    </Button>
+                  </Empty>
+                )
+              ) : (
+                <Tree
+                  showIcon
+                  blockNode
+                  treeData={treeData}
+                  selectedKeys={selectedPath === null ? [] : [selectedPath]}
+                  expandedKeys={expandedKeys}
+                  onExpand={(keys) => setExpandedKeys(keys)}
+                  loadData={async (node) => {
+                    // 自己 catch：rc-tree 会吞掉 loadData 的 rejection，不接住就表现为"点了没反应"
+                    try {
+                      await loadChildren(String(node.key));
+                    } catch {
+                      /* loadChildren 已处理提示与失败标记 */
                     }
                   }}
-                >
-                  <FileOutlined /> {r.path}
-                </div>
-              ))
-            )
-          ) : isLoading ? (
-            <div style={{ padding: 12, opacity: 0.6 }}>加载中…</div>
-          ) : error !== undefined && error !== null ? (
-            <Alert type="error" message={error instanceof Error ? error.message : '加载失败'} />
-          ) : treeData.length === 0 ? (
-            // 空态必须区分两种情形（原先两者都只剩一片空白，用户无法判断"是空的"还是"坏了"）
-            (rootData?.hiddenCount ?? 0) > 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={`内容被忽略规则隐藏（${rootData?.hiddenCount ?? 0} 项，如 node_modules / dist）`}
-                data-testid="tree-empty-hidden"
-              >
-                <Button size="small" type="primary" onClick={() => setSetting('showIgnored', true)}>
-                  显示忽略项
-                </Button>
-              </Empty>
-            ) : (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="这个目录里还没有文件"
-                data-testid="tree-empty"
-              >
-                <Button size="small" onClick={() => setNewEntry({ kind: 'file' })}>新建文件</Button>
-              </Empty>
-            )
-          ) : (
-            <Tree
-              showIcon
-              blockNode
-              treeData={treeData}
-              selectedKeys={selectedPath === null ? [] : [selectedPath]}
-              expandedKeys={expandedKeys}
-              onExpand={(keys) => setExpandedKeys(keys)}
-              loadData={async (node) => {
-                // 自己 catch：rc-tree 会吞掉 loadData 的 rejection，不接住就表现为"点了没反应"
-                try {
-                  await loadChildren(String(node.key));
-                } catch {
-                  /* loadChildren 已处理提示与失败标记 */
-                }
-              }}
-              onSelect={(keys) => {
-                const key = keys[0];
-                // 点已选中的节点时 rc-tree 会"反选"，keys 为空数组 → key 不是 string。
-                // 原实现在这里直接 return，于是"后退回到未打开文件 → 再点同一个文件"没有任何反应
-                // （选中态还在、编辑器却不再打开），必须改点别的文件才能恢复。
-                // 现在改为读当前选中态：反选语义只作用于目录（清掉选中高亮），文件仍然照常打开。
-                const resolved = typeof key === 'string' ? key : selectedPath;
-                if (resolved === null) return;
-                const kind = findKind(treeData, resolved);
-                if (kind === 'file') useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
-                setSelectedPath(kind === 'file' ? resolved : (typeof key === 'string' ? key : null));
-              }}
-            />
-          )}
-        </div>
+                  onSelect={(keys) => {
+                    const key = keys[0];
+                    // 点已选中的节点时 rc-tree 会"反选"，keys 为空数组 → key 不是 string。
+                    // 原实现在这里直接 return，于是"后退回到未打开文件 → 再点同一个文件"没有任何反应
+                    // （选中态还在、编辑器却不再打开），必须改点别的文件才能恢复。
+                    // 现在改为读当前选中态：反选语义只作用于目录（清掉选中高亮），文件仍然照常打开。
+                    const resolved = typeof key === 'string' ? key : selectedPath;
+                    if (resolved === null) return;
+                    const kind = findKind(treeData, resolved);
+                    if (kind === 'file')
+                      useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
+                    setSelectedPath(kind === 'file' ? resolved : typeof key === 'string' ? key : null);
+                  }}
+                />
+              )}
+            </div>
           </div>
         }
         right={
@@ -428,7 +473,11 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             {openPath === null ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={selKind === 'dir' ? `已选中目录 ${selectedPath ?? ''}（点左侧箭头展开，或用上方按钮在其中新建）` : '选择左侧文件打开'}
+                description={
+                  selKind === 'dir'
+                    ? `已选中目录 ${selectedPath ?? ''}（点左侧箭头展开，或用上方按钮在其中新建）`
+                    : '选择左侧文件打开'
+                }
                 style={{ marginTop: 64 }}
               />
             ) : isImage ? (
@@ -439,7 +488,12 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           </div>
         }
       />
-      <NewEntryModal projectId={projectId} parent={newParent} kind={newEntry?.kind ?? null} onClose={() => setNewEntry(null)} />
+      <NewEntryModal
+        projectId={projectId}
+        parent={newParent}
+        kind={newEntry?.kind ?? null}
+        onClose={() => setNewEntry(null)}
+      />
       <RenameModal projectId={projectId} path={renameTarget} onClose={() => setRenameTarget(null)} />
       <MoveCopyModal
         projectId={projectId}
@@ -459,7 +513,16 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
       {ctxMenu !== null && (
         <div
           data-testid="tree-ctx-menu"
-          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
+          style={{
+            position: 'fixed',
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            zIndex: 1050,
+            borderRadius: 8,
+            background: SEMANTIC.layoutBg,
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)',
+            padding: 4,
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -473,11 +536,15 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               else if (key === 'delete') confirmDelete(path);
               else if (key === 'copy-to') setMcTarget({ items: [path], mode: 'copy' });
               else if (key === 'move-to') setMcTarget({ items: [path], mode: 'move' });
-              else if (key === 'explorer') void api.post('/api/open', { target: 'explorer', projectId, path });
+              else if (key === 'explorer')
+                void api.post('/api/open', { target: 'explorer', projectId, path });
               else if (key === 'copy-rel') writeClipboard(path, `已复制相对路径：${path}`);
               else if (key === 'copy-abs') {
                 const dir = dirPathRef.current;
-                if (dir === null) { void message.error('项目信息尚未加载'); return; }
+                if (dir === null) {
+                  void message.error('项目信息尚未加载');
+                  return;
+                }
                 const abs = absJoin(dir, path);
                 writeClipboard(abs, `已复制绝对路径：${abs}`);
               }
@@ -491,7 +558,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined /> },
               { type: 'divider' as const },
               { key: 'copy-rel', label: '复制相对路径' },
-              { key: 'copy-abs', label: '复制绝对路径' }
+              { key: 'copy-abs', label: '复制绝对路径' },
             ]}
           />
         </div>
@@ -522,14 +589,22 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = [], projectId = ''): D
             : `符号链接：指向项目内的${n.linkTarget === 'dir' ? '目录' : '文件'}`
         : '';
     const isFailed = failed.includes(key);
-    const tip = [isFailed ? '展开失败（权限不足或路径已失效）' : '', linkNote, n.gitState !== undefined ? `Git: ${n.gitState}` : '']
+    const tip = [
+      isFailed ? '展开失败（权限不足或路径已失效）' : '',
+      linkNote,
+      n.gitState !== undefined ? `Git: ${n.gitState}` : '',
+    ]
       .filter((s) => s !== '')
       .join(' · ');
     // 右键菜单（第 27 轮重构）：节点只带 data-path 标记，菜单由树容器级
     // onContextMenu 委托 + 受控固定定位菜单实现——不依赖 trigger 落点，
     // 右键节点任意位置（含行空白）都能弹，且与 React mousedown 重渲染无竞争。
     const title = (
-      <span data-path={key} style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }} title={tip}>
+      <span
+        data-path={key}
+        style={{ color: isFailed ? SEMANTIC.error : gitColor, opacity: linkDisabled ? 0.5 : 1 }}
+        title={tip}
+      >
         {n.name}
         {n.symlink === true && <LinkOutlined style={{ marginLeft: 4, opacity: 0.55, fontSize: 11 }} />}
         {n.ignored === true ? '（忽略）' : ''}
@@ -547,8 +622,16 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = [], projectId = ''): D
             alt=""
             loading="lazy"
             data-testid="tree-thumb"
-            onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-            style={{ width: 16, height: 16, objectFit: 'cover', borderRadius: 2, border: '1px solid rgba(128,128,128,0.25)' }}
+            onError={(e) => {
+              e.currentTarget.style.visibility = 'hidden';
+            }}
+            style={{
+              width: 16,
+              height: 16,
+              objectFit: 'cover',
+              borderRadius: 2,
+              border: '1px solid rgba(128,128,128,0.25)',
+            }}
           />
         ) : n.kind === 'dir' ? (
           <FolderOutlined />
@@ -560,26 +643,35 @@ function toAntdTree(nodes: TreeNode[], failed: string[] = [], projectId = ''): D
       disabled: linkDisabled,
       selectable: !linkDisabled,
       path: n.path,
-      kind: n.kind
+      kind: n.kind,
     } as unknown as DataNode;
   });
 }
 
-export function NewEntryModal({ projectId, parent, kind, onClose }: {
-  projectId: string; parent: string; kind: 'file' | 'dir' | null; onClose: () => void;
+export function NewEntryModal({
+  projectId,
+  parent,
+  kind,
+  onClose,
+}: {
+  projectId: string;
+  parent: string;
+  kind: 'file' | 'dir' | null;
+  onClose: () => void;
 }): React.JSX.Element | null {
   const [name, setName] = useState('');
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const create = useMutation({
-    mutationFn: () => api.post('/api/fs/entry', { projectId, parentPath: parent, name, kind: kind ?? 'file' }),
+    mutationFn: () =>
+      api.post('/api/fs/entry', { projectId, parentPath: parent, name, kind: kind ?? 'file' }),
     onSuccess: () => {
       void message.success(parent === '' ? '已创建' : `已在 ${parent}/ 创建`);
       void queryClient.invalidateQueries({ queryKey: ['tree', projectId] });
       onClose();
       setName('');
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '创建失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '创建失败'),
   });
   if (kind === null) return null;
   return (
@@ -591,13 +683,24 @@ export function NewEntryModal({ projectId, parent, kind, onClose }: {
       okText="创建"
       cancelText="取消"
     >
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="名称不能包含非法字符或 Windows 保留名" autoFocus />
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="名称不能包含非法字符或 Windows 保留名"
+        autoFocus
+      />
     </Modal>
   );
 }
 
-export function RenameModal({ projectId, path, onClose }: {
-  projectId: string; path: string | null; onClose: () => void;
+export function RenameModal({
+  projectId,
+  path,
+  onClose,
+}: {
+  projectId: string;
+  path: string | null;
+  onClose: () => void;
 }): React.JSX.Element | null {
   const [name, setName] = useState('');
   const [confirmDir, setConfirmDir] = useState(false);
@@ -628,7 +731,7 @@ export function RenameModal({ projectId, path, onClose }: {
                 void queryClient.invalidateQueries({ queryKey: ['tree', projectId] });
                 onClose();
               });
-            }
+            },
           });
           return;
         }

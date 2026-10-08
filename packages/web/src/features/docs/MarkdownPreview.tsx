@@ -5,7 +5,12 @@ import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import { rawUrl } from '@/lib/api';
 
-export default function MarkdownPreview({ content, projectId, mountId, basePath }: {
+export default function MarkdownPreview({
+  content,
+  projectId,
+  mountId,
+  basePath,
+}: {
   content: string;
   projectId: string;
   mountId: string | null;
@@ -30,7 +35,7 @@ export default function MarkdownPreview({ content, projectId, mountId, basePath 
             <a href={href} target="_blank" rel="noopener noreferrer">
               {children}
             </a>
-          )
+          ),
         }}
       >
         {content}

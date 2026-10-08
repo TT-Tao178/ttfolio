@@ -8,14 +8,16 @@ export function LanguageBar({ languages }: { languages: LanguageStat[] }): React
     return <div style={{ height: 6, borderRadius: 3, background: SEMANTIC.split }} />;
   }
   return (
-    <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: SEMANTIC.split }}>
+    <div
+      style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: SEMANTIC.split }}
+    >
       {languages.map((l) => (
         <Tooltip key={l.language} title={`${l.language} ${l.percent}%`}>
           <div
             style={{
               width: `${Math.max(l.percent, 1)}%`,
               minWidth: l.percent > 0 ? 1 : 0,
-              background: langColor(l.language)
+              background: langColor(l.language),
             }}
           />
         </Tooltip>

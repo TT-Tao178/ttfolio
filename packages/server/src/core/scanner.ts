@@ -25,5 +25,5 @@ export const defaultScanRootConfig: ScanRootConfig = {
   rootDir: '',
   maxDepth: 3,
   manifestNames: ['package.json', 'pom.xml', 'go.mod', 'Cargo.toml', '.git'],
-  enabled: false
+  enabled: false,
 };

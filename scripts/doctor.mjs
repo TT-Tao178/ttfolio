@@ -6,6 +6,6 @@ import process from 'node:process';
 const isWin = process.platform === 'win32';
 const r = spawnSync('npx', ['tsx', 'packages/server/src/cli/doctor.ts'], {
   stdio: 'inherit',
-  shell: isWin
+  shell: isWin,
 });
 process.exitCode = r.status ?? 1;

@@ -5,14 +5,20 @@ import type { IgnoreRule } from '@ttfolio/shared';
 import { INDEXABLE_EXTENSIONS, MAX_INDEX_FILE_BYTES } from '@ttfolio/shared';
 import { compileIgnore, type CompiledIgnore } from './ignore.js';
 import * as fsx from './fsx.js';
-import { getIndexState, upsertIndexEntry, clearProjectIndex, searchFts, indexStats } from '../db/repo/filesRepo.js';
+import {
+  getIndexState,
+  upsertIndexEntry,
+  clearProjectIndex,
+  searchFts,
+  indexStats,
+} from '../db/repo/filesRepo.js';
 import { listIgnoreRules } from '../db/repo/rulesRepo.js';
 import type { TaskContext } from './tasks.js';
 import { AppError } from './errors.js';
 
 export function buildMatcher(db: Database.Database, projectId: string | null): CompiledIgnore {
   const rules: IgnoreRule[] = listIgnoreRules(db).filter(
-    (r) => r.scope === 'global' || (r.projectId !== null && r.projectId === projectId)
+    (r) => r.scope === 'global' || (r.projectId !== null && r.projectId === projectId),
   );
   return compileIgnore(rules);
 }
@@ -22,7 +28,7 @@ export async function buildProjectIndex(
   db: Database.Database,
   projectId: string,
   projectRoot: string,
-  ctx: TaskContext
+  ctx: TaskContext,
 ): Promise<{ indexed: number; skipped: number; total: number }> {
   const matcher = buildMatcher(db, projectId);
   const state = getIndexState(db, projectId);
@@ -105,7 +111,7 @@ export function queryContent(
   db: Database.Database,
   projectId: string,
   query: string,
-  limit: number
+  limit: number,
 ): Array<{ relPath: string; snippet: string }> {
   const expr = ftsMatchExpr(query);
   if (expr === null) return [];

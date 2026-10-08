@@ -91,7 +91,7 @@ export const GITHUB_LANG_COLORS: Record<string, string> = {
   Fortran: '#4d41b1',
   COBOL: '#005ca5',
   DotEnv: '#ecd53f',
-  Other: '#8b949e'
+  Other: '#8b949e',
 };
 
 /**
@@ -113,7 +113,7 @@ const VARS_LIGHT: Record<string, string> = {
   'tt-border': '#d9d9d9',
   'tt-text': 'rgba(0,0,0,.88)',
   'tt-text-2': 'rgba(0,0,0,.65)',
-  'tt-text-3': 'rgba(0,0,0,.45)'
+  'tt-text-3': 'rgba(0,0,0,.45)',
 };
 
 const VARS_DARK: Record<string, string> = {
@@ -129,15 +129,19 @@ const VARS_DARK: Record<string, string> = {
   'tt-border': '#424242',
   'tt-text': 'rgba(255,255,255,.85)',
   'tt-text-2': 'rgba(255,255,255,.65)',
-  'tt-text-3': 'rgba(255,255,255,.45)'
+  'tt-text-3': 'rgba(255,255,255,.45)',
 };
 
 export const THEME_STYLE_ID = 'tt-theme-vars';
 
 /** 生成变量表样式文本（浅色进 :root，深色进 html[data-tt-dark="1"]）。 */
 export function themeVarsCss(): string {
-  const light = Object.entries(VARS_LIGHT).map(([k, v]) => `--${k}:${v};`).join('');
-  const dark = Object.entries(VARS_DARK).map(([k, v]) => `--${k}:${v};`).join('');
+  const light = Object.entries(VARS_LIGHT)
+    .map(([k, v]) => `--${k}:${v};`)
+    .join('');
+  const dark = Object.entries(VARS_DARK)
+    .map(([k, v]) => `--${k}:${v};`)
+    .join('');
   return `:root{${light}}html[data-tt-dark="1"]{${dark}}`;
 }
 
@@ -154,8 +158,12 @@ export function applyThemeVars(dark: boolean): void {
   document.documentElement.dataset['ttDark'] = dark ? '1' : '0';
   // 让浏览器原生控件（滚动条、表单、默认底色）也跟随深浅，避免"深色页面配白滚动条"
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-  document.documentElement.style.background = dark ? VARS_DARK['tt-layout-bg'] ?? '' : VARS_LIGHT['tt-layout-bg'] ?? '';
-  document.body.style.background = dark ? VARS_DARK['tt-layout-bg'] ?? '' : VARS_LIGHT['tt-layout-bg'] ?? '';
+  document.documentElement.style.background = dark
+    ? (VARS_DARK['tt-layout-bg'] ?? '')
+    : (VARS_LIGHT['tt-layout-bg'] ?? '');
+  document.body.style.background = dark
+    ? (VARS_DARK['tt-layout-bg'] ?? '')
+    : (VARS_LIGHT['tt-layout-bg'] ?? '');
 }
 
 /** 语义色常量（组件内唯一允许的取色来源，值与深浅无关，实际色值随 html[data-tt-dark] 切换）。 */
@@ -175,7 +183,7 @@ export const SEMANTIC = {
   border: 'var(--tt-border)',
   text: 'var(--tt-text)',
   textSecondary: 'var(--tt-text-2)',
-  textTertiary: 'var(--tt-text-3)'
+  textTertiary: 'var(--tt-text-3)',
 } as const;
 
 export function langColor(language: string): string {
@@ -204,7 +212,7 @@ export function antdThemeConfig(resolvedDark: boolean): ThemeConfig {
       colorTextTertiary: v['tt-text-3'],
       borderRadius: 6,
       fontSize: 14,
-      lineHeight: 1.5715
+      lineHeight: 1.5715,
     },
     components: {
       Card: { borderRadiusLG: 8 },
@@ -212,8 +220,8 @@ export function antdThemeConfig(resolvedDark: boolean): ThemeConfig {
       Menu: { itemBorderRadius: 8, itemBg: 'transparent' },
       Tag: { borderRadiusSM: 4 },
       Segmented: { borderRadiusSM: 4 },
-      Layout: { bodyBg: v['tt-layout-bg'] }
-    }
+      Layout: { bodyBg: v['tt-layout-bg'] },
+    },
   };
 }
 

@@ -1,5 +1,10 @@
 /** Fastify 应用装配：鉴权（token+Host+Origin）、路由注册、静态托管、统一错误映射。 */
-import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from 'fastify';
 import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import type { AppContext } from './context.js';
@@ -40,7 +45,7 @@ function hostAllowed(host: string | undefined, port: number): boolean {
 export function buildApp(ctx: AppContext): FastifyInstance {
   const app = Fastify({
     logger: false,
-    bodyLimit: 64 * 1024 * 1024
+    bodyLimit: 64 * 1024 * 1024,
   });
   app.ttfolio = ctx;
 
@@ -68,7 +73,8 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       return;
     }
     if (url === '/api/health') return;
-    const isApiScope = url.indexOf('/api/') === 0 || url.indexOf('/arch/') === 0 || url.indexOf('/raw/') === 0;
+    const isApiScope =
+      url.indexOf('/api/') === 0 || url.indexOf('/arch/') === 0 || url.indexOf('/raw/') === 0;
     if (isApiScope) {
       const isSse = url.indexOf('/api/events') === 0;
       const headerToken = req.headers['x-ttfolio-token'];
@@ -76,7 +82,9 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       const queryToken = (req.query as Record<string, string | undefined> | undefined)?.['token'];
       if (isSse) {
         if (queryToken !== ctx.token) {
-          void reply.code(401).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'token 无效' } });
+          void reply
+            .code(401)
+            .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'token 无效' } });
         }
         return;
       }
@@ -90,7 +98,9 @@ export function buildApp(ctx: AppContext): FastifyInstance {
         if (origin !== undefined && origin !== '') {
           const o = origin.toLowerCase();
           if (!HOST_OK.some((h) => o.includes(`//${h}`))) {
-            void reply.code(403).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '非法 Origin' } });
+            void reply
+              .code(403)
+              .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '非法 Origin' } });
           }
         }
       }
@@ -118,7 +128,9 @@ export function buildApp(ctx: AppContext): FastifyInstance {
     if (mapped.code === 'INTERNAL') {
       ctx.logger.error({ mod: 'http', msg: `${_req.method} ${_req.url}: ${err.message}` });
     }
-    void reply.code(mapped.status).send({ ok: false, error: { code: mapped.code, message: mapped.message, detail: mapped.detail } });
+    void reply
+      .code(mapped.status)
+      .send({ ok: false, error: { code: mapped.code, message: mapped.message, detail: mapped.detail } });
   });
 
   app.register(systemRoutes);
@@ -135,9 +147,12 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   // 静态托管 web/dist（token 注入 index.html）
   app.get('/', async (_req, reply) => {
     if (ctx.webDist === null || !existsSync(path.join(ctx.webDist, 'index.html'))) {
-      void reply.code(200).type('text/html; charset=utf-8').send(
-        '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>ttFolio</title><p>前端尚未构建：请先运行 <code>npm run build -w @ttfolio/web</code>，或在开发模式使用 vite (npm run dev)。</p>'
-      );
+      void reply
+        .code(200)
+        .type('text/html; charset=utf-8')
+        .send(
+          '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>ttFolio</title><p>前端尚未构建：请先运行 <code>npm run build -w @ttfolio/web</code>，或在开发模式使用 vite (npm run dev)。</p>',
+        );
       return reply;
     }
     const html = readFileSync(path.join(ctx.webDist, 'index.html'), 'utf8')
@@ -161,7 +176,11 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       }
       const ext = path.extname(full).toLowerCase();
       const types: Record<string, string> = {
-        '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2'
+        '.js': 'text/javascript',
+        '.css': 'text/css',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.woff2': 'font/woff2',
       };
       void reply.type(types[ext] ?? 'application/octet-stream').send(readFileSync(full));
       return reply;

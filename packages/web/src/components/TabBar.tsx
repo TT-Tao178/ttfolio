@@ -1,11 +1,27 @@
 /** 浏览器式标签条（FR-1.2/1.3）：dnd-kit 拖动排序、复用/关闭/固定、未保存提示、失效标红。 */
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { App as AntdApp, Dropdown } from 'antd';
 import {
-  CloseOutlined, PushpinOutlined, FileTextOutlined, FolderOutlined, SearchOutlined,
-  SettingOutlined, DeleteOutlined, PictureOutlined, BookOutlined, AppstoreOutlined, BranchesOutlined
+  CloseOutlined,
+  PushpinOutlined,
+  FileTextOutlined,
+  FolderOutlined,
+  SearchOutlined,
+  SettingOutlined,
+  DeleteOutlined,
+  PictureOutlined,
+  BookOutlined,
+  AppstoreOutlined,
+  BranchesOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useRef } from 'react';
 import { useAppStore, type Tab } from '@/app/store';
@@ -14,23 +30,43 @@ import { SEMANTIC } from '@/theme/tokens';
 
 function kindIcon(t: Tab): React.JSX.Element {
   switch (t.kind) {
-    case 'project': return <FolderOutlined />;
-    case 'file': return <FileTextOutlined />;
-    case 'git': return <BranchesOutlined />;
-    case 'archive': return <AppstoreOutlined />;
-    case 'doc': return <BookOutlined />;
-    case 'image': return <PictureOutlined />;
-    case 'search': return <SearchOutlined />;
-    case 'settings': return <SettingOutlined />;
-    case 'trash': return <DeleteOutlined />;
-    default: return <FileTextOutlined />;
+    case 'project':
+      return <FolderOutlined />;
+    case 'file':
+      return <FileTextOutlined />;
+    case 'git':
+      return <BranchesOutlined />;
+    case 'archive':
+      return <AppstoreOutlined />;
+    case 'doc':
+      return <BookOutlined />;
+    case 'image':
+      return <PictureOutlined />;
+    case 'search':
+      return <SearchOutlined />;
+    case 'settings':
+      return <SettingOutlined />;
+    case 'trash':
+      return <DeleteOutlined />;
+    default:
+      return <FileTextOutlined />;
   }
 }
 
-function SortableTab({ tab, active, onActivate, onClose }: {
-  tab: Tab; active: boolean; onActivate: () => void; onClose: () => void;
+function SortableTab({
+  tab,
+  active,
+  onActivate,
+  onClose,
+}: {
+  tab: Tab;
+  active: boolean;
+  onActivate: () => void;
+  onClose: () => void;
 }): React.JSX.Element {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tab.id,
+  });
   return (
     <div
       ref={setNodeRef}
@@ -39,13 +75,19 @@ function SortableTab({ tab, active, onActivate, onClose }: {
         transform: CSS.Transform.toString(transform),
         transition,
         zIndex: isDragging ? 10 : 1,
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '0 8px 0 12px', height: 34, borderRadius: 8, cursor: 'pointer',
-        userSelect: 'none', whiteSpace: 'nowrap',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '0 8px 0 12px',
+        height: 34,
+        borderRadius: 8,
+        cursor: 'pointer',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
         background: active ? SEMANTIC.primaryBg : 'transparent',
         border: active ? `1px solid ${SEMANTIC.primaryBorder}` : '1px solid transparent',
         color: tab.invalid !== null ? SEMANTIC.error : 'inherit',
-        maxWidth: 200
+        maxWidth: 200,
       }}
       onClick={onActivate}
       onAuxClick={(e) => {
@@ -72,7 +114,8 @@ function SortableTab({ tab, active, onActivate, onClose }: {
 }
 
 export function TabBar(): React.JSX.Element {
-  const { tabs, activeTabId, activateTab, moveTab, togglePin, dirty, closedTabs, reopenLastClosed } = useAppStore();
+  const { tabs, activeTabId, activateTab, moveTab, togglePin, dirty, closedTabs, reopenLastClosed } =
+    useAppStore();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const { message } = AntdApp.useApp();
   // 关闭逻辑抽到 useCloseTab 共享（× / Ctrl+W / 右键菜单同一套未保存确认）
@@ -116,7 +159,15 @@ export function TabBar(): React.JSX.Element {
       <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
         <div
           ref={barRef}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            flex: 1,
+            minWidth: 0,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+          }}
           data-testid="tab-bar"
         >
           {tabs.map((tab) => (
@@ -125,22 +176,39 @@ export function TabBar(): React.JSX.Element {
               trigger={['contextMenu']}
               menu={{
                 items: [
-                  { key: 'reopen', label: '恢复已关闭标签', disabled: closedTabs.length === 0, onClick: () => reopenLastClosed() },
+                  {
+                    key: 'reopen',
+                    label: '恢复已关闭标签',
+                    disabled: closedTabs.length === 0,
+                    onClick: () => reopenLastClosed(),
+                  },
                   { type: 'divider' as const },
-                  { key: 'pin', label: tab.isPinned ? '取消固定' : '固定标签', onClick: () => togglePin(tab.id) },
+                  {
+                    key: 'pin',
+                    label: tab.isPinned ? '取消固定' : '固定标签',
+                    onClick: () => togglePin(tab.id),
+                  },
                   { key: 'close', label: '关闭', onClick: () => closeTabConfirmed(tab) },
                   { type: 'divider' as const },
-                  { key: 'closeOthers', label: '关闭其他标签（保留固定）', onClick: () => closeMany((t) => t.id !== tab.id) },
+                  {
+                    key: 'closeOthers',
+                    label: '关闭其他标签（保留固定）',
+                    onClick: () => closeMany((t) => t.id !== tab.id),
+                  },
                   {
                     key: 'closeRight',
                     label: '关闭右侧标签',
                     onClick: () => {
                       const idx = tabs.findIndex((t) => t.id === tab.id);
                       closeMany((t, i) => i > idx);
-                    }
+                    },
                   },
-                  { key: 'closeAll', label: '关闭全部标签（保留固定）', onClick: () => closeMany(() => true) }
-                ]
+                  {
+                    key: 'closeAll',
+                    label: '关闭全部标签（保留固定）',
+                    onClick: () => closeMany(() => true),
+                  },
+                ],
               }}
             >
               <div style={{ display: 'inline-flex' }}>

@@ -16,7 +16,16 @@ interface Props {
   children: React.ReactNode;
 }
 
-export function StateView({ loading, error, empty, emptyText, emptyAction, onRetry, errorExtra, children }: Props): React.JSX.Element {
+export function StateView({
+  loading,
+  error,
+  empty,
+  emptyText,
+  emptyAction,
+  onRetry,
+  errorExtra,
+  children,
+}: Props): React.JSX.Element {
   if (loading) {
     return (
       <div style={{ padding: 16 }}>
@@ -39,8 +48,16 @@ export function StateView({ loading, error, empty, emptyText, emptyAction, onRet
   }
   if (empty === true) {
     return (
-      <Empty description={emptyText ?? '暂无数据'} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: 32 }}>
-        {emptyAction !== undefined && <Button type="primary" onClick={emptyAction.onClick}>{emptyAction.label}</Button>}
+      <Empty
+        description={emptyText ?? '暂无数据'}
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        style={{ padding: 32 }}
+      >
+        {emptyAction !== undefined && (
+          <Button type="primary" onClick={emptyAction.onClick}>
+            {emptyAction.label}
+          </Button>
+        )}
       </Empty>
     );
   }

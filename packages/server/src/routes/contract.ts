@@ -29,14 +29,24 @@ export const contractRoutes: FastifyPluginAsync = async (app) => {
       `- 路径：${p.dirPath}`,
       `- 类型：${p.type}`,
       `- 主语言：${p.primaryLanguage ?? '未分析'}`,
-      `- 语言占比：${p.languages.slice(0, 5).map((l) => `${l.language} ${l.percent}%`).join(' / ') || '未分析'}`,
+      `- 语言占比：${
+        p.languages
+          .slice(0, 5)
+          .map((l) => `${l.language} ${l.percent}%`)
+          .join(' / ') || '未分析'
+      }`,
       `- 技术栈：${p.techStack.join('、') || '—'}`,
       `- Git：${p.gitIsRepo ? `分支 ${p.gitBranch ?? '?'}${p.gitDirty ? '（有未提交改动）' : '（干净）'}` : '非 git 仓库'}`,
       `- 文档挂载：${mounts.length === 0 ? '无' : ''}`,
-      ...mounts.map((m) => `  - [${m.source === 'manual' ? '手动' : '自动'}] ${m.path}${m.existsOk ? '' : '（路径失效）'}`),
+      ...mounts.map(
+        (m) =>
+          `  - [${m.source === 'manual' ? '手动' : '自动'}] ${m.path}${m.existsOk ? '' : '（路径失效）'}`,
+      ),
       `- 架构图：${archives.length === 0 ? '未登记' : archives.map((a) => a.dirPath).join('、')}`,
       `- 未完成清单：${todos.length === 0 ? '无' : ''}`,
-      ...todos.slice(0, 20).map((t) => `  - [${t.done ? 'x' : ' '}] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`)
+      ...todos
+        .slice(0, 20)
+        .map((t) => `  - [${t.done ? 'x' : ' '}] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`),
     ];
     return ok(lines.join('\n'));
   });
@@ -61,7 +71,12 @@ export const contractRoutes: FastifyPluginAsync = async (app) => {
       `- 磁盘路径：${p.dirPath}`,
       `- 项目类型：${p.type}${p.typeSource === 'manual' ? '（人工指定）' : ''}`,
       `- 主语言：${p.primaryLanguage ?? '未分析'}`,
-      `- 语言占比：${p.languages.slice(0, 8).map((l) => `${l.language} ${l.percent}%`).join(' / ') || '未分析'}`,
+      `- 语言占比：${
+        p.languages
+          .slice(0, 8)
+          .map((l) => `${l.language} ${l.percent}%`)
+          .join(' / ') || '未分析'
+      }`,
       `- 技术栈：${p.techStack.join('、') || '—'}`,
       `- Git：${p.gitIsRepo ? `分支 ${p.gitBranch ?? '?'}，HEAD ${p.gitHeadShort ?? '?'}` : '非 git 仓库'}`,
       ``,
@@ -75,14 +90,22 @@ export const contractRoutes: FastifyPluginAsync = async (app) => {
       ``,
       `## 三、关联档案（自动预填）`,
       ``,
-      `- 文档挂载：${listMounts(db, id).map((m) => m.path).join('、') || '无'}`,
-      `- 架构图：${listArchives(db, id).map((a) => a.dir_path).join('、') || '未登记（可由外部工具生成后登记）'}`,
+      `- 文档挂载：${
+        listMounts(db, id)
+          .map((m) => m.path)
+          .join('、') || '无'
+      }`,
+      `- 架构图：${
+        listArchives(db, id)
+          .map((a) => a.dir_path)
+          .join('、') || '未登记（可由外部工具生成后登记）'
+      }`,
       `- 未完成清单：${listTodos(db, { projectId: id, includeDone: false }).length} 条`,
       ``,
       `## 四、给 agent 的注意事项`,
       ``,
       `- 磁盘是真相：改动前后以文件系统为准，本契约只是索引快照。`,
-      `- 不要执行 push/pull 等网络操作（本项目工作流不含远程协作）。`
+      `- 不要执行 push/pull 等网络操作（本项目工作流不含远程协作）。`,
     ].join('\n');
     if (parsed.data.writeToProject) {
       const target = path.join(p.dirPath, 'PROJECT-CONTEXT.md');
@@ -90,9 +113,19 @@ export const contractRoutes: FastifyPluginAsync = async (app) => {
         fsx.accessSyncForWrite(dirnameExists(target) ? target : target);
         fsx.atomicWriteText(target, md, 'utf8', detectEolSafe(target));
       } catch (err) {
-        return fail('PERMISSION_DENIED', `写入项目根失败：${err instanceof Error ? err.message : String(err)}`, 403);
+        return fail(
+          'PERMISSION_DENIED',
+          `写入项目根失败：${err instanceof Error ? err.message : String(err)}`,
+          403,
+        );
       }
-      logActivity(db, { kind: 'context.contract.write', level: 'L2', projectId: id, targetPath: target, actor: currentActor().actor });
+      logActivity(db, {
+        kind: 'context.contract.write',
+        level: 'L2',
+        projectId: id,
+        targetPath: target,
+        actor: currentActor().actor,
+      });
     }
     return ok({ markdown: md, writtenToProject: parsed.data.writeToProject });
   });

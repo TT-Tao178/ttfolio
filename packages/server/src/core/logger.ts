@@ -39,8 +39,11 @@ export function createLogger(logDir: string, level = 'info'): pino.Logger {
     { level, base: undefined },
     pino.multistream([
       { stream: dest },
-      { stream: process.stdout, level: (['error', 'warn', 'info', 'debug'].includes(level) ? level : 'info') as pino.Level }
-    ])
+      {
+        stream: process.stdout,
+        level: (['error', 'warn', 'info', 'debug'].includes(level) ? level : 'info') as pino.Level,
+      },
+    ]),
   );
 }
 

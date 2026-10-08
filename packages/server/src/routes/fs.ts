@@ -9,7 +9,13 @@ import { assertSafeName, isInsideOrEqual } from '../core/pathGuard.js';
 import { promises as fsp } from 'node:fs';
 import { resolveInProject } from '../roots.js';
 import { buildMatcher } from '../core/search.js';
-import { draftPutSchema, fsEntryCreateSchema, fsFileSaveSchema, fsMoveSchema, fsRenameSchema } from '@ttfolio/shared';
+import {
+  draftPutSchema,
+  fsEntryCreateSchema,
+  fsFileSaveSchema,
+  fsMoveSchema,
+  fsRenameSchema,
+} from '@ttfolio/shared';
 import { MAX_TEXT_EDIT_BYTES, MAX_PREVIEW_BYTES } from '@ttfolio/shared';
 import { getDraft, putDraft, deleteDraft } from '../db/repo/filesRepo.js';
 import { recordRecentFile } from '../db/repo/metaRepo.js';
@@ -17,7 +23,36 @@ import { gitStatusMarks } from '../core/gitfs.js';
 import { logActivity } from '../db/repo/metaRepo.js';
 import { currentActor } from '../core/actor.js';
 
-const BINARY_EXTS = new Set(['png','jpg','jpeg','gif','webp','bmp','ico','pdf','zip','gz','tar','rar','7z','exe','dll','so','dylib','mp4','mov','mp3','wav','woff','woff2','ttf','otf','eot','psd','ai']);
+const BINARY_EXTS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'ico',
+  'pdf',
+  'zip',
+  'gz',
+  'tar',
+  'rar',
+  '7z',
+  'exe',
+  'dll',
+  'so',
+  'dylib',
+  'mp4',
+  'mov',
+  'mp3',
+  'wav',
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+  'psd',
+  'ai',
+]);
 
 export const fsRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
@@ -73,7 +108,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         ignored: hidden,
         symlink: e.isSymlink ? true : undefined,
         linkTarget: e.isSymlink ? (e.linkTarget ?? 'unknown') : undefined,
-        linkOutside
+        linkOutside,
       });
     }
     nodes.sort((a, b) => {
@@ -113,7 +148,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
           hash: '',
           truncated: false,
           isBinary: binary,
-          tooLarge
+          tooLarge,
         });
       }
       // 文本：>5MB 只读预览（截断到 5MB）
@@ -132,7 +167,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         hash: content.hash,
         truncated,
         isBinary: false,
-        tooLarge: false
+        tooLarge: false,
       });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -153,9 +188,17 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       // 只读文件明确报错，不改权限（C-08）
       checkWritable(guarded.real);
       if (!b.force) {
-        const disk = fsx.readTextFile(guarded.real, st.size > MAX_TEXT_EDIT_BYTES ? MAX_TEXT_EDIT_BYTES : st.size);
+        const disk = fsx.readTextFile(
+          guarded.real,
+          st.size > MAX_TEXT_EDIT_BYTES ? MAX_TEXT_EDIT_BYTES : st.size,
+        );
         const baseKnown = b.baseHash !== null && b.baseHash !== undefined && b.baseHash !== '';
-        if (!baseKnown || disk.hash !== b.baseHash || st.size !== (b.baseSize ?? -1) || st.mtimeIso !== b.baseMtime) {
+        if (
+          !baseKnown ||
+          disk.hash !== b.baseHash ||
+          st.size !== (b.baseSize ?? -1) ||
+          st.mtimeIso !== b.baseMtime
+        ) {
           return fail('MTIME_CONFLICT', '文件已在磁盘上被修改', 409, {
             current: {
               mtime: st.mtimeIso,
@@ -163,16 +206,26 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
               hash: disk.hash,
               content: disk.content,
               encoding: disk.encoding,
-              eol: disk.eol
-            }
+              eol: disk.eol,
+            },
           });
         }
       }
       const eol = b.eol === 'CRLF' ? 'CRLF' : b.eol === 'MIXED' ? 'MIXED' : 'LF';
       fsx.atomicWriteText(guarded.real, b.content, (b.encoding as fsx.DetectedEncoding) ?? 'utf8', eol);
       const after = fsx.readTextFile(guarded.real, MAX_TEXT_EDIT_BYTES + 1);
-      logActivity(ctx.db(), { kind: 'fs.save', level: 'L2', projectId: b.projectId, targetPath: guarded.real, actor: currentActor().actor });
-      return ok({ mtime: after.mtimeMs ? new Date(after.mtimeMs).toISOString() : '', size: after.size, hash: after.hash });
+      logActivity(ctx.db(), {
+        kind: 'fs.save',
+        level: 'L2',
+        projectId: b.projectId,
+        targetPath: guarded.real,
+        actor: currentActor().actor,
+      });
+      return ok({
+        mtime: after.mtimeMs ? new Date(after.mtimeMs).toISOString() : '',
+        size: after.size,
+        hash: after.hash,
+      });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }
@@ -185,7 +238,9 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     const b = parsed.data;
     try {
       const name = assertSafeName(b.name);
-      const guarded = await resolveInProject(ctx.db(), b.projectId, path.join(b.parentPath, name), { mustExist: false });
+      const guarded = await resolveInProject(ctx.db(), b.projectId, path.join(b.parentPath, name), {
+        mustExist: false,
+      });
       if (fsx.exists(guarded.real)) return fail('INVALID_NAME', '同名文件或目录已存在');
       if (b.kind === 'dir') {
         fsx.ensureDir(guarded.real);
@@ -194,7 +249,13 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         fsx.writeFileSync(guarded.real, '', 'utf8');
       }
       fsx.markSelfWrite(guarded.real);
-      logActivity(ctx.db(), { kind: 'fs.create', level: 'L2', projectId: b.projectId, targetPath: guarded.real, actor: currentActor().actor });
+      logActivity(ctx.db(), {
+        kind: 'fs.create',
+        level: 'L2',
+        projectId: b.projectId,
+        targetPath: guarded.real,
+        actor: currentActor().actor,
+      });
       ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [guarded.real], kind: 'create' });
       return ok({ path: guarded.relToRoot });
     } catch (err) {
@@ -227,9 +288,13 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         projectId: b.projectId,
         targetPath: target,
         detail: { from: guarded.real, to: target, affectedFiles: before.files },
-        actor: currentActor().actor
+        actor: currentActor().actor,
       });
-      ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [guarded.real, target], kind: 'delete' });
+      ctx.sse.publish('fs.changed', {
+        projectId: b.projectId,
+        paths: [guarded.real, target],
+        kind: 'delete',
+      });
       return ok({ path: path.relative(guarded.projectRoot, target).split(path.sep).join('/') });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -254,18 +319,23 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         if (dest.toLowerCase() === item.real.toLowerCase()) continue;
         if (fsx.exists(dest)) {
           if (b.onConflict === 'skip') continue;
-          if (b.onConflict === 'ask') return fail('INVALID_NAME', `目标已存在：${name}（可选择 覆盖 或 跳过）`);
+          if (b.onConflict === 'ask')
+            return fail('INVALID_NAME', `目标已存在：${name}（可选择 覆盖 或 跳过）`);
         }
         if (b.mode === 'move') {
           const isDirMove = fsx.statSafe(item.real)?.isDir ?? false;
-          if (isDirMove && item.real.toLowerCase() !== dest.toLowerCase() && path.dirname(item.real).toLowerCase() !== targetDir.real.toLowerCase()) {
+          if (
+            isDirMove &&
+            item.real.toLowerCase() !== dest.toLowerCase() &&
+            path.dirname(item.real).toLowerCase() !== targetDir.real.toLowerCase()
+          ) {
             // 目录移动到自身子目录：拒绝
             if (dest.toLowerCase().indexOf(item.real.toLowerCase()) === 0) {
               return fail('INVALID_NAME', '不能把目录移动到它自己的子目录内');
             }
           }
           fsx.movePath(item.real, dest);
-          if (b.confirm !== true && (fsx.statSafe(item.real) === null)) {
+          if (b.confirm !== true && fsx.statSafe(item.real) === null) {
             // move 完成
           }
         } else {
@@ -278,7 +348,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         level: 'L2',
         projectId: b.projectId,
         detail: { items: b.items, target: targetDir.real },
-        actor: currentActor().actor
+        actor: currentActor().actor,
       });
       ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [targetDir.real], kind: 'create' });
       return ok({ done: true });
@@ -292,7 +362,10 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { projectId?: string; paths?: string[]; confirm?: boolean };
     if (b.projectId === undefined || b.paths === undefined) return fail('BAD_REQUEST', '缺少参数');
     if (b.confirm !== true) {
-      return fail('CONFIRM_REQUIRED', '删除是 L3 操作：文件将移入回收站（可在回收站恢复），需要 confirm=true');
+      return fail(
+        'CONFIRM_REQUIRED',
+        '删除是 L3 操作：文件将移入回收站（可在回收站恢复），需要 confirm=true',
+      );
     }
     const db = ctx.db();
     const ids = [];
@@ -305,7 +378,14 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         affected.bytes += before.bytes;
         const moved = ctx.trash.moveToTrash(db, [g.real], b.projectId, g.projectRoot);
         ids.push(...moved);
-        logActivity(db, { kind: 'fs.delete', level: 'L3', projectId: b.projectId, targetPath: g.real, detail: { files: before.files, bytes: before.bytes }, actor: currentActor().actor });
+        logActivity(db, {
+          kind: 'fs.delete',
+          level: 'L3',
+          projectId: b.projectId,
+          targetPath: g.real,
+          detail: { files: before.files, bytes: before.bytes },
+          actor: currentActor().actor,
+        });
       }
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -366,7 +446,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       encoding: row.encoding,
       eol: row.eol,
       updatedAt: row.updated_at,
-      projectId: row.project_id
+      projectId: row.project_id,
     });
   });
 
@@ -384,7 +464,7 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       baseSize: b.baseSize ?? null,
       baseHash: b.baseHash ?? null,
       encoding: b.encoding ?? null,
-      eol: b.eol ?? null
+      eol: b.eol ?? null,
     });
     return ok({ saved: true });
   });

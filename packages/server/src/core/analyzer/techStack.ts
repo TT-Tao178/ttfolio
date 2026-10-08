@@ -5,34 +5,92 @@ const MAX_TAGS = 10;
 const MAX_TAG_LEN = 24;
 
 const NPM_FRAMEWORK_MAP: Record<string, string> = {
-  react: 'React', 'react-dom': 'React', next: 'Next.js', vue: 'Vue', 'vue-router': 'Vue',
-  nuxt: 'Nuxt', '@angular/core': 'Angular', svelte: 'Svelte', '@sveltejs/kit': 'SvelteKit',
-  vite: 'Vite', webpack: 'Webpack', rollup: 'Rollup', esbuild: 'esbuild', turbo: 'Turborepo',
-  typescript: 'TypeScript', tailwindcss: 'Tailwind CSS', 'ant-design-vue': 'Ant Design Vue',
-  antd: 'Ant Design', 'element-plus': 'Element Plus', '@mui/material': 'MUI',
-  express: 'Express', fastify: 'Fastify', koa: 'Koa', nestjs: 'NestJS', '@nestjs/core': 'NestJS',
-  hapi: 'Hapi', electron: 'Electron', 'react-native': 'React Native',
-  'better-sqlite3': 'SQLite', prisma: 'Prisma', typeorm: 'TypeORM', sequelize: 'Sequelize',
-  jest: 'Jest', vitest: 'Vitest', mocha: 'Mocha', playwright: 'Playwright',
-  '@playwright/test': 'Playwright', cypress: 'Cypress', eslint: 'ESLint', axios: 'axios',
-  'socket.io': 'Socket.IO', ws: 'WebSocket', tauri: 'Tauri'
+  react: 'React',
+  'react-dom': 'React',
+  next: 'Next.js',
+  vue: 'Vue',
+  'vue-router': 'Vue',
+  nuxt: 'Nuxt',
+  '@angular/core': 'Angular',
+  svelte: 'Svelte',
+  '@sveltejs/kit': 'SvelteKit',
+  vite: 'Vite',
+  webpack: 'Webpack',
+  rollup: 'Rollup',
+  esbuild: 'esbuild',
+  turbo: 'Turborepo',
+  typescript: 'TypeScript',
+  tailwindcss: 'Tailwind CSS',
+  'ant-design-vue': 'Ant Design Vue',
+  antd: 'Ant Design',
+  'element-plus': 'Element Plus',
+  '@mui/material': 'MUI',
+  express: 'Express',
+  fastify: 'Fastify',
+  koa: 'Koa',
+  nestjs: 'NestJS',
+  '@nestjs/core': 'NestJS',
+  hapi: 'Hapi',
+  electron: 'Electron',
+  'react-native': 'React Native',
+  'better-sqlite3': 'SQLite',
+  prisma: 'Prisma',
+  typeorm: 'TypeORM',
+  sequelize: 'Sequelize',
+  jest: 'Jest',
+  vitest: 'Vitest',
+  mocha: 'Mocha',
+  playwright: 'Playwright',
+  '@playwright/test': 'Playwright',
+  cypress: 'Cypress',
+  eslint: 'ESLint',
+  axios: 'axios',
+  'socket.io': 'Socket.IO',
+  ws: 'WebSocket',
+  tauri: 'Tauri',
 };
 
 const PY_MAP: Record<string, string> = {
-  fastapi: 'FastAPI', flask: 'Flask', django: 'Django', starlette: 'Starlette',
-  sqlalchemy: 'SQLAlchemy', pydantic: 'Pydantic', pytest: 'pytest', celery: 'Celery',
-  numpy: 'NumPy', pandas: 'pandas', torch: 'PyTorch', tensorflow: 'TensorFlow',
-  'scikit-learn': 'scikit-learn', requests: 'requests', uvicorn: 'uvicorn', gunicorn: 'gunicorn'
+  fastapi: 'FastAPI',
+  flask: 'Flask',
+  django: 'Django',
+  starlette: 'Starlette',
+  sqlalchemy: 'SQLAlchemy',
+  pydantic: 'Pydantic',
+  pytest: 'pytest',
+  celery: 'Celery',
+  numpy: 'NumPy',
+  pandas: 'pandas',
+  torch: 'PyTorch',
+  tensorflow: 'TensorFlow',
+  'scikit-learn': 'scikit-learn',
+  requests: 'requests',
+  uvicorn: 'uvicorn',
+  gunicorn: 'gunicorn',
 };
 
 const GO_MAP: Record<string, string> = {
-  'gin-gonic/gin': 'Gin', 'labstack/echo': 'Echo', 'gofiber/fiber': 'Fiber',
-  'gorilla/mux': 'Gorilla', 'go-zero': 'go-zero', gorm: 'GORM', cobra: 'Cobra'
+  'gin-gonic/gin': 'Gin',
+  'labstack/echo': 'Echo',
+  'gofiber/fiber': 'Fiber',
+  'gorilla/mux': 'Gorilla',
+  'go-zero': 'go-zero',
+  gorm: 'GORM',
+  cobra: 'Cobra',
 };
 
 const RUST_MAP: Record<string, string> = {
-  axum: 'axum', actix: 'actix', actix_web: 'actix-web', rocket: 'Rocket', warp: 'Warp',
-  serde: 'serde', tokio: 'tokio', sqlx: 'sqlx', diesel: 'Diesel', clap: 'clap', tauri: 'Tauri'
+  axum: 'axum',
+  actix: 'actix',
+  actix_web: 'actix-web',
+  rocket: 'Rocket',
+  warp: 'Warp',
+  serde: 'serde',
+  tokio: 'tokio',
+  sqlx: 'sqlx',
+  diesel: 'Diesel',
+  clap: 'clap',
+  tauri: 'Tauri',
 };
 
 const JAVA_HINTS: Array<[RegExp, string]> = [
@@ -42,7 +100,7 @@ const JAVA_HINTS: Array<[RegExp, string]> = [
   [/netty/, 'Netty'],
   [/dubbo/, 'Dubbo'],
   [/log4j|logback|slf4j/, '日志组件'],
-  [/junit/, 'JUnit']
+  [/junit/, 'JUnit'],
 ];
 
 function addTag(tags: Set<string>, tag: string): void {

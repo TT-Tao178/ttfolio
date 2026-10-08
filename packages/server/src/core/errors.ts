@@ -16,7 +16,8 @@ export class AppError extends Error {
 }
 
 /** 错误码 → 默认 HTTP 状态（导出给统一响应钩子复用，避免两处映射漂移）。 */
-export function defaultHttpStatus(code: ErrorCode): number {  switch (code) {
+export function defaultHttpStatus(code: ErrorCode): number {
+  switch (code) {
     case 'NOT_FOUND':
       return 404;
     case 'PATH_OUT_OF_SCOPE':
@@ -47,5 +48,7 @@ export function defaultHttpStatus(code: ErrorCode): number {  switch (code) {
 
 /** 判断是否Node 系统错误中的"无权限/占用"类 */
 export function isErrnoException(e: unknown): e is NodeJS.ErrnoException {
-  return typeof e === 'object' && e !== null && 'code' in e && typeof (e as { code?: unknown }).code === 'string';
+  return (
+    typeof e === 'object' && e !== null && 'code' in e && typeof (e as { code?: unknown }).code === 'string'
+  );
 }

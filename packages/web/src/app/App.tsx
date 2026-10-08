@@ -87,7 +87,9 @@ function Shell(): React.JSX.Element {
           openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
         }
       })
-      .catch(() => openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'));
+      .catch(() =>
+        openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台'),
+      );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,7 +131,9 @@ function Shell(): React.JSX.Element {
         e.preventDefault();
         openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
       } else if (e.key === '?' && !inInput) {
-        void message.info('快捷键：Ctrl+K 面板 · Ctrl+W 关标签 · Ctrl+Tab 切标签 · Alt+←/→ 前进后退 · Ctrl+S 保存 · 1-5 切项目页签 · F2 重命名 · Delete 删除 · Ctrl+, 设置');
+        void message.info(
+          '快捷键：Ctrl+K 面板 · Ctrl+W 关标签 · Ctrl+Tab 切标签 · Alt+←/→ 前进后退 · Ctrl+S 保存 · 1-5 切项目页签 · F2 重命名 · Delete 删除 · Ctrl+, 设置',
+        );
       } else if (!inInput && /^[1-5]$/.test(e.key) && activeTab?.kind === 'project') {
         const map = ['overview', 'files', 'git', 'archives', 'docs'];
         const sub = map[Number(e.key) - 1];
@@ -138,12 +142,32 @@ function Shell(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [paletteOpen, setPalette, tabs, activeTabId, activeTab, closeTabConfirmed, updateActiveLocation, openTab, message, setDetail]);
+  }, [
+    paletteOpen,
+    setPalette,
+    tabs,
+    activeTabId,
+    activeTab,
+    closeTabConfirmed,
+    updateActiveLocation,
+    openTab,
+    message,
+    setDetail,
+  ]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 顶栏：标签 + 搜索/导入/设置（品牌区 logo+名称已去除——与系统窗口标题栏/任务栏重复，第 27 轮）。高度对齐《界面原型-AntD.html》#top = 56px */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          height: 56,
+          padding: '0 12px',
+          borderBottom: `1px solid ${SEMANTIC.split}`,
+        }}
+      >
         <Space size={6}>
           <span style={{ fontSize: 12, opacity: 0.6 }}>a local project workbench</span>
         </Space>
@@ -161,7 +185,7 @@ function Shell(): React.JSX.Element {
               justifyContent: 'flex-start',
               color: SEMANTIC.textTertiary,
               background: SEMANTIC.layoutBg,
-              borderColor: SEMANTIC.split
+              borderColor: SEMANTIC.split,
             }}
           >
             <span style={{ flex: 1, textAlign: 'left', fontSize: 13 }}>搜索项目 / 文件名 / 文件内容</span>
@@ -172,7 +196,10 @@ function Shell(): React.JSX.Element {
               icon={<PlusOutlined />}
               data-testid="top-add-btn"
               onClick={() => {
-                openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '工作台');
+                openTab(
+                  { kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                  '工作台',
+                );
                 useAppStore.getState().requestAddProject();
               }}
             >
@@ -183,7 +210,12 @@ function Shell(): React.JSX.Element {
             <Button
               type="text"
               icon={<SettingOutlined />}
-              onClick={() => openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置')}
+              onClick={() =>
+                openTab(
+                  { kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                  '设置',
+                )
+              }
             />
           </Tooltip>
         </Space>
@@ -218,36 +250,40 @@ function Shell(): React.JSX.Element {
                 collapsible={false}
                 testId="split-detail"
                 left={
-                  <div style={{ height: '100%', minWidth: 0, background: SEMANTIC.layoutBg, overflow: 'hidden' }}>
+                  <div
+                    style={{ height: '100%', minWidth: 0, background: SEMANTIC.layoutBg, overflow: 'hidden' }}
+                  >
                     <PaneErrorBoundary>
-                    {activeTab === null ? (
-                      <div />
-                    ) : activeTab.kind === 'overview' ? (
-                      <Workbench subTab={activeTab.subTab} />
-                    ) : activeTab.kind === 'project' && activeTab.projectId !== null ? (
-                      <ProjectPage projectId={activeTab.projectId} subTab={activeTab.subTab} />
-                    ) : activeTab.kind === 'trash' ? (
-                      <TrashPage />
-                    ) : activeTab.kind === 'settings' ? (
-                      <SettingsPage anchor={activeTab.subTab} />
-                    ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (
-                      // 提交历史点开的独立 git 标签：原先没有渲染分支 → 整页空白（用户报障）
-                      activeTab.subTab === 'commit' && activeTab.targetPath !== null ? (
-                        <CommitView projectId={activeTab.projectId} hash={activeTab.targetPath} />
+                      {activeTab === null ? (
+                        <div />
+                      ) : activeTab.kind === 'overview' ? (
+                        <Workbench subTab={activeTab.subTab} />
+                      ) : activeTab.kind === 'project' && activeTab.projectId !== null ? (
+                        <ProjectPage projectId={activeTab.projectId} subTab={activeTab.subTab} />
+                      ) : activeTab.kind === 'trash' ? (
+                        <TrashPage />
+                      ) : activeTab.kind === 'settings' ? (
+                        <SettingsPage anchor={activeTab.subTab} />
+                      ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (
+                        // 提交历史点开的独立 git 标签：原先没有渲染分支 → 整页空白（用户报障）
+                        activeTab.subTab === 'commit' && activeTab.targetPath !== null ? (
+                          <CommitView projectId={activeTab.projectId} hash={activeTab.targetPath} />
+                        ) : (
+                          <GitTab projectId={activeTab.projectId} />
+                        )
+                      ) : activeTab.subTab === 'git-overview' ? (
+                        <GitOverview />
                       ) : (
-                        <GitTab projectId={activeTab.projectId} />
-                      )
-                    ) : activeTab.subTab === 'git-overview' ? (
-                      <GitOverview />
-                    ) : (
-                      <div />
-                    )}
+                        <div />
+                      )}
                     </PaneErrorBoundary>
                   </div>
                 }
                 right={
                   <div style={{ height: '100%', overflow: 'auto' }}>
-                    {activeTab !== null && activeTab.projectId !== null && <DetailPanel projectId={activeTab.projectId} />}
+                    {activeTab !== null && activeTab.projectId !== null && (
+                      <DetailPanel projectId={activeTab.projectId} />
+                    )}
                   </div>
                 }
               />
@@ -258,7 +294,12 @@ function Shell(): React.JSX.Element {
 
       <StatusBar sseState={sseState} />
       <CommandPalette />
-      <span data-testid="app-theme" data-dark={dark ? '1' : '0'} data-default-tab={settings.defaultProjectTab} hidden />
+      <span
+        data-testid="app-theme"
+        data-dark={dark ? '1' : '0'}
+        data-default-tab={settings.defaultProjectTab}
+        hidden
+      />
     </div>
   );
 }

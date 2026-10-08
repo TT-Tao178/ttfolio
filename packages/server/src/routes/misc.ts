@@ -3,11 +3,30 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import type { SessionTab } from '@ttfolio/shared';
-import { todosCreateSchema, todoPatchSchema, sessionPutSchema, openExternalSchema, openLogsSchema } from '@ttfolio/shared';
-import { listTodos, createTodo, patchTodo, deleteTodo, getSession, putSession } from '../db/repo/sessionRepo.js';
+import {
+  todosCreateSchema,
+  todoPatchSchema,
+  sessionPutSchema,
+  openExternalSchema,
+  openLogsSchema,
+} from '@ttfolio/shared';
+import {
+  listTodos,
+  createTodo,
+  patchTodo,
+  deleteTodo,
+  getSession,
+  putSession,
+} from '../db/repo/sessionRepo.js';
 import { logActivity } from '../db/repo/metaRepo.js';
 import { pickFolder, pickFile } from '../core/dialogs.js';
-import { openExplorer, openTerminal, runTemplate, renderTemplateArgs, validateTemplateArgs } from '../core/openExternal.js';
+import {
+  openExplorer,
+  openTerminal,
+  runTemplate,
+  renderTemplateArgs,
+  validateTemplateArgs,
+} from '../core/openExternal.js';
 import { listCommandTemplates } from '../db/repo/rulesRepo.js';
 import { resolveInProject } from '../roots.js';
 import { currentActor } from '../core/actor.js';
@@ -33,7 +52,12 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
       if (r.status === 'taken') {
         return fail('TRASH_PATH_TAKEN', '原路径已被占用，可指定其他目录恢复', 409, { originPath: b.id });
       }
-      logActivity(ctx.db(), { kind: 'trash.restore', level: 'L2', detail: { id: b.id, to: r.restoredTo }, actor: currentActor().actor });
+      logActivity(ctx.db(), {
+        kind: 'trash.restore',
+        level: 'L2',
+        detail: { id: b.id, to: r.restoredTo },
+        actor: currentActor().actor,
+      });
       ctx.sse.publish('trash.changed', {});
       ctx.sse.publish('fs.changed', { paths: [r.restoredTo ?? ''], kind: 'create' });
       return ok(r);
@@ -86,7 +110,7 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
       title: parsed.data.title,
       category: parsed.data.category ?? null,
       dueOn: parsed.data.dueOn ?? null,
-      sortOrder: parsed.data.sortOrder ?? Date.now() % 1e7
+      sortOrder: parsed.data.sortOrder ?? Date.now() % 1e7,
     });
     return ok(todo);
   });
@@ -113,7 +137,10 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
   app.put('/api/session', async (req) => {
     const parsed = sessionPutSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
-    putSession(ctx.db(), { tabs: parsed.data.tabs as unknown as SessionTab[], activeTabId: parsed.data.activeTabId ?? null });
+    putSession(ctx.db(), {
+      tabs: parsed.data.tabs as unknown as SessionTab[],
+      activeTabId: parsed.data.activeTabId ?? null,
+    });
     return ok({ saved: true });
   });
 
@@ -145,7 +172,13 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
     if (logs.success) {
       try {
         await openExplorer(ctx.layout.logDir);
-        logActivity(ctx.db(), { kind: 'open.external', level: 'L1', targetPath: ctx.layout.logDir, detail: { target: 'logs' }, actor: currentActor().actor });
+        logActivity(ctx.db(), {
+          kind: 'open.external',
+          level: 'L1',
+          targetPath: ctx.layout.logDir,
+          detail: { target: 'logs' },
+          actor: currentActor().actor,
+        });
         return ok({ opened: true });
       } catch (err) {
         return fail(...toApiErrorTuple(err));
@@ -174,11 +207,18 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
           path: target,
           file: st?.isDir === false ? path.basename(target) : '',
           project: path.basename(g.projectRoot),
-          paths: target
+          paths: target,
         });
         await runTemplate(t.executable, args);
       }
-      logActivity(ctx.db(), { kind: 'open.external', level: 'L2', projectId: b.projectId, targetPath: target, detail: { target: b.target, templateId: b.templateId }, actor: currentActor().actor });
+      logActivity(ctx.db(), {
+        kind: 'open.external',
+        level: 'L2',
+        projectId: b.projectId,
+        targetPath: target,
+        detail: { target: b.target, templateId: b.templateId },
+        actor: currentActor().actor,
+      });
       return ok({ opened: true });
     } catch (err) {
       return fail(...toApiErrorTuple(err));

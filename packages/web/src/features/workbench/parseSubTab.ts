@@ -11,13 +11,20 @@ export function parseSubTab(subTab: string | null): Record<string, string> {
   if (subTab.startsWith('view:my-')) {
     const key = subTab.slice(8);
     switch (key) {
-      case 'dirty': return { status: 'active', dirty: '1' };
-      case 'nodocs': return { status: 'active', hasDocs: '0' };
-      case 'noarch': return { status: 'active', hasArch: '0' };
-      case 'unanalyzed': return { status: 'active', analyzed: '0' };
-      case 'stale': return { status: 'active', stale: '30' };
-      case 'archived': return { status: 'archived' };
-      default: return { status: 'active' };
+      case 'dirty':
+        return { status: 'active', dirty: '1' };
+      case 'nodocs':
+        return { status: 'active', hasDocs: '0' };
+      case 'noarch':
+        return { status: 'active', hasArch: '0' };
+      case 'unanalyzed':
+        return { status: 'active', analyzed: '0' };
+      case 'stale':
+        return { status: 'active', stale: '30' };
+      case 'archived':
+        return { status: 'archived' };
+      default:
+        return { status: 'active' };
     }
   }
   if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };

@@ -23,7 +23,7 @@ export class TaskManager {
 
   constructor(
     private readonly sse: SseHub,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   start(kind: TaskInfo['kind'], title: string, total: number, runner: Runner): string {
@@ -36,7 +36,7 @@ export class TaskManager {
       total,
       status: 'running',
       startedAt: new Date().toISOString(),
-      cancelled: false
+      cancelled: false,
     };
     this.tasks.set(taskId, record);
     const ctx: TaskContext = {
@@ -54,7 +54,7 @@ export class TaskManager {
         record.total = total_;
         if (phase) record.title = `${title} — ${phase}`;
         this.emitProgress(record);
-      }
+      },
     };
     void runner(ctx)
       .then(() => {
@@ -79,10 +79,13 @@ export class TaskManager {
       })
       .finally(() => {
         // 已结束的任务保留 10 分钟供查询
-        setTimeout(() => {
-          const t = this.tasks.get(taskId);
-          if (t && t.status !== 'running') this.tasks.delete(taskId);
-        }, 10 * 60 * 1000);
+        setTimeout(
+          () => {
+            const t = this.tasks.get(taskId);
+            if (t && t.status !== 'running') this.tasks.delete(taskId);
+          },
+          10 * 60 * 1000,
+        );
       });
     return taskId;
   }
@@ -119,7 +122,7 @@ export class TaskManager {
       total: t.total,
       status: t.status,
       title: t.title,
-      error: t.error
+      error: t.error,
     });
   }
 }

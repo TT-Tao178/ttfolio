@@ -6,7 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { runMigrations } from './db/migrate.js';
-import { insertProject, getProjectByPathKey, getProjectRow, patchProject, softDeleteProject, listProjects, checkPathOk } from './db/repo/projectsRepo.js';
+import {
+  insertProject,
+  getProjectByPathKey,
+  getProjectRow,
+  patchProject,
+  softDeleteProject,
+  listProjects,
+  checkPathOk,
+} from './db/repo/projectsRepo.js';
 import { getSession, putSession } from './db/repo/sessionRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
@@ -19,7 +27,12 @@ import { AppError } from './core/errors.js';
 let root: string;
 let projDir: string;
 let db: Database.Database;
-const noopCtx = { taskId: 't', checkCancelled: (): void => {}, isCancelled: (): boolean => false, progress: (): void => {} };
+const noopCtx = {
+  taskId: 't',
+  checkCancelled: (): void => {},
+  isCancelled: (): boolean => false,
+  progress: (): void => {},
+};
 
 function git(cwd: string, args: string[], input?: string): string {
   return execFileSync('git', args, { cwd, input, encoding: 'utf8' });
@@ -38,7 +51,10 @@ beforeAll(() => {
   fs.writeFileSync(path.join(projDir, 'README.md'), '# Demo\n内容一\n');
   fs.writeFileSync(path.join(projDir, 'docs', 'guide.md'), '# 指南\n唯有关键词 قاهرة\n');
   fs.writeFileSync(path.join(projDir, 'app.ts'), 'export const x = 1;\n');
-  fs.writeFileSync(path.join(projDir, 'package.json'), JSON.stringify({ name: 'demo', dependencies: { react: '^18' } }));
+  fs.writeFileSync(
+    path.join(projDir, 'package.json'),
+    JSON.stringify({ name: 'demo', dependencies: { react: '^18' } }),
+  );
   git(projDir, ['init', '-q', '-b', 'main']);
   git(projDir, ['config', 'user.email', 't@t.local']);
   git(projDir, ['config', 'user.name', 'T']);
@@ -52,7 +68,12 @@ afterAll(() => {
 });
 
 function register(): string {
-  const row = insertProject(db, { dirPath: projDir, dirPathKey: pathKey(projDir), diskName: path.basename(projDir), defaultArchDir: '架构图' });
+  const row = insertProject(db, {
+    dirPath: projDir,
+    dirPathKey: pathKey(projDir),
+    diskName: path.basename(projDir),
+    defaultArchDir: '架构图',
+  });
   return row.id;
 }
 
@@ -72,11 +93,21 @@ describe('分析器（红线 2/5/7）', () => {
   it('分析产出类型/语言/技术栈/Git 摘要且幂等', async () => {
     const id = (getProjectByPathKey(db, pathKey(projDir)) as { id: string }).id;
     const sse = new SseHub();
-    const r1 = await analyzeProject(db, { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' }, sse, noopCtx);
+    const r1 = await analyzeProject(
+      db,
+      { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse,
+      noopCtx,
+    );
     expect(r1.ok).toBe(true);
     const snap1 = listProjects(db, {})[0];
     if (snap1 === undefined) throw new Error('project missing');
-    const r2 = await analyzeProject(db, { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' }, sse, noopCtx);
+    const r2 = await analyzeProject(
+      db,
+      { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse,
+      noopCtx,
+    );
     const snap2 = listProjects(db, {})[0];
     if (snap2 === undefined) throw new Error('project missing');
     expect(r2.ok).toBe(true);
@@ -92,7 +123,12 @@ describe('分析器（红线 2/5/7）', () => {
     const before = git(projDir, ['status', '--porcelain=v2']);
     const id = (getProjectByPathKey(db, pathKey(projDir)) as { id: string }).id;
     const sse = new SseHub();
-    await analyzeProject(db, { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' }, sse, noopCtx);
+    await analyzeProject(
+      db,
+      { id, dirPath: projDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse,
+      noopCtx,
+    );
     const after = git(projDir, ['status', '--porcelain=v2']);
     expect(after).toBe(before);
   });
@@ -199,7 +235,12 @@ describe('失效项目：检测 → 重新定位 → 移除登记', () => {
   it('目录移动后置失效，relocate 语义改指新家恢复，移除登记后列表不可见', () => {
     const dirA = path.join(root, '失效项目A');
     fs.mkdirSync(dirA);
-    const idA = insertProject(db, { dirPath: dirA, dirPathKey: pathKey(dirA), diskName: '失效项目A', defaultArchDir: '架构图' }).id;
+    const idA = insertProject(db, {
+      dirPath: dirA,
+      dirPathKey: pathKey(dirA),
+      diskName: '失效项目A',
+      defaultArchDir: '架构图',
+    }).id;
 
     // 用户把目录移走 → 失效检测置 path_ok=0，且列表可按 pathOk 过滤出失效项
     const dirB = path.join(root, '失效项目A-新家');
@@ -210,7 +251,12 @@ describe('失效项目：检测 → 重新定位 → 移除登记', () => {
 
     // relocate 语义（路由层：先查重再 patch 回 path_ok=1）
     expect(getProjectByPathKey(db, pathKey(dirB))).toBeUndefined();
-    patchProject(db, idA, { dir_path: dirB, dir_path_key: pathKey(dirB), disk_name: path.basename(dirB), path_ok: 1 });
+    patchProject(db, idA, {
+      dir_path: dirB,
+      dir_path_key: pathKey(dirB),
+      disk_name: path.basename(dirB),
+      path_ok: 1,
+    });
     expect(getProjectByPathKey(db, pathKey(dirB))?.id).toBe(idA);
     expect(getProjectRow(db, idA)?.path_ok).toBe(1);
     expect(listProjects(db, { status: 'all', pathOk: false }).some((x) => x.id === idA)).toBe(false);
@@ -226,8 +272,32 @@ describe('失效项目：检测 → 重新定位 → 移除登记', () => {
 describe('会话恢复：活动标签（FR-1.4）', () => {
   it('PUT 的 activeTabId 被记住，GET 原样返回（不再恒等于第一个标签）', () => {
     const tabs = [
-      { id: 'tab-a', sortOrder: 0, kind: 'overview', projectId: null, targetPath: null, subTab: null, titleSnapshot: '工作台', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false },
-      { id: 'tab-b', sortOrder: 1, kind: 'project', projectId: 'p1', targetPath: 'src/app/store.ts', subTab: 'files', titleSnapshot: 'demo', scrollJson: null, navHistoryJson: null, navIndex: 1, isPinned: false }
+      {
+        id: 'tab-a',
+        sortOrder: 0,
+        kind: 'overview',
+        projectId: null,
+        targetPath: null,
+        subTab: null,
+        titleSnapshot: '工作台',
+        scrollJson: null,
+        navHistoryJson: null,
+        navIndex: 0,
+        isPinned: false,
+      },
+      {
+        id: 'tab-b',
+        sortOrder: 1,
+        kind: 'project',
+        projectId: 'p1',
+        targetPath: 'src/app/store.ts',
+        subTab: 'files',
+        titleSnapshot: 'demo',
+        scrollJson: null,
+        navHistoryJson: null,
+        navIndex: 1,
+        isPinned: false,
+      },
     ] as never;
     putSession(db, { tabs, activeTabId: 'tab-b' });
     const back = getSession(db);
@@ -238,7 +308,19 @@ describe('会话恢复：活动标签（FR-1.4）', () => {
 
   it('activeTabId 悬空（指向已关闭的标签）时回落到第一个标签而不是返回悬空 id', () => {
     const tabs = [
-      { id: 'tab-x', sortOrder: 0, kind: 'overview', projectId: null, targetPath: null, subTab: null, titleSnapshot: '工作台', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false }
+      {
+        id: 'tab-x',
+        sortOrder: 0,
+        kind: 'overview',
+        projectId: null,
+        targetPath: null,
+        subTab: null,
+        titleSnapshot: '工作台',
+        scrollJson: null,
+        navHistoryJson: null,
+        navIndex: 0,
+        isPinned: false,
+      },
     ] as never;
     putSession(db, { tabs, activeTabId: 'tab-gone' });
     expect(getSession(db).activeTabId).toBe('tab-x');
@@ -246,7 +328,19 @@ describe('会话恢复：活动标签（FR-1.4）', () => {
 
   it('activeTabId 为 null（老库补列后的情形）时回落到第一个标签', () => {
     const tabs = [
-      { id: 'tab-y', sortOrder: 0, kind: 'settings', projectId: null, targetPath: null, subTab: null, titleSnapshot: '设置', scrollJson: null, navHistoryJson: null, navIndex: 0, isPinned: false }
+      {
+        id: 'tab-y',
+        sortOrder: 0,
+        kind: 'settings',
+        projectId: null,
+        targetPath: null,
+        subTab: null,
+        titleSnapshot: '设置',
+        scrollJson: null,
+        navHistoryJson: null,
+        navIndex: 0,
+        isPinned: false,
+      },
     ] as never;
     putSession(db, { tabs, activeTabId: null });
     expect(getSession(db).activeTabId).toBe('tab-y');

@@ -21,7 +21,7 @@ interface CommitDetail extends GitLogEntry {
 export function CommitView({ projectId, hash }: { projectId: string; hash: string }): React.JSX.Element {
   const { data, isLoading, error } = useQuery({
     queryKey: ['git', projectId, 'commit', hash],
-    queryFn: () => api.get<CommitDetail>(`/api/git/${projectId}/commit/${encodeURIComponent(hash)}`)
+    queryFn: () => api.get<CommitDetail>(`/api/git/${projectId}/commit/${encodeURIComponent(hash)}`),
   });
 
   if (isLoading) return <Spin style={{ margin: '48px auto', display: 'block' }} />;
@@ -33,11 +33,21 @@ export function CommitView({ projectId, hash }: { projectId: string; hash: strin
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 12 }} data-testid="commit-view">
       <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <Tag className="tt-mono" color="blue">{data.short}</Tag>
+        <Tag className="tt-mono" color="blue">
+          {data.short}
+        </Tag>
         <strong style={{ fontSize: 14 }}>{data.subject}</strong>
-        <span style={{ fontSize: 12, opacity: 0.65 }}>{data.author} · {relTime(data.date)}</span>
+        <span style={{ fontSize: 12, opacity: 0.65 }}>
+          {data.author} · {relTime(data.date)}
+        </span>
         <span style={{ flex: 1 }} />
-        <Button size="small" className="tt-mono" onClick={() => { void navigator.clipboard.writeText(data.hash); }}>
+        <Button
+          size="small"
+          className="tt-mono"
+          onClick={() => {
+            void navigator.clipboard.writeText(data.hash);
+          }}
+        >
           复制完整 hash
         </Button>
       </div>
@@ -48,14 +58,19 @@ export function CommitView({ projectId, hash }: { projectId: string; hash: strin
         locale={{ emptyText: '无变更文件' }}
         renderItem={(f) => (
           <List.Item style={{ padding: '2px 0' }}>
-            <span className="tt-mono tt-ellipsis" style={{ fontSize: 12, flex: 1 }}>{f.path}</span>
+            <span className="tt-mono tt-ellipsis" style={{ fontSize: 12, flex: 1 }}>
+              {f.path}
+            </span>
             <Tag style={{ fontSize: 10 }}>{f.status}</Tag>
           </List.Item>
         )}
       />
       <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
         {data.patch === '' ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="这个提交没有文本差异（可能是空提交或纯二进制变更）" />
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="这个提交没有文本差异（可能是空提交或纯二进制变更）"
+          />
         ) : (
           <DiffView patch={data.patch} truncated={data.truncated === true} />
         )}

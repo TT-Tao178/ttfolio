@@ -10,7 +10,7 @@ export const projectTypeSchema = z.enum([
   'microservice',
   'script',
   'assets',
-  'unknown'
+  'unknown',
 ]);
 
 // ---------- 系统 ----------
@@ -21,13 +21,13 @@ export const ignoreRuleCreateSchema = z.object({
   projectId: z.string().nullish(),
   pattern: z.string().min(1),
   mode: z.enum(['hide', 'analyze_only']).default('hide'),
-  enabled: z.boolean().default(true)
+  enabled: z.boolean().default(true),
 });
 
 export const ignoreRuleUpdateSchema = z.object({
   pattern: z.string().min(1).optional(),
   mode: z.enum(['hide', 'analyze_only']).optional(),
-  enabled: z.boolean().optional()
+  enabled: z.boolean().optional(),
 });
 
 export const commandTemplateCreateSchema = z.object({
@@ -37,7 +37,7 @@ export const commandTemplateCreateSchema = z.object({
   needsConfirm: z.boolean().default(true),
   platforms: z.string().nullish(),
   enabled: z.boolean().default(true),
-  sortOrder: z.number().default(0)
+  sortOrder: z.number().default(0),
 });
 
 export const commandTemplateUpdateSchema = z.object({
@@ -46,14 +46,14 @@ export const commandTemplateUpdateSchema = z.object({
   argsJson: z.array(z.string()).min(1).optional(),
   needsConfirm: z.boolean().optional(),
   enabled: z.boolean().optional(),
-  sortOrder: z.number().optional()
+  sortOrder: z.number().optional(),
 });
 
 export const openExternalSchema = z.object({
   target: z.enum(['explorer', 'terminal', 'template']),
   projectId: z.string(),
   path: z.string().optional(),
-  templateId: z.string().optional()
+  templateId: z.string().optional(),
 });
 
 /**
@@ -68,7 +68,7 @@ export const openLogsSchema = z.object({ target: z.literal('logs') }).strict();
 // ---------- 项目 ----------
 export const addProjectsSchema = z.union([
   z.object({ paths: z.array(z.string().min(1)).min(1) }),
-  z.object({ parentPath: z.string().min(1), children: z.array(z.string().min(1)).min(1) })
+  z.object({ parentPath: z.string().min(1), children: z.array(z.string().min(1)).min(1) }),
 ]);
 
 export const projectPatchSchema = z.object({
@@ -79,19 +79,19 @@ export const projectPatchSchema = z.object({
   notes: z.string().nullish(),
   isPinned: z.boolean().optional(),
   status: z.enum(['active', 'archived']).optional(),
-  defaultArchDir: z.string().max(100).optional()
+  defaultArchDir: z.string().max(100).optional(),
 });
 
 export const relocateSchema = z.object({ dirPath: z.string().min(1) });
 
 export const renameDiskSchema = z.object({
   newName: z.string().min(1).max(100),
-  confirmText: z.string().min(1)
+  confirmText: z.string().min(1),
 });
 
 export const deleteProjectSchema = z.object({
   mode: z.enum(['unregister', 'delete']).default('unregister'),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const analyzeBodySchema = z.object({ projectIds: z.array(z.string()).optional() });
@@ -99,18 +99,18 @@ export const analyzeBodySchema = z.object({ projectIds: z.array(z.string()).opti
 export const collectionCreateSchema = z.object({ name: z.string().min(1), note: z.string().nullish() });
 export const collectionPatchSchema = z.object({
   name: z.string().min(1).optional(),
-  note: z.string().nullish().optional()
+  note: z.string().nullish().optional(),
 });
 export const collectionMembersSchema = z.object({
   projectIds: z.array(z.string()).min(0),
-  replace: z.boolean().default(false)
+  replace: z.boolean().default(false),
 });
 
 // ---------- 文件 ----------
 export const fsTreeQuerySchema = z.object({
   projectId: z.string(),
   path: z.string().default(''),
-  showIgnored: z.enum(['0', '1', 'true', 'false']).default('false')
+  showIgnored: z.enum(['0', '1', 'true', 'false']).default('false'),
 });
 
 export const fsFileQuerySchema = z.object({ projectId: z.string(), path: z.string().min(1) });
@@ -124,21 +124,21 @@ export const fsFileSaveSchema = z.object({
   baseHash: z.string().nullish(),
   encoding: z.string().default('utf8'),
   eol: z.enum(['CRLF', 'LF', 'MIXED']).default('LF'),
-  force: z.boolean().default(false)
+  force: z.boolean().default(false),
 });
 
 export const fsEntryCreateSchema = z.object({
   projectId: z.string(),
   parentPath: z.string().default(''),
   name: z.string().min(1),
-  kind: z.enum(['file', 'dir'])
+  kind: z.enum(['file', 'dir']),
 });
 
 export const fsRenameSchema = z.object({
   projectId: z.string(),
   path: z.string().min(1),
   newName: z.string().min(1),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const fsMoveSchema = z.object({
@@ -147,20 +147,20 @@ export const fsMoveSchema = z.object({
   targetDir: z.string().min(1),
   mode: z.enum(['move', 'copy']).default('move'),
   onConflict: z.enum(['ask', 'skip', 'overwrite']).default('ask'),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const fsDeleteSchema = z.object({
   projectId: z.string(),
   paths: z.array(z.string()).min(1),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const fsSearchQuerySchema = z.object({
   projectId: z.string(),
   q: z.string().min(1),
   caseSensitive: z.enum(['0', '1']).default('0'),
-  wholeWord: z.enum(['0', '1']).default('0')
+  wholeWord: z.enum(['0', '1']).default('0'),
 });
 
 export const draftPutSchema = z.object({
@@ -174,25 +174,25 @@ export const draftPutSchema = z.object({
   baseSize: z.number().int().nullish(),
   baseHash: z.string().nullish(),
   encoding: z.string().nullish(),
-  eol: z.string().nullish()
+  eol: z.string().nullish(),
 });
 
 // ---------- Git ----------
 export const gitPathsSchema = z.object({
   paths: z.array(z.string()).optional(),
-  all: z.boolean().default(false)
+  all: z.boolean().default(false),
 });
 
 export const gitDiscardSchema = z.object({
   paths: z.array(z.string()).min(1),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const gitCommitSchema = z.object({ message: z.string().min(1) });
 
 export const gitCheckoutSchema = z.object({
   branch: z.string().min(1),
-  confirmDirty: z.boolean().default(false)
+  confirmDirty: z.boolean().default(false),
 });
 
 export const gitBranchCreateSchema = z.object({ branch: z.string().min(1) });
@@ -203,7 +203,7 @@ export const docRootCreateSchema = z.object({ path: z.string().min(1), label: z.
 export const mountCreateSchema = z.object({
   path: z.string().min(1),
   kind: z.enum(['dir', 'file']).optional(),
-  label: z.string().nullish()
+  label: z.string().nullish(),
 });
 
 export const mountRelocateSchema = z.object({ path: z.string().min(1) });
@@ -211,7 +211,7 @@ export const mountRelocateSchema = z.object({ path: z.string().min(1) });
 export const docsContentQuerySchema = z.object({
   projectId: z.string(),
   path: z.string().min(1),
-  mountId: z.string().optional()
+  mountId: z.string().optional(),
 });
 
 export const docsContentPutSchema = z.object({
@@ -224,19 +224,19 @@ export const docsContentPutSchema = z.object({
   baseHash: z.string().nullish(),
   encoding: z.string().default('utf8'),
   eol: z.enum(['CRLF', 'LF', 'MIXED']).default('LF'),
-  force: z.boolean().default(false)
+  force: z.boolean().default(false),
 });
 
 export const archiveCreateSchema = z.object({
   projectId: z.string(),
   dirPath: z.string().min(1),
-  label: z.string().nullish()
+  label: z.string().nullish(),
 });
 
 export const archivePatchSchema = z.object({
   entryRel: z.string().nullish().optional(),
   isDefault: z.boolean().optional(),
-  label: z.string().nullish().optional()
+  label: z.string().nullish().optional(),
 });
 
 // ---------- 搜索 / 清单 / 会话 ----------
@@ -244,16 +244,23 @@ export const todosCreateSchema = z.object({
   projectId: z.string(),
   title: z.string().min(1),
   category: z.string().nullish(),
-  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
-  sortOrder: z.number().optional()
+  dueOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
+  sortOrder: z.number().optional(),
 });
 
 export const todoPatchSchema = z.object({
   title: z.string().min(1).optional(),
   category: z.string().nullish().optional(),
-  dueOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().optional(),
+  dueOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish()
+    .optional(),
   done: z.boolean().optional(),
-  sortOrder: z.number().optional()
+  sortOrder: z.number().optional(),
 });
 
 export const sessionPutSchema = z.object({
@@ -269,22 +276,22 @@ export const sessionPutSchema = z.object({
       scrollJson: z.string().nullish(),
       navHistoryJson: z.string().nullish(),
       navIndex: z.number().int().default(-1),
-      isPinned: z.boolean().default(false)
-    })
+      isPinned: z.boolean().default(false),
+    }),
   ),
-  activeTabId: z.string().nullish()
+  activeTabId: z.string().nullish(),
 });
 
 export const backupBodySchema = z.object({ confirm: z.boolean().optional() });
 
 export const restoreBodySchema = z.object({
   file: z.string().min(1),
-  confirm: z.boolean().optional()
+  confirm: z.boolean().optional(),
 });
 
 export const libraryResetSchema = z.object({ confirm: z.boolean().optional() });
 
 export const contextContractSchema = z.object({
   writeToProject: z.boolean().default(false),
-  fields: z.record(z.string(), z.string()).default({})
+  fields: z.record(z.string(), z.string()).default({}),
 });

@@ -32,7 +32,13 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
   const pathKey = `${projectId}:${path}`.toLowerCase();
 
   const [value, setValue] = useState<string>('');
-  const [base, setBase] = useState<{ mtime: string; size: number; hash: string; encoding: FileContent['encoding']; eol: FileContent['eol'] } | null>(null);
+  const [base, setBase] = useState<{
+    mtime: string;
+    size: number;
+    hash: string;
+    encoding: FileContent['encoding'];
+    eol: FileContent['eol'];
+  } | null>(null);
   const [dirty, setDirty] = useState(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
   const [externalChanged, setExternalChanged] = useState(false);
@@ -54,18 +60,21 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
 
   const { data: file, error } = useQuery({
     queryKey: ['file', projectId, path],
-    queryFn: () => api.get<FileContent>('/api/fs/file', { projectId, path })
+    queryFn: () => api.get<FileContent>('/api/fs/file', { projectId, path }),
   });
 
   const { data: draft, isFetchedAfterMount: draftFetchedAfterMount } = useQuery({
     queryKey: ['draft', pathKey],
     queryFn: () =>
-      api.get<{ content: string; updatedAt: string } | null>('/api/drafts', { scope: 'project_file', pathKey }),
+      api.get<{ content: string; updatedAt: string } | null>('/api/drafts', {
+        scope: 'project_file',
+        pathKey,
+      }),
     enabled: file !== undefined,
     // 必须每次挂载都重取：全局 staleTime=15s 会让"刚打开过、当时没有草稿"的 null 结果被缓存住，
     // 于是后退/前进或切标签回来时（组件重新挂载）拿到陈旧的 null → 有草稿却不恢复。
     staleTime: 0,
-    refetchOnMount: 'always'
+    refetchOnMount: 'always',
   });
 
   // 载入/重载：只在"换了文件"或"磁盘版本真的变了"时重置缓冲区
@@ -90,13 +99,23 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
       return;
     }
     const hasDraft =
-      !forceReload && draft !== null && draft !== undefined && draft.content !== '' && draft.content !== file.content;
+      !forceReload &&
+      draft !== null &&
+      draft !== undefined &&
+      draft.content !== '' &&
+      draft.content !== file.content;
     if (sameVersion) {
       // 磁盘内容已经在编辑器里了，这一轮只为"草稿是否要填进去"服务，不动其它状态
       if (hasDraft && draft !== null && draft !== undefined) {
         setValue(draft.content);
         setDirty(true);
-        setBase({ mtime: file.mtime, size: file.size, hash: file.hash, encoding: file.encoding, eol: file.eol });
+        setBase({
+          mtime: file.mtime,
+          size: file.size,
+          hash: file.hash,
+          encoding: file.encoding,
+          eol: file.eol,
+        });
         void message.info('已恢复未保存的草稿');
       }
       // draftApplied 如实反映"这一次是否处理过草稿结果"：文件查询通常先于草稿查询返回，
@@ -135,7 +154,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           baseHash: base.hash,
           encoding: base.encoding,
           eol: base.eol,
-          force
+          force,
         });
         setBase({ ...base, mtime: r.mtime, size: r.size, hash: r.hash });
         setDirty(false);
@@ -155,7 +174,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         setSaving(false);
       }
     },
-    [base, projectId, path, pathKey, draftKey, message, queryClient, saving]
+    [base, projectId, path, pathKey, draftKey, message, queryClient, saving],
   );
 
   // Ctrl+S
@@ -188,7 +207,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           baseSize: base?.size ?? null,
           baseHash: base?.hash ?? null,
           encoding: base?.encoding ?? 'utf8',
-          eol: base?.eol ?? 'LF'
+          eol: base?.eol ?? 'LF',
         })
         .catch(() => {});
     }, DRAFT_DEBOUNCE_MS);
@@ -200,7 +219,10 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
       setDirty(false);
       // 标记"本版本已处理过草稿"，否则草稿查询一到齐就会把刚放弃的内容again 恢复回来
       if (file !== undefined) {
-        loadedRef.current = { version: `${path}|${file.mtime}|${file.size}|${file.hash}`, draftApplied: true };
+        loadedRef.current = {
+          version: `${path}|${file.mtime}|${file.size}|${file.hash}`,
+          draftApplied: true,
+        };
       }
       setConflict(null);
       void message.info('已放弃本地改动，载入磁盘版本（草稿保留 24h）');
@@ -220,7 +242,13 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
   if (error !== undefined && error !== null) {
     // 目录被误当文件打开时给出可读提示（后端已把 EISDIR 映射为业务错误码 IS_DIRECTORY）
     if (error instanceof ApiClientError && error.code === 'IS_DIRECTORY') {
-      return <Alert type="info" message="这是一个目录" description="目录不能作为文件打开；在左侧点击文件夹前的箭头即可展开。" />;
+      return (
+        <Alert
+          type="info"
+          message="这是一个目录"
+          description="目录不能作为文件打开；在左侧点击文件夹前的箭头即可展开。"
+        />
+      );
     }
     return <Alert type="error" message={error instanceof Error ? error.message : '打开失败'} />;
   }
@@ -231,26 +259,55 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         type="info"
         message="二进制文件"
         description="该文件是二进制格式，不提供编辑器预览。"
-        action={<Button onClick={() => window.open(rawUrl(projectId, path), '_blank')}>用外部程序打开</Button>}
+        action={
+          <Button onClick={() => window.open(rawUrl(projectId, path), '_blank')}>用外部程序打开</Button>
+        }
       />
     );
   }
   if (file.tooLarge || file.truncated) {
-    return <Alert type="warning" message="文件过大（>5MB）" description="仅支持只读预览前 5MB，建议用外部编辑器打开。" />;
+    return (
+      <Alert
+        type="warning"
+        message="文件过大（>5MB）"
+        description="仅支持只读预览前 5MB，建议用外部编辑器打开。"
+      />
+    );
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }} data-testid="editor-pane" data-path={path}>
+    <div
+      style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      data-testid="editor-pane"
+      data-path={path}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-        <span className="tt-mono tt-ellipsis" style={{ fontSize: 12 }}>{path}</span>
+        <span className="tt-mono tt-ellipsis" style={{ fontSize: 12 }}>
+          {path}
+        </span>
         {dirty && (
-          <span title="未保存" data-testid="dirty-dot" style={{ width: 8, height: 8, borderRadius: 4, background: SEMANTIC.warning, display: 'inline-block' }} />
+          <span
+            title="未保存"
+            data-testid="dirty-dot"
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              background: SEMANTIC.warning,
+              display: 'inline-block',
+            }}
+          />
         )}
         <Tag>{file.encoding}</Tag>
         <Tag>{file.eol}</Tag>
         <div style={{ flex: 1 }} />
         <Space>
-          <Button size="small" disabled={!dirty || saving} onClick={() => void save(false)} data-testid="save-btn">
+          <Button
+            size="small"
+            disabled={!dirty || saving}
+            onClick={() => void save(false)}
+            data-testid="save-btn"
+          >
             保存 (Ctrl+S)
           </Button>
         </Space>
@@ -263,8 +320,19 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           style={{ marginBottom: 4 }}
           action={
             <Space>
-              <Button size="small" onClick={() => { setExternalChanged(false); setForceReload(true); void queryClient.invalidateQueries({ queryKey: ['file', projectId, path] }); }}>重新加载</Button>
-              <Button size="small" onClick={() => setExternalChanged(false)}>忽略</Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  setExternalChanged(false);
+                  setForceReload(true);
+                  void queryClient.invalidateQueries({ queryKey: ['file', projectId, path] });
+                }}
+              >
+                重新加载
+              </Button>
+              <Button size="small" onClick={() => setExternalChanged(false)}>
+                忽略
+              </Button>
             </Space>
           }
         />
@@ -284,16 +352,29 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         title="保存冲突：文件已在磁盘上被修改"
         onCancel={() => setConflict(null)}
         footer={[
-          <Button key="diff" onClick={() => window.open(rawUrl(projectId, path), '_blank')}>对比（查看磁盘版本）</Button>,
-          <Button key="discard" danger onClick={discardLocal}>放弃本地改动</Button>,
-          <Button key="overwrite" type="primary" danger onClick={() => { setConflict(null); void save(true); }}>
+          <Button key="diff" onClick={() => window.open(rawUrl(projectId, path), '_blank')}>
+            对比（查看磁盘版本）
+          </Button>,
+          <Button key="discard" danger onClick={discardLocal}>
+            放弃本地改动
+          </Button>,
+          <Button
+            key="overwrite"
+            type="primary"
+            danger
+            onClick={() => {
+              setConflict(null);
+              void save(true);
+            }}
+          >
             用我的内容覆盖磁盘
-          </Button>
+          </Button>,
         ]}
       >
         <p>你的改动仍在（草稿已保留）。磁盘版本摘要：</p>
         <pre className="tt-mono" style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>
-          {conflict !== null && `mtime: ${conflict.disk.mtime}\nsize: ${conflict.disk.size}\nhash: ${conflict.disk.hash}`}
+          {conflict !== null &&
+            `mtime: ${conflict.disk.mtime}\nsize: ${conflict.disk.size}\nhash: ${conflict.disk.hash}`}
         </pre>
         <p style={{ opacity: 0.7 }}>选择：对比后决定 / 放弃本地 / 直接覆盖（不可撤销，建议先对比）。</p>
       </Modal>

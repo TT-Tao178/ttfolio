@@ -20,7 +20,7 @@ export const ERROR_CODES = [
   'TRASH_PATH_TAKEN',
   'CANCELLED',
   'BAD_REQUEST',
-  'INTERNAL'
+  'INTERNAL',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

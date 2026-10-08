@@ -37,9 +37,13 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
   const [archId, setArchId] = useState<string | null>(null);
   const [selectedRel, setSelectedRel] = useState<string | null>(null);
 
-  const { data: archives, isLoading, error } = useQuery({
+  const {
+    data: archives,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['archives', projectId],
-    queryFn: () => api.get<ArchiveInfo[]>(`/api/projects/${projectId}/archives`)
+    queryFn: () => api.get<ArchiveInfo[]>(`/api/projects/${projectId}/archives`),
   });
 
   const current: ArchiveInfo | null = useMemo(() => {
@@ -54,7 +58,7 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
     const all: ArchFile[] = [
       ...current.htmlFiles.map((f) => ({ ...f, kind: 'html' as const })),
       ...current.imageFiles.map((f) => ({ ...f, kind: 'image' as const, hasSourceJson: false })),
-      ...current.textFiles.map((f) => ({ ...f, kind: 'text' as const, hasSourceJson: false }))
+      ...current.textFiles.map((f) => ({ ...f, kind: 'text' as const, hasSourceJson: false })),
     ];
     return all.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
   }, [current]);
@@ -78,7 +82,9 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
         if (selected.rel.toLowerCase().endsWith('.json')) {
           try {
             raw = JSON.stringify(JSON.parse(raw), null, 2);
-          } catch { /* 非 JSON 内容原样展示 */ }
+          } catch {
+            /* 非 JSON 内容原样展示 */
+          }
         }
         setTextContent(raw);
       })
@@ -122,13 +128,35 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
 
   const preview = (): React.JSX.Element => {
     if (current === null || selected === null) {
-      return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="选择左侧文件查看" style={{ marginTop: 64 }} />;
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="选择左侧文件查看"
+          style={{ marginTop: 64 }}
+        />
+      );
     }
     const url = archUrl(projectId, current.id, selected.rel);
     if (selected.kind === 'image') {
       return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 12, overflow: 'auto' }}>
-          <img src={url} alt={selected.rel} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} data-testid="archive-image" />
+        <div
+          style={{
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: SEMANTIC.layoutBg,
+            borderRadius: 8,
+            padding: 12,
+            overflow: 'auto',
+          }}
+        >
+          <img
+            src={url}
+            alt={selected.rel}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            data-testid="archive-image"
+          />
         </div>
       );
     }
@@ -139,8 +167,20 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
           <pre
             data-testid="archive-text"
             className="tt-mono"
-            style={{ flex: 1, overflow: 'auto', background: SEMANTIC.layoutBg, borderRadius: 8, padding: 12, margin: 0, fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-          >{textContent ?? '加载中…'}</pre>
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              background: SEMANTIC.layoutBg,
+              borderRadius: 8,
+              padding: 12,
+              margin: 0,
+              fontSize: 12,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+            }}
+          >
+            {textContent ?? '加载中…'}
+          </pre>
         </div>
       );
     }
@@ -148,7 +188,13 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
       <iframe
         src={url}
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-        style={{ width: '100%', height: '100%', border: 'none', borderRadius: 8, background: SEMANTIC.layoutBg }}
+        style={{
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          borderRadius: 8,
+          background: SEMANTIC.layoutBg,
+        }}
         title="architecture-viewer"
       />
     );
@@ -157,15 +203,30 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
   const fileList = (): React.JSX.Element => (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 8 }}>
       {(archives ?? []).length > 1 && (
-        <Select value={current?.id} onChange={switchArchive} size="small" options={(archives ?? []).map((a) => ({ value: a.id, label: a.label ?? a.dirPath }))} />
+        <Select
+          value={current?.id}
+          onChange={switchArchive}
+          size="small"
+          options={(archives ?? []).map((a) => ({ value: a.id, label: a.label ?? a.dirPath }))}
+        />
       )}
-      {current !== null && current.changed && <Alert type="info" showIcon message="架构图已更新（文件数或入口内容有变化）" style={{ padding: '4px 12px' }} />}
+      {current !== null && current.changed && (
+        <Alert
+          type="info"
+          showIcon
+          message="架构图已更新（文件数或入口内容有变化）"
+          style={{ padding: '4px 12px' }}
+        />
+      )}
       <div style={{ fontSize: 12, opacity: 0.75 }}>
         {current?.label ?? current?.dirPath} · 入口：{current?.entryRel ?? '（无）'}
       </div>
       <div style={{ flex: 1, overflow: 'auto' }} data-testid="archive-file-list">
         {files.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="目录里没有可查看的文件（支持 HTML 与图片）" />
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="目录里没有可查看的文件（支持 HTML 与图片）"
+          />
         ) : (
           <List
             size="small"
@@ -176,7 +237,7 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
                   padding: '3px 6px',
                   cursor: 'pointer',
                   borderRadius: 4,
-                  background: selectedRel === f.rel ? SEMANTIC.primaryBg : undefined
+                  background: selectedRel === f.rel ? SEMANTIC.primaryBg : undefined,
                 }}
                 onClick={() => openFile(f)}
                 data-testid="archive-file-item"
@@ -184,8 +245,17 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
                 <span className="tt-ellipsis" style={{ flex: 1, fontSize: 12 }} title={f.rel}>
                   {f.rel.includes('/') ? f.rel.slice(f.rel.lastIndexOf('/') + 1) : f.rel}
                 </span>
-                {current?.entryRel === f.rel && <Tag color="blue" style={{ marginRight: 0 }}>入口</Tag>}
-                <Tag style={{ marginRight: 0 }} color={f.kind === "html" ? "green" : f.kind === "image" ? "purple" : "geekblue"}>{f.kind === "html" ? "HTML" : f.kind === "image" ? "图片" : "文本"}</Tag>
+                {current?.entryRel === f.rel && (
+                  <Tag color="blue" style={{ marginRight: 0 }}>
+                    入口
+                  </Tag>
+                )}
+                <Tag
+                  style={{ marginRight: 0 }}
+                  color={f.kind === 'html' ? 'green' : f.kind === 'image' ? 'purple' : 'geekblue'}
+                >
+                  {f.kind === 'html' ? 'HTML' : f.kind === 'image' ? '图片' : '文本'}
+                </Tag>
                 <span style={{ fontSize: 11, opacity: 0.55 }}>{relTime(f.mtime)}</span>
               </List.Item>
             )}
@@ -208,7 +278,12 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
           <Space size={4} wrap>
             <ApartmentOutlined />
             <strong>架构图</strong>
-            {current !== null && <Tag>{current.htmlCount} HTML · {(current.imageFiles ?? []).length} 图片 · {fmtBytes(current.totalBytes)}</Tag>}
+            {current !== null && (
+              <Tag>
+                {current.htmlCount} HTML · {(current.imageFiles ?? []).length} 图片 ·{' '}
+                {fmtBytes(current.totalBytes)}
+              </Tag>
+            )}
             {current !== null && current.isDefault && <Tag color="blue">默认</Tag>}
             <Button
               size="small"
@@ -221,24 +296,43 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
                 <Button
                   size="small"
                   icon={<FullscreenOutlined />}
-                  onClick={() => current !== null && selected !== null && window.open(archUrl(projectId, current.id, selected.rel), '_blank')}
+                  onClick={() =>
+                    current !== null &&
+                    selected !== null &&
+                    window.open(archUrl(projectId, current.id, selected.rel), '_blank')
+                  }
                 />
               </Tooltip>
             )}
             {current !== null && (
               <Tooltip title="复制目录路径">
-                <Button size="small" onClick={() => { void navigator.clipboard.writeText(current.dirPath); void message.success('已复制'); }} />
+                <Button
+                  size="small"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(current.dirPath);
+                    void message.success('已复制');
+                  }}
+                />
               </Tooltip>
             )}
-            <Button size="small" icon={<FileAddOutlined />} onClick={() => setRegOpen(true)}>登记目录</Button>
-            {current !== null && current.entryRel !== null && current.entryRel !== '' && current.entrySource !== 'list' && (
-              <Button
-                size="small"
-                onClick={() => void api.patch(`/api/archives/${current.id}`, { entryRel: '' }).then(() => queryClient.invalidateQueries({ queryKey: ['archives', projectId] }))}
-              >
-                改为图集列表
-              </Button>
-            )}
+            <Button size="small" icon={<FileAddOutlined />} onClick={() => setRegOpen(true)}>
+              登记目录
+            </Button>
+            {current !== null &&
+              current.entryRel !== null &&
+              current.entryRel !== '' &&
+              current.entrySource !== 'list' && (
+                <Button
+                  size="small"
+                  onClick={() =>
+                    void api
+                      .patch(`/api/archives/${current.id}`, { entryRel: '' })
+                      .then(() => queryClient.invalidateQueries({ queryKey: ['archives', projectId] }))
+                  }
+                >
+                  改为图集列表
+                </Button>
+              )}
           </Space>
           <div style={{ flex: 1, minHeight: 0 }}>
             <PaneSplit
@@ -272,14 +366,23 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
             onChange={(e) => setRegPath(e.target.value)}
             placeholder="目录绝对路径（默认项目内 架构图/ 会自动登记）"
           />
-          <Button onClick={() => {
-            void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
-            void api.post('/api/dialogs/pick-folder').then((r) => {
-              const list = (r as { paths: string[] }).paths;
-              const first = list[0];
-              if (first !== undefined) setRegPath(first);
-            }).catch(() => { void message.error('打开系统对话框失败，请手动粘贴路径'); });
-          }}>选择…</Button>
+          <Button
+            onClick={() => {
+              void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
+              void api
+                .post('/api/dialogs/pick-folder')
+                .then((r) => {
+                  const list = (r as { paths: string[] }).paths;
+                  const first = list[0];
+                  if (first !== undefined) setRegPath(first);
+                })
+                .catch(() => {
+                  void message.error('打开系统对话框失败，请手动粘贴路径');
+                });
+            }}
+          >
+            选择…
+          </Button>
         </Space.Compact>
       </Modal>
     </div>

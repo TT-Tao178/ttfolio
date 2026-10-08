@@ -29,7 +29,12 @@ export async function analyzeProjects(ctx: AppContext, projectIds: string[]): Pr
       try {
         await analyzeProject(
           ctx.db(),
-          { id: row.id, dirPath: row.dir_path, typeSource: row.type_source, defaultArchDir: row.default_arch_dir },
+          {
+            id: row.id,
+            dirPath: row.dir_path,
+            typeSource: row.type_source,
+            defaultArchDir: row.default_arch_dir,
+          },
           ctx.sse,
           {
             taskId: taskCtx.taskId,
@@ -38,18 +43,17 @@ export async function analyzeProjects(ctx: AppContext, projectIds: string[]): Pr
             progress: (done_, total, phase) => {
               void total;
               void phase;
-            }
-          }
+            },
+          },
         );
       } catch (err) {
         if ((err as { code?: string }).code === 'CANCELLED') {
           inFlight.delete(row.id);
           throw err;
         }
-        ctx.db()
-          .prepare(
-            'UPDATE projects SET analyze_partial = 1, analyze_error = ? WHERE id = ?'
-          )
+        ctx
+          .db()
+          .prepare('UPDATE projects SET analyze_partial = 1, analyze_error = ? WHERE id = ?')
           .run(err instanceof Error ? err.message.slice(0, 300) : '分析失败', row.id);
         ctx.sse.publish('project.analyzed', { projectId: row.id });
       } finally {

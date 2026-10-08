@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
-import { assertNoWindowsPathHazards, assertSafeName, guardPath, isInsideOrEqual, resolveWithin } from './pathGuard.js';
+import {
+  assertNoWindowsPathHazards,
+  assertSafeName,
+  guardPath,
+  isInsideOrEqual,
+  resolveWithin,
+} from './pathGuard.js';
 import { AppError } from './errors.js';
 
 async function tmpDir(): Promise<string> {
@@ -64,7 +70,10 @@ describe('guardPath', () => {
     const root = await tmpDir();
     await fsp.mkdir(path.join(root, 'sub'));
     await fsp.writeFile(path.join(root, 'sub', 'a.txt'), 'x');
-    const g = await guardPath({ userPath: path.join(root, 'sub', 'a.txt'), allowedRoots: [root] }, { mustExist: true });
+    const g = await guardPath(
+      { userPath: path.join(root, 'sub', 'a.txt'), allowedRoots: [root] },
+      { mustExist: true },
+    );
     expect(g.relToRoot).toBe('sub/a.txt');
     await fsp.rm(root, { recursive: true, force: true });
   });
@@ -74,7 +83,10 @@ describe('guardPath', () => {
     const outside = await tmpDir();
     await fsp.writeFile(path.join(outside, 'secret.txt'), 's');
     await expect(
-      guardPath({ userPath: path.join(root, '..', path.basename(outside), 'secret.txt'), allowedRoots: [root] }, { mustExist: true })
+      guardPath(
+        { userPath: path.join(root, '..', path.basename(outside), 'secret.txt'), allowedRoots: [root] },
+        { mustExist: true },
+      ),
     ).rejects.toThrow(AppError);
     await fsp.rm(root, { recursive: true, force: true });
     await fsp.rm(outside, { recursive: true, force: true });
@@ -83,7 +95,7 @@ describe('guardPath', () => {
   it('拒绝白名单外的绝对路径', async () => {
     const root = await tmpDir();
     await expect(
-      guardPath({ userPath: 'C:\\Windows\\system32', allowedRoots: [root] }, { mustExist: false })
+      guardPath({ userPath: 'C:\\Windows\\system32', allowedRoots: [root] }, { mustExist: false }),
     ).rejects.toThrow(AppError);
     await fsp.rm(root, { recursive: true, force: true });
   });
@@ -95,7 +107,7 @@ describe('guardPath', () => {
     try {
       await fsp.symlink(path.join(outside, 't.txt'), path.join(root, 'link.txt'));
       await expect(
-        guardPath({ userPath: path.join(root, 'link.txt'), allowedRoots: [root] }, { mustExist: true })
+        guardPath({ userPath: path.join(root, 'link.txt'), allowedRoots: [root] }, { mustExist: true }),
       ).rejects.toThrow(AppError);
     } catch {
       // Windows 无符号链接权限时跳过该用例
@@ -106,7 +118,10 @@ describe('guardPath', () => {
 
   it('新建场景：父目录在白名单内时放行（mustExist=false）', async () => {
     const root = await tmpDir();
-    const g = await guardPath({ userPath: path.join(root, 'new.md'), allowedRoots: [root] }, { mustExist: false });
+    const g = await guardPath(
+      { userPath: path.join(root, 'new.md'), allowedRoots: [root] },
+      { mustExist: false },
+    );
     expect(g.relToRoot).toBe('new.md');
     await fsp.rm(root, { recursive: true, force: true });
   });

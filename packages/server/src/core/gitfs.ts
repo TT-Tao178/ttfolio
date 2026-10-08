@@ -22,7 +22,10 @@ export async function gitStatusMarks(db: Database.Database, projectId: string): 
     if (!st.isRepo) return marks;
     for (const e of [...st.staged, ...st.unstaged]) {
       if (e.state === 'staged') {
-        marks.set(e.path.toLowerCase(), e.x === 'A' ? 'added' : e.x === 'D' ? 'deleted' : e.x === 'R' ? 'renamed' : 'modified');
+        marks.set(
+          e.path.toLowerCase(),
+          e.x === 'A' ? 'added' : e.x === 'D' ? 'deleted' : e.x === 'R' ? 'renamed' : 'modified',
+        );
       } else if (e.state === 'conflicted') {
         marks.set(e.path.toLowerCase(), 'conflicted');
       } else {

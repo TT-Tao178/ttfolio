@@ -20,7 +20,9 @@ export interface TypeDetectInput {
 const FRONTEND_DIR_NAMES = new Set(['web', 'frontend', 'client', 'ui', 'app', 'h5']);
 const BACKEND_DIR_NAMES = new Set(['server', 'api', 'backend', 'service', 'services', 'gateway']);
 
-export function detectProjectType(input: TypeDetectInput): 'frontend' | 'backend' | 'split' | 'monolith' | 'microservice' | 'script' | 'assets' | 'unknown' {
+export function detectProjectType(
+  input: TypeDetectInput,
+): 'frontend' | 'backend' | 'split' | 'monolith' | 'microservice' | 'script' | 'assets' | 'unknown' {
   // 1) 微服务：≥2 个带清单子目录 + (compose 多 service 或 gateway 目录)
   if (input.manifestSubDirs.length >= 2 && (input.composeServices >= 2 || input.hasGatewayDir)) {
     return 'microservice';

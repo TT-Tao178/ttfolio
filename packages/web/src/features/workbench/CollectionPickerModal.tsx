@@ -17,8 +17,12 @@ import { api, ApiClientError } from '@/lib/api';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 
-export function CollectionPickerModal({ project, onClose }: {
-  project: ProjectSummary; onClose: () => void;
+export function CollectionPickerModal({
+  project,
+  onClose,
+}: {
+  project: ProjectSummary;
+  onClose: () => void;
 }): React.JSX.Element {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -28,7 +32,7 @@ export function CollectionPickerModal({ project, onClose }: {
   const [createdCols, setCreatedCols] = useState<CollectionInfo[]>([]);
   const { data: collections } = useQuery({
     queryKey: ['collections'],
-    queryFn: () => api.get<CollectionInfo[]>('/api/collections')
+    queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
   });
   const fetched = collections ?? [];
   // 展示与保存统一用合并视图：服务端列表 + 本地新建（去重，刷新落地后自然收敛）
@@ -58,7 +62,7 @@ export function CollectionPickerModal({ project, onClose }: {
       void invalidate();
       onClose();
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败'),
   });
 
   const create = useMutation({
@@ -72,11 +76,16 @@ export function CollectionPickerModal({ project, onClose }: {
       void queryClient.invalidateQueries({ queryKey: ['collections'] });
       void message.success(`已创建集合「${c?.name ?? ''}」并勾选`);
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '创建失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '创建失败'),
   });
 
   const goSettings = (): void => {
-    useAppStore.getState().openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: 'collections', scroll: 0 }, '设置');
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'settings', projectId: null, targetPath: null, subTab: 'collections', scroll: 0 },
+        '设置',
+      );
     onClose();
   };
 
@@ -95,11 +104,20 @@ export function CollectionPickerModal({ project, onClose }: {
       data-testid="collection-picker-modal"
     >
       {cols.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有集合" data-testid="collection-picker-empty">
-          <Button type="primary" onClick={goSettings}>去设置页创建</Button>
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="还没有集合"
+          data-testid="collection-picker-empty"
+        >
+          <Button type="primary" onClick={goSettings}>
+            去设置页创建
+          </Button>
         </Empty>
       ) : (
-        <div style={{ maxHeight: 280, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="collection-picker-list">
+        <div
+          style={{ maxHeight: 280, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}
+          data-testid="collection-picker-list"
+        >
           {cols.map((c) => (
             <Checkbox
               key={c.id}
@@ -125,7 +143,9 @@ export function CollectionPickerModal({ project, onClose }: {
           placeholder="新集合名称（回车创建并勾选）"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          onPressEnter={() => { if (newName.trim() !== '') create.mutate(); }}
+          onPressEnter={() => {
+            if (newName.trim() !== '') create.mutate();
+          }}
         />
         <Button
           size="small"

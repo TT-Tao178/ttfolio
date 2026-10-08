@@ -56,14 +56,16 @@ function startDialogBridge(token) {
       return;
     }
     let body = '';
-    req.on('data', (c) => { body += c; });
+    req.on('data', (c) => {
+      body += c;
+    });
     req.on('end', async () => {
       try {
         const parsed = JSON.parse(body || '{}');
         const kind = parsed.kind === 'file' ? 'file' : 'folder';
         const r = await dialog.showOpenDialog(win, {
           title: kind === 'file' ? '选择文件（可多选）' : '选择文件夹',
-          properties: kind === 'file' ? ['openFile', 'multiSelections'] : ['openDirectory']
+          properties: kind === 'file' ? ['openFile', 'multiSelections'] : ['openDirectory'],
         });
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ paths: r.canceled ? [] : r.filePaths }));
@@ -98,7 +100,14 @@ async function boot() {
   const bridgeToken = crypto.randomBytes(16).toString('hex');
   const bridge = await startDialogBridge(bridgeToken);
   process.env['TTFOLIO_PORT'] = String(appPort);
-  process.env['TTFOLIO_MIGRATIONS_DIR'] = path.join(__dirname, '..', 'packages', 'server', 'src', 'migrations');
+  process.env['TTFOLIO_MIGRATIONS_DIR'] = path.join(
+    __dirname,
+    '..',
+    'packages',
+    'server',
+    'src',
+    'migrations',
+  );
   process.env['TTFOLIO_WEB_DIST'] = path.join(__dirname, '..', 'packages', 'web', 'dist');
   process.env['TTFOLIO_DIALOG_BRIDGE_URL'] = `http://127.0.0.1:${bridge.port}/dialog`;
   process.env['TTFOLIO_DIALOG_BRIDGE_TOKEN'] = bridgeToken;
@@ -125,9 +134,11 @@ async function boot() {
     height: 900,
     autoHideMenuBar: true,
     title: 'TT项目管理工作台',
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => {
+    win = null;
+  });
   process.stdout.write(`[ttfolio-electron] server ready on 127.0.0.1:${appPort}, loading window\n`);
   await win.loadURL(`http://127.0.0.1:${appPort}/`);
 }
@@ -138,8 +149,11 @@ app.on('second-instance', () => {
     win.focus();
   }
 });
-app.whenReady().then(boot).catch((err) => {
-  dialog.showErrorBox('TT项目管理工作台启动失败', String(err && err.stack ? err.stack : err));
-  app.quit();
-});
+app
+  .whenReady()
+  .then(boot)
+  .catch((err) => {
+    dialog.showErrorBox('TT项目管理工作台启动失败', String(err && err.stack ? err.stack : err));
+    app.quit();
+  });
 app.on('window-all-closed', () => app.quit());

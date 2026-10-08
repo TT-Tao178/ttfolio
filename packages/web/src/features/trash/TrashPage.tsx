@@ -12,11 +12,15 @@ export function TrashPage(): React.JSX.Element {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState<TrashItem | null>(null);
-  const { data: items, isLoading, error } = useQuery({ queryKey: ['trash'], queryFn: () => api.get<TrashItem[]>('/api/trash') });
+  const {
+    data: items,
+    isLoading,
+    error,
+  } = useQuery({ queryKey: ['trash'], queryFn: () => api.get<TrashItem[]>('/api/trash') });
   const { data: previewData } = useQuery({
     queryKey: ['trash-preview', preview?.id],
     queryFn: () => api.get<{ entries: string[] }>(`/api/trash/${preview?.id}/preview`),
-    enabled: preview !== null
+    enabled: preview !== null,
   });
 
   const invalidate = (): void => {
@@ -48,12 +52,12 @@ export function TrashPage(): React.JSX.Element {
             } catch {
               void message.error('打开系统对话框失败');
             }
-          }
+          },
         });
         return;
       }
       void message.error(e instanceof ApiClientError ? e.message : '恢复失败');
-    }
+    },
   });
 
   const purge = useMutation({
@@ -61,7 +65,7 @@ export function TrashPage(): React.JSX.Element {
     onSuccess: () => {
       void message.success('已彻底删除');
       invalidate();
-    }
+    },
   });
 
   const empty = useMutation({
@@ -69,14 +73,17 @@ export function TrashPage(): React.JSX.Element {
     onSuccess: () => {
       void message.success('清空完成');
       invalidate();
-    }
+    },
   });
 
   return (
     <div style={{ padding: 16, height: '100%', overflow: 'auto' }} data-testid="trash-page">
       <Space style={{ marginBottom: 12 }}>
         <strong>回收站</strong>
-        <span style={{ fontSize: 12, opacity: 0.7 }}>{(items ?? []).length} 条 · {fmtBytes((items ?? []).reduce((a, t) => a + t.sizeBytes, 0))} · 默认保留 30 天（到期在设置页提示清理，不自动删）</span>
+        <span style={{ fontSize: 12, opacity: 0.7 }}>
+          {(items ?? []).length} 条 · {fmtBytes((items ?? []).reduce((a, t) => a + t.sizeBytes, 0))} ·
+          默认保留 30 天（到期在设置页提示清理，不自动删）
+        </span>
         <div style={{ flex: 1 }} />
         <Button
           danger
@@ -85,11 +92,12 @@ export function TrashPage(): React.JSX.Element {
           onClick={() =>
             modal.confirm({
               title: '清空回收站？',
-              content: '将彻底删除回收站内全部内容，不可恢复、不进任何回收站。项目文件中未被删除的部分不受影响。',
+              content:
+                '将彻底删除回收站内全部内容，不可恢复、不进任何回收站。项目文件中未被删除的部分不受影响。',
               okText: '清空（L3）',
               okButtonProps: { danger: true },
               cancelText: '取消',
-              onOk: () => empty.mutate()
+              onOk: () => empty.mutate(),
             })
           }
         >
@@ -105,14 +113,19 @@ export function TrashPage(): React.JSX.Element {
               okText: '清理（L3）',
               okButtonProps: { danger: true },
               cancelText: '取消',
-              onOk: () => void api.post('/api/trash/purge-old').then(invalidate)
+              onOk: () => void api.post('/api/trash/purge-old').then(invalidate),
             })
           }
         >
           清理超过保留期的条目
         </Button>
       </Space>
-      <StateView loading={isLoading} error={error} empty={(items ?? []).length === 0} emptyText="回收站是空的">
+      <StateView
+        loading={isLoading}
+        error={error}
+        empty={(items ?? []).length === 0}
+        emptyText="回收站是空的"
+      >
         <List
           dataSource={items ?? []}
           renderItem={(t) => (
@@ -120,11 +133,24 @@ export function TrashPage(): React.JSX.Element {
               <span style={{ display: 'inline-flex', gap: 8, width: '100%', alignItems: 'center' }}>
                 <Tag color={t.kind === 'dir' ? 'blue' : 'default'}>{t.kind === 'dir' ? '目录' : '文件'}</Tag>
                 <strong>{t.name}</strong>
-                <span className="tt-ellipsis tt-mono" style={{ fontSize: 12, flex: 1, opacity: 0.7 }}>{t.originPath}</span>
-                <span style={{ fontSize: 12, opacity: 0.6 }}>{fmtBytes(t.sizeBytes)} · {relTime(t.deletedAt)}</span>
+                <span className="tt-ellipsis tt-mono" style={{ fontSize: 12, flex: 1, opacity: 0.7 }}>
+                  {t.originPath}
+                </span>
+                <span style={{ fontSize: 12, opacity: 0.6 }}>
+                  {fmtBytes(t.sizeBytes)} · {relTime(t.deletedAt)}
+                </span>
                 <Space>
-                  <Button size="small" onClick={() => setPreview(t)}>预览</Button>
-                  <Button size="small" type="primary" icon={<UndoOutlined />} onClick={() => restore.mutate({ id: t.id })}>恢复</Button>
+                  <Button size="small" onClick={() => setPreview(t)}>
+                    预览
+                  </Button>
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<UndoOutlined />}
+                    onClick={() => restore.mutate({ id: t.id })}
+                  >
+                    恢复
+                  </Button>
                   <Button
                     size="small"
                     danger
@@ -136,7 +162,7 @@ export function TrashPage(): React.JSX.Element {
                         okText: '彻底删除（L3）',
                         okButtonProps: { danger: true },
                         cancelText: '取消',
-                        onOk: () => purge.mutate(t.id)
+                        onOk: () => purge.mutate(t.id),
                       })
                     }
                   />
@@ -147,11 +173,31 @@ export function TrashPage(): React.JSX.Element {
         />
       </StateView>
       {preview !== null && (
-        <Modal title={`预览：${preview.name}（前 50 条）`} open onCancel={() => setPreview(null)} footer={[<Button key="c" onClick={() => setPreview(null)}>关闭</Button>]}>
+        <Modal
+          title={`预览：${preview.name}（前 50 条）`}
+          open
+          onCancel={() => setPreview(null)}
+          footer={[
+            <Button key="c" onClick={() => setPreview(null)}>
+              关闭
+            </Button>,
+          ]}
+        >
           {(previewData?.entries ?? []).length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无法读取内容（可能已损坏）" />
           ) : (
-            <Alert type="info" message={<div style={{ maxHeight: 300, overflow: 'auto' }}>{(previewData?.entries ?? []).map((e) => <div key={e} className="tt-mono" style={{ fontSize: 12 }}>{e}</div>)}</div>} />
+            <Alert
+              type="info"
+              message={
+                <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                  {(previewData?.entries ?? []).map((e) => (
+                    <div key={e} className="tt-mono" style={{ fontSize: 12 }}>
+                      {e}
+                    </div>
+                  ))}
+                </div>
+              }
+            />
           )}
         </Modal>
       )}

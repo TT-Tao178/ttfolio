@@ -11,8 +11,17 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 
-export function MoveCopyModal({ projectId, items, mode, onClose, onDone }: {
-  projectId: string; items: string[]; mode: 'move' | 'copy' | null; onClose: () => void;
+export function MoveCopyModal({
+  projectId,
+  items,
+  mode,
+  onClose,
+  onDone,
+}: {
+  projectId: string;
+  items: string[];
+  mode: 'move' | 'copy' | null;
+  onClose: () => void;
   /** 成功后回调：移动/复制会让已展开子层的本地缓存过期，FilesTab 用它强制整树刷新 */
   onDone?: () => void;
 }): React.JSX.Element | null {
@@ -36,13 +45,17 @@ export function MoveCopyModal({ projectId, items, mode, onClose, onDone }: {
         onClose();
       })
       .catch((e: unknown) => {
-        if (e instanceof ApiClientError && e.code === 'INVALID_NAME' && (e.message ?? '').includes('目标已存在')) {
+        if (
+          e instanceof ApiClientError &&
+          e.code === 'INVALID_NAME' &&
+          (e.message ?? '').includes('目标已存在')
+        ) {
           modal.confirm({
             title: '目标目录存在同名项',
             content: `跳过同名项继续${verb}其余内容？（本轮不提供覆盖，避免误删目标已有文件）`,
             okText: '跳过同名项',
             cancelText: '取消',
-            onOk: () => submit('skip')
+            onOk: () => submit('skip'),
           });
           return;
         }
@@ -62,18 +75,13 @@ export function MoveCopyModal({ projectId, items, mode, onClose, onDone }: {
 
   if (mode === null) return null;
   return (
-    <Modal
-      title={`${verb} ${items.length} 项到…`}
-      open
-      onCancel={onClose}
-      footer={null}
-      width={560}
-    >
+    <Modal title={`${verb} ${items.length} 项到…`} open onCancel={onClose} footer={null} width={560}>
       {/* data-testid 放内层可见元素：Modal 根层是零高包裹层，visible 判定恒 false（round25 教训） */}
       <div data-testid="movecopy-modal">
         <p style={{ opacity: 0.75 }}>
           {items.join('、')}
-          <br />选择目标目录（目录与文件都会被{verb}；目标已存在同名项时可选择跳过）。
+          <br />
+          选择目标目录（目录与文件都会被{verb}；目标已存在同名项时可选择跳过）。
         </p>
         <Space.Compact style={{ width: '100%' }}>
           <Input
@@ -83,8 +91,15 @@ export function MoveCopyModal({ projectId, items, mode, onClose, onDone }: {
             placeholder="粘贴目标目录路径（须为项目内已存在的目录）"
             data-testid="movecopy-input"
           />
-          <Button icon={<FolderOpenOutlined />} onClick={() => void pick()} data-testid="movecopy-pick">选择目录…</Button>
-          <Button type="primary" disabled={targetDir.trim() === ''} onClick={() => submit('ask')} data-testid="movecopy-ok">
+          <Button icon={<FolderOpenOutlined />} onClick={() => void pick()} data-testid="movecopy-pick">
+            选择目录…
+          </Button>
+          <Button
+            type="primary"
+            disabled={targetDir.trim() === ''}
+            onClick={() => submit('ask')}
+            data-testid="movecopy-ok"
+          >
             {verb}
           </Button>
         </Space.Compact>

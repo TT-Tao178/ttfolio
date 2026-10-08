@@ -21,7 +21,9 @@ export interface MigrationOutcome {
 
 export function listMigrationFiles(): Array<{ version: number; file: string; sql: string }> {
   const dir = migrationsDir();
-  const files = readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
+  const files = readdirSync(dir)
+    .filter((f) => /^\d{4}_.*\.sql$/.test(f))
+    .sort();
   return files.map((file) => {
     const version = Number.parseInt(file.slice(0, 4), 10);
     return { version, file, sql: readFileSync(join(dir, file), 'utf8') };

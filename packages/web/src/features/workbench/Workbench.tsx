@@ -1,10 +1,20 @@
 /** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图 + 添加项目。 */
 import {
-  Button, Dropdown, Empty, Input, Menu, Modal, Segmented, Select, Space, Table, Tag, Tooltip, App
+  Button,
+  Dropdown,
+  Empty,
+  Input,
+  Menu,
+  Modal,
+  Segmented,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  App,
 } from 'antd';
-import {
-  InboxOutlined, MoreOutlined, PlusOutlined, ReloadOutlined
-} from '@ant-design/icons';
+import { InboxOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
@@ -58,9 +68,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 
   const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab);
-  const { data: allProjects, isLoading, error } = useQuery({
+  const {
+    data: allProjects,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['projects', filters, q, sort],
-    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { ...filters, q, sort })
+    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { ...filters, q, sort }),
   });
 
   const projects = (allProjects ?? []).filter((p) => !pinnedOnly || p.isPinned);
@@ -69,21 +83,27 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     // 默认落点跟随设置 default_project_tab（原先硬编码 files，设置里改了不生效）
     const sub = settings.defaultProjectTab === 'overview' ? 'overview' : 'files';
     if (sub === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 }, p.alias ?? p.diskName);
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 },
+        p.alias ?? p.diskName,
+      );
     void api.post(`/api/projects/${p.id}/open`);
   };
 
   const pin = useMutation({
-    mutationFn: (p: ProjectSummary) => api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
+    mutationFn: (p: ProjectSummary) =>
+      api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });
 
   const analyze = useMutation({
     mutationFn: (ids: string[]) => api.post('/api/projects/analyze', { projectIds: ids }),
-    onSuccess: () => void message.success('已开始重新分析')
+    onSuccess: () => void message.success('已开始重新分析'),
   });
 
   // 移除登记/移除并删除（与 ProjectCard 同款语义；确认弹窗在 confirmXxx 内）
@@ -94,7 +114,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       void message.success('已移除');
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });
   const confirmUnregister = (p: ProjectSummary): void => {
     modal.confirm({
@@ -102,7 +122,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
       okText: '移除登记',
       okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync({ p, mode: 'unregister' })
+      onOk: () => remove.mutateAsync({ p, mode: 'unregister' }),
     });
   };
   const confirmDelete = (p: ProjectSummary): void => {
@@ -111,13 +131,18 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
       okText: '移入回收站',
       okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync({ p, mode: 'delete' })
+      onOk: () => remove.mutateAsync({ p, mode: 'delete' }),
     });
   };
 
   const openFilesTab = (p: ProjectSummary): void => {
     useAppStore.getState().requestAutoOpenProject(p.id);
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 },
+        p.alias ?? p.diskName,
+      );
     void api.post(`/api/projects/${p.id}/open`);
   };
   const archiveProject = useArchiveProject();
@@ -132,7 +157,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       onRelocate: () => setRelocateProject(p),
       onUnregister: () => confirmUnregister(p),
       onDelete: () => confirmDelete(p),
-      message
+      message,
     });
 
   // 行右键菜单打开时，点击其它位置/滚动/Esc 关闭（与卡片受控菜单同款口径）
@@ -155,11 +180,24 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   }, [ctxMenu]);
 
   const columns = [
-    { title: '名称', dataIndex: 'diskName', render: (_: unknown, p: ProjectSummary) => (p.alias ?? p.diskName) + (p.alias !== null ? '（别名）' : '') },
+    {
+      title: '名称',
+      dataIndex: 'diskName',
+      render: (_: unknown, p: ProjectSummary) =>
+        (p.alias ?? p.diskName) + (p.alias !== null ? '（别名）' : ''),
+    },
     { title: '类型', dataIndex: 'type', render: (t: string) => typeLabel(t) },
     { title: '主语言', dataIndex: 'primaryLanguage', render: (v: string | null) => v ?? '—' },
-    { title: '规模', dataIndex: 'sizeBytes', render: (v: number, p: ProjectSummary) => `${p.fileCount} / ${fmtBytes(v)}` },
-    { title: 'Git', render: (_: unknown, p: ProjectSummary) => (p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' *' : ''}` : '—') },
+    {
+      title: '规模',
+      dataIndex: 'sizeBytes',
+      render: (v: number, p: ProjectSummary) => `${p.fileCount} / ${fmtBytes(v)}`,
+    },
+    {
+      title: 'Git',
+      render: (_: unknown, p: ProjectSummary) =>
+        p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' *' : ''}` : '—',
+    },
     { title: '最近打开', dataIndex: 'lastOpenedAt', render: (v: string | null) => relTime(v) },
     {
       title: '操作',
@@ -168,13 +206,16 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         return (
           <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
             <a onClick={() => openProjectTab(p)}>打开</a>
-            <Dropdown menu={{ items: menu.items, onClick: ({ key }) => menu.onAction(key) }} trigger={['click']}>
+            <Dropdown
+              menu={{ items: menu.items, onClick: ({ key }) => menu.onAction(key) }}
+              trigger={['click']}
+            >
               <MoreOutlined style={{ cursor: 'pointer' }} />
             </Dropdown>
           </span>
         );
-      }
-    }
+      },
+    },
   ];
 
   return (
@@ -187,99 +228,166 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         </>
       ) : (
         <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
-        <Input.Search
-          placeholder="搜索项目名 / 别名 / 路径 / 技术栈"
-          allowClear
-          style={{ width: 300 }}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <Select value={sort} onChange={(v) => { sortTouched.current = true; setSort(v); }} style={{ width: 140 }}
-          options={[
-            { value: 'last_opened', label: '最近打开' },
-            { value: 'last_commit', label: '最近提交' },
-            { value: 'name', label: '名称' },
-            { value: 'size', label: '体积' }
-          ]}
-        />
-        <Segmented options={[{ label: '卡片', value: 'card' }, { label: '表格', value: 'table' }]} value={view} onChange={(v) => setView(v as 'card' | 'table')} />
-        <div style={{ flex: 1 }} />
-        <Tooltip title="重建分析（全部项目）">
-          <Button icon={<ReloadOutlined />} onClick={() => analyze.mutate([])} />
-        </Tooltip>
-        {/* 归档的找回入口：归档后项目从卡片墙消失，这里进「已归档」视图（评审二.5 的闭环） */}
-        <Tooltip title="已归档项目（查看 / 恢复）">
-          <Button icon={<InboxOutlined />} data-testid="archived-view-btn" onClick={() => useAppStore.getState().openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: 'view:my-archived', scroll: 0 }, '已归档')} />
-        </Tooltip>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)} data-testid="add-project-btn">
-          添加项目
-        </Button>
-      </div>
-      <StateView loading={isLoading} error={error} empty={(projects ?? []).length === 0} emptyText="还没有登记任何项目" emptyAction={{ label: '添加第一个项目', onClick: () => setAddOpen(true) }}>
-        {view === 'card' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-            {(projects ?? []).map((p) => (
-              <ProjectCard key={p.id} p={p} onOpen={() => openProjectTab(p)} onPin={() => pin.mutate(p)} onAnalyze={() => analyze.mutate([p.id])} />
-            ))}
-          </div>
-        ) : (
-          <Table
-            rowKey="id"
-            columns={columns}
-            dataSource={projects ?? []}
-            size="middle"
-            pagination={{ pageSize: 30 }}
-            onRow={(p) => ({
-              onContextMenu: (e) => {
-                e.preventDefault();
-                setCtxMenu({
-                  x: Math.min(e.clientX, window.innerWidth - 232),
-                  y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520)),
-                  projectId: p.id
-                });
-              }
-            })}
-          />
-        )}
-      </StateView>
-      <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
-      {pickerProject !== null && (
-        <CollectionPickerModal key={pickerProject.id} project={pickerProject} onClose={() => setPickerProject(null)} />
-      )}
-      {relocateProject !== null && (
-        <RelocateModal
-          projectId={relocateProject.id}
-          name={relocateProject.alias ?? relocateProject.diskName}
-          dirPath={relocateProject.dirPath}
-          open
-          onClose={() => setRelocateProject(null)}
-        />
-      )}
-      {/* 表格行受控右键菜单：与卡片菜单同一份定义（projectMenu） */}
-      {ctxMenu !== null && (() => {
-        const p = (projects ?? []).find((x) => x.id === ctxMenu.projectId);
-        if (p === undefined) return null;
-        const menu = menuFor(p);
-        return (
-          <div
-            data-testid="table-row-ctx-menu"
-            style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <Menu
-              selectable={false}
-              style={{ border: 'none', background: 'transparent' }}
-              items={menu.items}
-              onClick={({ key }) => {
-                setCtxMenu(null);
-                menu.onAction(key);
-              }}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <Input.Search
+              placeholder="搜索项目名 / 别名 / 路径 / 技术栈"
+              allowClear
+              style={{ width: 300 }}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
             />
+            <Select
+              value={sort}
+              onChange={(v) => {
+                sortTouched.current = true;
+                setSort(v);
+              }}
+              style={{ width: 140 }}
+              options={[
+                { value: 'last_opened', label: '最近打开' },
+                { value: 'last_commit', label: '最近提交' },
+                { value: 'name', label: '名称' },
+                { value: 'size', label: '体积' },
+              ]}
+            />
+            <Segmented
+              options={[
+                { label: '卡片', value: 'card' },
+                { label: '表格', value: 'table' },
+              ]}
+              value={view}
+              onChange={(v) => setView(v as 'card' | 'table')}
+            />
+            <div style={{ flex: 1 }} />
+            <Tooltip title="重建分析（全部项目）">
+              <Button icon={<ReloadOutlined />} onClick={() => analyze.mutate([])} />
+            </Tooltip>
+            {/* 归档的找回入口：归档后项目从卡片墙消失，这里进「已归档」视图（评审二.5 的闭环） */}
+            <Tooltip title="已归档项目（查看 / 恢复）">
+              <Button
+                icon={<InboxOutlined />}
+                data-testid="archived-view-btn"
+                onClick={() =>
+                  useAppStore
+                    .getState()
+                    .openTab(
+                      {
+                        kind: 'overview',
+                        projectId: null,
+                        targetPath: null,
+                        subTab: 'view:my-archived',
+                        scroll: 0,
+                      },
+                      '已归档',
+                    )
+                }
+              />
+            </Tooltip>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setAddOpen(true)}
+              data-testid="add-project-btn"
+            >
+              添加项目
+            </Button>
           </div>
-        );
-      })()}
+          <StateView
+            loading={isLoading}
+            error={error}
+            empty={(projects ?? []).length === 0}
+            emptyText="还没有登记任何项目"
+            emptyAction={{ label: '添加第一个项目', onClick: () => setAddOpen(true) }}
+          >
+            {view === 'card' ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                {(projects ?? []).map((p) => (
+                  <ProjectCard
+                    key={p.id}
+                    p={p}
+                    onOpen={() => openProjectTab(p)}
+                    onPin={() => pin.mutate(p)}
+                    onAnalyze={() => analyze.mutate([p.id])}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Table
+                rowKey="id"
+                columns={columns}
+                dataSource={projects ?? []}
+                size="middle"
+                pagination={{ pageSize: 30 }}
+                onRow={(p) => ({
+                  onContextMenu: (e) => {
+                    e.preventDefault();
+                    setCtxMenu({
+                      x: Math.min(e.clientX, window.innerWidth - 232),
+                      y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520)),
+                      projectId: p.id,
+                    });
+                  },
+                })}
+              />
+            )}
+          </StateView>
+          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+          {pickerProject !== null && (
+            <CollectionPickerModal
+              key={pickerProject.id}
+              project={pickerProject}
+              onClose={() => setPickerProject(null)}
+            />
+          )}
+          {relocateProject !== null && (
+            <RelocateModal
+              projectId={relocateProject.id}
+              name={relocateProject.alias ?? relocateProject.diskName}
+              dirPath={relocateProject.dirPath}
+              open
+              onClose={() => setRelocateProject(null)}
+            />
+          )}
+          {/* 表格行受控右键菜单：与卡片菜单同一份定义（projectMenu） */}
+          {ctxMenu !== null &&
+            (() => {
+              const p = (projects ?? []).find((x) => x.id === ctxMenu.projectId);
+              if (p === undefined) return null;
+              const menu = menuFor(p);
+              return (
+                <div
+                  data-testid="table-row-ctx-menu"
+                  style={{
+                    position: 'fixed',
+                    left: ctxMenu.x,
+                    top: ctxMenu.y,
+                    zIndex: 1050,
+                    borderRadius: 8,
+                    background: SEMANTIC.layoutBg,
+                    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)',
+                    padding: 4,
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  <Menu
+                    selectable={false}
+                    style={{ border: 'none', background: 'transparent' }}
+                    items={menu.items}
+                    onClick={({ key }) => {
+                      setCtxMenu(null);
+                      menu.onAction(key);
+                    }}
+                  />
+                </div>
+              );
+            })()}
         </>
       )}
     </div>
@@ -289,14 +397,17 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element {
   const [text, setText] = useState('');
   const [parentPath, setParentPath] = useState('');
-  const [children, setChildren] = useState<Array<{ name: string; path: string; registered: boolean; checked: boolean }>>([]);
+  const [children, setChildren] = useState<
+    Array<{ name: string; path: string; registered: boolean; checked: boolean }>
+  >([]);
   const [picking, setPicking] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const { message } = App.useApp();
   const queryClient = useQueryClient();
 
   const add = useMutation({
-    mutationFn: (body: unknown) => api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>('/api/projects', body),
+    mutationFn: (body: unknown) =>
+      api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>('/api/projects', body),
     onSuccess: (r) => {
       if (r.added.length > 0) {
         void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
@@ -304,14 +415,18 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
         const st = useAppStore.getState();
         const cur = st.tabs.find((t) => t.id === st.activeTabId);
         if (cur?.kind === 'overview') st.updateActiveLocation({ subTab: 'view:all' }, true);
-        else st.openTab({ kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 }, '工作台');
+        else
+          st.openTab(
+            { kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 },
+            '工作台',
+          );
       }
       for (const s of r.skipped) void message.warning(`跳过 ${s.path}：${s.reason}`);
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
       onClose();
       setText('');
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '登记失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '登记失败'),
   });
 
   const pickFolder = async (): Promise<void> => {
@@ -347,7 +462,10 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   const loadChildren = async (): Promise<void> => {
     if (parentPath === '') return;
     try {
-      const r = await api.get<{ path: string; children: Array<{ name: string; path: string; registered: boolean }> }>('/api/folders/children', { path: parentPath });
+      const r = await api.get<{
+        path: string;
+        children: Array<{ name: string; path: string; registered: boolean }>;
+      }>('/api/folders/children', { path: parentPath });
       setChildren(r.children.map((c) => ({ ...c, checked: !c.registered })));
     } catch (e) {
       void message.error(e instanceof ApiClientError ? e.message : '读取子目录失败');
@@ -374,8 +492,15 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
             data-testid="paste-paths"
           />
           <Space style={{ marginTop: 8 }}>
-            <Button loading={picking} onClick={() => void pickFolder()}>系统对话框选择…</Button>
-            <Button type="primary" disabled={text.trim() === ''} data-testid="paste-add-btn" onClick={() => add.mutate({ paths: text.split(/\r?\n/) })}>
+            <Button loading={picking} onClick={() => void pickFolder()}>
+              系统对话框选择…
+            </Button>
+            <Button
+              type="primary"
+              disabled={text.trim() === ''}
+              data-testid="paste-add-btn"
+              onClick={() => add.mutate({ paths: text.split(/\r?\n/) })}
+            >
               登记以上目录
             </Button>
           </Space>
@@ -383,12 +508,27 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
         <div>
           <div style={{ marginBottom: 6 }}>② 从父目录批量登记</div>
           <Space.Compact style={{ width: '100%' }}>
-            <Input value={parentPath} onChange={(e) => setParentPath(e.target.value)} placeholder="父目录路径" />
-            <Button loading={browsing} onClick={() => void browseParent()}>选择…</Button>
+            <Input
+              value={parentPath}
+              onChange={(e) => setParentPath(e.target.value)}
+              placeholder="父目录路径"
+            />
+            <Button loading={browsing} onClick={() => void browseParent()}>
+              选择…
+            </Button>
             <Button onClick={() => void loadChildren()}>载入子目录</Button>
           </Space.Compact>
           {children.length > 0 && (
-            <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', border: `1px solid ${SEMANTIC.split}`, borderRadius: 6, padding: 8 }}>
+            <div
+              style={{
+                marginTop: 8,
+                maxHeight: 200,
+                overflow: 'auto',
+                border: `1px solid ${SEMANTIC.split}`,
+                borderRadius: 6,
+                padding: 8,
+              }}
+            >
               {children.map((c, i) => (
                 <label key={c.path} style={{ display: 'block' }}>
                   <input
@@ -413,7 +553,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
                 onClick={() =>
                   add.mutate({
                     parentPath,
-                    children: children.filter((c) => c.checked && !c.registered).map((c) => c.name)
+                    children: children.filter((c) => c.checked && !c.registered).map((c) => c.name),
                   })
                 }
               >
@@ -423,13 +563,13 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
           )}
         </div>
         <div style={{ fontSize: 12, opacity: 0.65 }}>
-          提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，拖拽添加暂不可用——请用上方三种入口（粘贴路径 / 系统对话框 / 父目录批量登记）。
+          提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，拖拽添加暂不可用——请用上方三种入口（粘贴路径 /
+          系统对话框 / 父目录批量登记）。
         </div>
       </div>
     </Modal>
   );
 }
-
 
 export function Empty_(props: { text: string }): React.JSX.Element {
   return <Empty description={props.text} />;

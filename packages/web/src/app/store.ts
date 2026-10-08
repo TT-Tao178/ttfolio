@@ -2,7 +2,8 @@
 import { create } from 'zustand';
 import { ulidLike } from '@/lib/ulid';
 
-export type TabKind = 'overview' | 'project' | 'file' | 'image' | 'doc' | 'archive' | 'git' | 'search' | 'settings' | 'trash';
+export type TabKind =
+  'overview' | 'project' | 'file' | 'image' | 'doc' | 'archive' | 'git' | 'search' | 'settings' | 'trash';
 
 export interface TabLocation {
   kind: TabKind;
@@ -59,7 +60,21 @@ interface AppState {
   /** 面包屑目录段点击的定位请求（第 26 轮）：FilesTab 监听 nonce 变化，展开树到该目录并选中 */
   treeLocate: { projectId: string; path: string; nonce: number } | null;
   setTreeLocate: (loc: { projectId: string; path: string }) => void;
-  syncFromServer: (tabs: Array<{ id: string; kind: TabKind; projectId?: string | null; targetPath?: string | null; subTab?: string | null; titleSnapshot?: string | null; scrollJson?: string | null; navHistoryJson?: string | null; navIndex?: number; isPinned?: boolean }>, activeId: string | null) => void;
+  syncFromServer: (
+    tabs: Array<{
+      id: string;
+      kind: TabKind;
+      projectId?: string | null;
+      targetPath?: string | null;
+      subTab?: string | null;
+      titleSnapshot?: string | null;
+      scrollJson?: string | null;
+      navHistoryJson?: string | null;
+      navIndex?: number;
+      isPinned?: boolean;
+    }>,
+    activeId: string | null,
+  ) => void;
 }
 
 function tabKey(loc: TabLocation): string {
@@ -105,7 +120,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       history: [{ ...loc }],
       historyIndex: 0,
       isPinned: false,
-      invalid: null
+      invalid: null,
     };
     set({ tabs: [...tabs, tab], activeTabId: tab.id });
   },
@@ -114,14 +129,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     const { tabs, activeTabId, dirty } = get();
     const tab = tabs.find((t) => t.id === id);
     if (tab === undefined) return null;
-    const tabDirtyKey = tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
+    const tabDirtyKey =
+      tab.projectId !== null && tab.targetPath !== null ? `${tab.projectId}|${tab.targetPath}` : null;
     if (tabDirtyKey !== null && dirty.has(tabDirtyKey)) return id;
     const idx = tabs.findIndex((t) => t.id === id);
     // 记入已关闭栈（供「恢复已关闭标签」；脏标签被拦截的不记）
-    set({ closedTabs: [...get().closedTabs, { loc: { kind: tab.kind, projectId: tab.projectId, targetPath: tab.targetPath, subTab: tab.subTab, scroll: tab.scroll }, title: tab.title }].slice(-10) });
+    set({
+      closedTabs: [
+        ...get().closedTabs,
+        {
+          loc: {
+            kind: tab.kind,
+            projectId: tab.projectId,
+            targetPath: tab.targetPath,
+            subTab: tab.subTab,
+            scroll: tab.scroll,
+          },
+          title: tab.title,
+        },
+      ].slice(-10),
+    });
     const next = tabs.filter((t) => t.id !== id);
-    const nextActive =
-      activeTabId === id ? (next[Math.min(idx, next.length - 1)]?.id ?? null) : activeTabId;
+    const nextActive = activeTabId === id ? (next[Math.min(idx, next.length - 1)]?.id ?? null) : activeTabId;
     set({ tabs: next, activeTabId: nextActive });
     return null;
   },
@@ -156,7 +185,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   togglePin: (id) => {
     set({
-      tabs: get().tabs.map((t) => (t.id === id ? { ...t, isPinned: !t.isPinned } : t))
+      tabs: get().tabs.map((t) => (t.id === id ? { ...t, isPinned: !t.isPinned } : t)),
     });
   },
 
@@ -170,7 +199,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           projectId: loc.projectId !== undefined ? loc.projectId : t.projectId,
           targetPath: loc.targetPath !== undefined ? loc.targetPath : t.targetPath,
           subTab: loc.subTab !== undefined ? loc.subTab : t.subTab,
-          scroll: loc.scroll ?? t.scroll
+          scroll: loc.scroll ?? t.scroll,
         };
         if (!pushHistory) return { ...t, ...merged };
         const kept = t.history.slice(0, t.historyIndex + 1);
@@ -185,7 +214,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
         const history = [...kept, { ...merged }].slice(-100);
         return { ...t, ...merged, history, historyIndex: history.length - 1 };
-      })
+      }),
     });
   },
 
@@ -199,7 +228,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const loc = t.history[idx];
         if (loc === undefined) return t;
         return { ...t, ...loc, historyIndex: idx };
-      })
+      }),
     });
   },
 
@@ -231,7 +260,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         projectId: t.projectId ?? null,
         targetPath: t.targetPath ?? null,
         subTab: t.subTab ?? null,
-        scroll: 0
+        scroll: 0,
       };
       // 历史栈必须随标签一起恢复：原实现把 history 置空、historyIndex 置 -1，
       // 于是刷新/重启后「后退/前进」永远按不动（FR-1.3 要求恢复页签与浏览历史）。
@@ -243,24 +272,36 @@ export const useAppStore = create<AppState>((set, get) => ({
         history: restored.history,
         historyIndex: restored.index,
         isPinned: t.isPinned ?? false,
-        invalid: null
+        invalid: null,
       };
     });
     // FR-1.4：恢复"上次活动的标签"。服务端 activeTabId 可能为 null（老库）或指向一个已不存在的
     // 标签（异常中断保存）——两种都必须回落到第一个标签，绝不能把 activeTabId 设成悬空 id，
     // 否则恢复后没有任何标签匹配到 → 内容区整片空白。
-    const restoredActive = activeId !== null && tabs.some((t) => t.id === activeId) ? activeId : (tabs[0]?.id ?? null);
+    const restoredActive =
+      activeId !== null && tabs.some((t) => t.id === activeId) ? activeId : (tabs[0]?.id ?? null);
     set({ tabs, activeTabId: restoredActive });
-  }
+  },
 }));
 
 const TAB_KINDS: string[] = [
-  'overview', 'project', 'file', 'image', 'doc', 'archive', 'git', 'search', 'settings', 'trash'
+  'overview',
+  'project',
+  'file',
+  'image',
+  'doc',
+  'archive',
+  'git',
+  'search',
+  'settings',
+  'trash',
 ];
 
 /** 两个位置是否完全相同（导航是否真的发生了）。用于"是否压入历史栈"的判断。 */
 function sameLocation(a: TabLocation, b: TabLocation): boolean {
-  return a.kind === b.kind && a.projectId === b.projectId && a.targetPath === b.targetPath && a.subTab === b.subTab;
+  return (
+    a.kind === b.kind && a.projectId === b.projectId && a.targetPath === b.targetPath && a.subTab === b.subTab
+  );
 }
 
 function isTabLocation(v: unknown): v is TabLocation {
@@ -273,7 +314,7 @@ function isTabLocation(v: unknown): v is TabLocation {
 function parseNavHistory(
   json: string | null | undefined,
   fallback: TabLocation,
-  navIndex: number | undefined
+  navIndex: number | undefined,
 ): { history: TabLocation[]; index: number } {
   try {
     if (json !== null && json !== undefined && json !== '') {
@@ -311,8 +352,8 @@ export function serializeSession(tabs: Tab[], activeTabId: string | null) {
       scrollJson: JSON.stringify({ scroll: t.scroll }),
       navHistoryJson: JSON.stringify({ history: t.history.slice(-30), index: t.historyIndex }),
       navIndex: t.historyIndex,
-      isPinned: t.isPinned
+      isPinned: t.isPinned,
     })),
-    activeTabId
+    activeTabId,
   };
 }

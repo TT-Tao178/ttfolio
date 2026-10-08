@@ -31,7 +31,7 @@ export async function resolveInProject(
   db: Database.Database,
   projectId: string,
   userPath: string,
-  opts: { mustExist: boolean; abs?: boolean }
+  opts: { mustExist: boolean; abs?: boolean },
 ): Promise<GuardedPath & { projectRoot: string }> {
   const { roots } = projectRoots(db, projectId);
   const p = opts.abs === true ? userPath : path.resolve(roots[0] ?? '.', userPath);

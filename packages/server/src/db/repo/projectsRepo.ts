@@ -4,7 +4,7 @@ import type {
   LanguageStat,
   ProjectStatus,
   ProjectSummary,
-  ProjectType
+  ProjectType,
 } from '@ttfolio/shared';
 import type Database from 'better-sqlite3';
 import { getAll, getOne, run } from '../sql.js';
@@ -25,13 +25,18 @@ export interface ListFilters {
   staleDays?: number;
 }
 
-function mapSummary(row: ProjectRow, langs: LanguageStatRow[], tags: string[], collections: string[]): ProjectSummary {
+function mapSummary(
+  row: ProjectRow,
+  langs: LanguageStatRow[],
+  tags: string[],
+  collections: string[],
+): ProjectSummary {
   const totalBytes = langs.reduce((acc, l) => acc + l.bytes, 0);
   const languages: LanguageStat[] = langs.map((l) => ({
     language: l.language,
     bytes: l.bytes,
     fileCount: l.file_count,
-    percent: totalBytes > 0 ? Math.round((l.bytes / totalBytes) * 1000) / 10 : 0
+    percent: totalBytes > 0 ? Math.round((l.bytes / totalBytes) * 1000) / 10 : 0,
   }));
   let techStack: string[] = [];
   try {
@@ -76,11 +81,14 @@ function mapSummary(row: ProjectRow, langs: LanguageStatRow[], tags: string[], c
     updatedAt: row.updated_at,
     languages,
     tags,
-    collections
+    collections,
   };
 }
 
-function loadExtras(db: Database.Database, ids: string[]): {
+function loadExtras(
+  db: Database.Database,
+  ids: string[],
+): {
   langs: Map<string, LanguageStatRow[]>;
   tags: Map<string, string[]>;
   collections: Map<string, string[]>;
@@ -94,7 +102,7 @@ function loadExtras(db: Database.Database, ids: string[]): {
     db,
     `SELECT project_id, language, bytes, file_count FROM language_stats
      WHERE project_id IN (${list.map(() => '?').join(',')}) ORDER BY bytes DESC`,
-    list
+    list,
   );
   for (const r of langRows) {
     const arr = langs.get(r.project_id) ?? [];
@@ -105,7 +113,7 @@ function loadExtras(db: Database.Database, ids: string[]): {
     db,
     `SELECT pt.project_id, t.name FROM project_tags pt JOIN tags t ON t.id = pt.tag_id
      WHERE pt.project_id IN (${list.map(() => '?').join(',')})`,
-    list
+    list,
   );
   for (const r of tagRows) {
     const arr = tags.get(r.project_id) ?? [];
@@ -116,7 +124,7 @@ function loadExtras(db: Database.Database, ids: string[]): {
     db,
     `SELECT project_id, collection_id FROM collection_members
      WHERE project_id IN (${list.map(() => '?').join(',')})`,
-    list
+    list,
   );
   for (const r of colRows) {
     const arr = collections.get(r.project_id) ?? [];
@@ -163,7 +171,9 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
   }
   if (filters.q !== undefined && filters.q !== '') {
     const like = `%${filters.q.toLowerCase()}%`;
-    where.push('(lower(alias) LIKE ? OR lower(disk_name) LIKE ? OR lower(dir_path) LIKE ? OR lower(tech_stack) LIKE ?)');
+    where.push(
+      '(lower(alias) LIKE ? OR lower(disk_name) LIKE ? OR lower(dir_path) LIKE ? OR lower(tech_stack) LIKE ?)',
+    );
     params.push(like, like, like, like);
   }
   if (filters.collectionId !== undefined) {
@@ -183,13 +193,17 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
         return 'is_pinned DESC, CASE WHEN last_opened_at IS NULL THEN 1 ELSE 0 END, last_opened_at DESC';
     }
   })();
-  const rows = getAll<ProjectRow>(db, `SELECT * FROM projects WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT 1000`, params);
+  const rows = getAll<ProjectRow>(
+    db,
+    `SELECT * FROM projects WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT 1000`,
+    params,
+  );
   const { langs, tags, collections } = loadExtras(
     db,
-    rows.map((r) => r.id)
+    rows.map((r) => r.id),
   );
   return rows.map((r) =>
-    mapSummary(r, langs.get(r.id) ?? [], tags.get(r.id) ?? [], collections.get(r.id) ?? [])
+    mapSummary(r, langs.get(r.id) ?? [], tags.get(r.id) ?? [], collections.get(r.id) ?? []),
   );
 }
 
@@ -205,12 +219,14 @@ export function getProjectSummary(db: Database.Database, id: string): ProjectSum
     row,
     extras.langs.get(id) ?? [],
     extras.tags.get(id) ?? [],
-    extras.collections.get(id) ?? []
+    extras.collections.get(id) ?? [],
   );
 }
 
 export function getProjectByPathKey(db: Database.Database, keyArg: string): ProjectRow | undefined {
-  return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NULL', [keyArg]);
+  return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NULL', [
+    keyArg,
+  ]);
 }
 
 /**
@@ -220,28 +236,30 @@ export function getProjectByPathKey(db: Database.Database, keyArg: string): Proj
  * ——实测"移除登记后无法再导入同一目录"。找到软删除行后可原地复活（保留原有别名/备注）。
  */
 export function getRemovedProjectByPathKey(db: Database.Database, keyArg: string): ProjectRow | undefined {
-  return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NOT NULL', [keyArg]);
+  return getOne<ProjectRow>(db, 'SELECT * FROM projects WHERE dir_path_key = ? AND deleted_at IS NOT NULL', [
+    keyArg,
+  ]);
 }
 
 /** 复活一个被移除登记的项目：清空 deleted_at，刷新路径与目录名，rev +1。 */
 export function reviveProject(
   db: Database.Database,
   id: string,
-  data: { dirPath: string; diskName: string }
+  data: { dirPath: string; diskName: string },
 ): ProjectRow | undefined {
   const now = new Date().toISOString();
   run(
     db,
     `UPDATE projects SET deleted_at = NULL, dir_path = ?, disk_name = ?, path_ok = 1,
        path_checked_at = ?, updated_at = ?, rev = rev + 1 WHERE id = ?`,
-    [data.dirPath, data.diskName, now, now, id]
+    [data.dirPath, data.diskName, now, now, id],
   );
   return getProjectRow(db, id);
 }
 
 export function insertProject(
   db: Database.Database,
-  data: { dirPath: string; dirPathKey: string; diskName: string; defaultArchDir: string }
+  data: { dirPath: string; dirPathKey: string; diskName: string; defaultArchDir: string },
 ): ProjectRow {
   const now = new Date().toISOString();
   const id = ulid();
@@ -249,7 +267,7 @@ export function insertProject(
     db,
     `INSERT INTO projects (id, dir_path, dir_path_key, disk_name, default_arch_dir, created_at, updated_at, path_checked_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, data.dirPath, data.dirPathKey, data.diskName, data.defaultArchDir, now, now, now]
+    [id, data.dirPath, data.dirPathKey, data.diskName, data.defaultArchDir, now, now, now],
   );
   const row = getProjectRow(db, id);
   if (row === undefined) throw new Error('insert project failed');
@@ -272,7 +290,11 @@ export function patchProject(db: Database.Database, id: string, fields: Record<s
 
 export function markOpened(db: Database.Database, id: string): void {
   const now2 = new Date().toISOString();
-  run(db, 'UPDATE projects SET open_count = open_count + 1, last_opened_at = ?, updated_at = ? WHERE id = ?', [now2, now2, id]);
+  run(
+    db,
+    'UPDATE projects SET open_count = open_count + 1, last_opened_at = ?, updated_at = ? WHERE id = ?',
+    [now2, now2, id],
+  );
 }
 
 export function softDeleteProject(db: Database.Database, id: string): void {
@@ -299,15 +321,23 @@ export interface CollectionMeta extends CollectionInfo {
 export function listCollections(db: Database.Database): CollectionMeta[] {
   const rows = getAll<CollectionRow>(db, 'SELECT * FROM collections ORDER BY sort_order, created_at');
   return rows.map((r) => {
-    const members = getAll<{ project_id: string }>(db, 'SELECT project_id FROM collection_members WHERE collection_id = ?', [r.id]);
-    const c = getOne<{ c: number }>(db, 'SELECT COUNT(*) AS c FROM collection_members WHERE collection_id = ?', [r.id]);
+    const members = getAll<{ project_id: string }>(
+      db,
+      'SELECT project_id FROM collection_members WHERE collection_id = ?',
+      [r.id],
+    );
+    const c = getOne<{ c: number }>(
+      db,
+      'SELECT COUNT(*) AS c FROM collection_members WHERE collection_id = ?',
+      [r.id],
+    );
     return {
       id: r.id,
       name: r.name,
       note: r.note,
       memberCount: c?.c ?? 0,
       projectIds: members.map((m) => m.project_id),
-      sortOrder: r.sort_order
+      sortOrder: r.sort_order,
     };
   });
 }

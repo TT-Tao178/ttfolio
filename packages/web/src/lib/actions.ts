@@ -4,8 +4,8 @@ import type { App as AntdApp } from 'antd';
 export type ActionLevel = 'L0' | 'L1' | 'L2' | 'L3';
 
 export interface ActionCtx {
-  message: ReturnType<typeof AntdApp['useApp']>['message'];
-  modal: ReturnType<typeof AntdApp['useApp']>['modal'];
+  message: ReturnType<(typeof AntdApp)['useApp']>['message'];
+  modal: ReturnType<(typeof AntdApp)['useApp']>['modal'];
 }
 
 export interface Action {

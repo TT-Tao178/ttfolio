@@ -24,7 +24,7 @@ export function runCommand(exe: string, args: string[], opts: ExecOptions = {}):
       cwd: opts.cwd,
       shell: false,
       windowsHide: true,
-      env: opts.env ? { ...process.env, ...opts.env } : process.env
+      env: opts.env ? { ...process.env, ...opts.env } : process.env,
     });
     let stdout = '';
     let stderr = '';

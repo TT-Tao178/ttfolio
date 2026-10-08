@@ -20,7 +20,7 @@ import {
   rmSync,
   statSync,
   unlinkSync,
-  writeFileSync
+  writeFileSync,
 } from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -46,14 +46,16 @@ export function exists(p: string): boolean {
   return existsSync(p);
 }
 
-export function statSafe(p: string): { size: number; mtimeMs: number; isDir: boolean; mtimeIso: string } | null {
+export function statSafe(
+  p: string,
+): { size: number; mtimeMs: number; isDir: boolean; mtimeIso: string } | null {
   try {
     const st = statSync(p);
     return {
       size: Number(st.size),
       mtimeMs: st.mtimeMs,
       isDir: st.isDirectory(),
-      mtimeIso: st.mtime.toISOString()
+      mtimeIso: st.mtime.toISOString(),
     };
   } catch {
     return null;
@@ -90,7 +92,7 @@ export function listEntries(p: string): FsEntry[] {
       isDir: linkTarget === 'dir',
       isFile: linkTarget === 'file',
       isSymlink: true,
-      linkTarget
+      linkTarget,
     };
   });
 }
@@ -206,7 +208,7 @@ export function readTextFile(absPath: string, maxBytes: number): ReadTextResult 
   const st = statSync(absPath);
   if (st.size > maxBytes) {
     throw new AppError('TOO_LARGE', `文件超过 ${Math.floor(maxBytes / 1024 / 1024)}MB，不支持编辑器打开`, {
-      size: st.size
+      size: st.size,
     });
   }
   const buf = readFileSync(absPath);
@@ -217,7 +219,7 @@ export function readTextFile(absPath: string, maxBytes: number): ReadTextResult 
     eol: detectEol(content),
     size: st.size,
     mtimeMs: st.mtimeMs,
-    hash: sha256OfBuffer(buf)
+    hash: sha256OfBuffer(buf),
   };
 }
 
@@ -225,7 +227,12 @@ export function readTextFile(absPath: string, maxBytes: number): ReadTextResult 
  * 原子写（C-05）：同目录临时文件 + fsync + rename。
  * eol='CRLF' 时把内容行尾规整为 CRLF；LF/MIXED 保存为 \n。
  */
-export function atomicWriteText(absPath: string, content: string, encoding: DetectedEncoding, eol: DetectedEol): void {
+export function atomicWriteText(
+  absPath: string,
+  content: string,
+  encoding: DetectedEncoding,
+  eol: DetectedEol,
+): void {
   const dir = path.dirname(absPath);
   const out = eol === 'CRLF' ? content.replace(/\r?\n/g, '\r\n') : content.replace(/\r?\n/g, '\n');
   const buf = encodeByDetected(out, encoding);
@@ -250,7 +257,19 @@ export function atomicWriteText(absPath: string, content: string, encoding: Dete
   markSelfWrite(absPath);
 }
 
-export { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync };
+export {
+  copyFileSync,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+};
 
 /** 移动：同盘 rename；跨盘 复制+校验+删源。复制失败绝不删源（ERR-6）。 */
 export function movePath(src: string, dest: string): void {

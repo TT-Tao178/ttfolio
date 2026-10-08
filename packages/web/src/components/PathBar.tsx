@@ -1,8 +1,12 @@
 /** 路径条（FR-1.5）：前进/后退/刷新 + Breadcrumb + 主题/密度/右栏开关。 */
 import { Breadcrumb, Button, Dropdown, Space, Tooltip } from 'antd';
 import {
-  ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined,
-  BgColorsOutlined, ColumnWidthOutlined, BorderRightOutlined
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  ReloadOutlined,
+  BgColorsOutlined,
+  ColumnWidthOutlined,
+  BorderRightOutlined,
 } from '@ant-design/icons';
 import React from 'react';
 import { navAvailability, useAppStore, type Tab, type TabLocation } from '@/app/store';
@@ -35,16 +39,18 @@ export function PathBar(): React.JSX.Element {
         const loc = hist[i];
         if (loc === undefined) return [];
         const isCurrent = i === cur;
-        return [{
-          key: String(i),
-          label: `${isCurrent ? '● 当前：' : ''}${locSummary(loc, tabs)}`,
-          disabled: isCurrent
-        }];
+        return [
+          {
+            key: String(i),
+            label: `${isCurrent ? '● 当前：' : ''}${locSummary(loc, tabs)}`,
+            disabled: isCurrent,
+          },
+        ];
       }),
       onClick: (e: { key: string }) => {
         const target = Number(e.key);
         if (!Number.isNaN(target)) navigate(target - cur);
-      }
+      },
     };
   };
   const neighborSummary = (dir: 'back' | 'forward'): string | null => {
@@ -60,34 +66,57 @@ export function PathBar(): React.JSX.Element {
     items: [
       { key: 'light', label: '浅色（默认）' },
       { key: 'dark', label: '深色' },
-      { key: 'system', label: '跟随系统' }
+      { key: 'system', label: '跟随系统' },
     ],
     selectable: true,
     selectedKeys: [settings.theme],
-    onClick: (e: { key: string }) => setSetting('theme', e.key)
+    onClick: (e: { key: string }) => setSetting('theme', e.key),
   };
   const densityMenu = {
     items: [
       { key: 'small', label: '紧凑' },
       { key: 'middle', label: '标准' },
-      { key: 'large', label: '舒适' }
+      { key: 'large', label: '舒适' },
     ],
     selectable: true,
     selectedKeys: [settings.density],
-    onClick: (e: { key: string }) => setSetting('density', e.key)
+    onClick: (e: { key: string }) => setSetting('density', e.key),
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', borderBottom: `1px solid ${SEMANTIC.split}` }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        height: 40,
+        padding: '0 12px',
+        borderBottom: `1px solid ${SEMANTIC.split}`,
+      }}
+    >
       <Space.Compact>
         <Dropdown menu={historyMenu('back')} trigger={['click']} placement="bottomLeft">
           <Tooltip title={backTarget !== null ? `后退到：${backTarget}` : '没有可后退的历史'}>
-            <Button size="small" type="text" icon={<ArrowLeftOutlined />} disabled={!nav.back} onClick={() => navigate(-1)} data-testid="nav-back" />
+            <Button
+              size="small"
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              disabled={!nav.back}
+              onClick={() => navigate(-1)}
+              data-testid="nav-back"
+            />
           </Tooltip>
         </Dropdown>
         <Dropdown menu={historyMenu('forward')} trigger={['click']} placement="bottomLeft">
           <Tooltip title={forwardTarget !== null ? `前进到：${forwardTarget}` : '没有可前进的历史'}>
-            <Button size="small" type="text" icon={<ArrowRightOutlined />} disabled={!nav.forward} onClick={() => navigate(1)} data-testid="nav-forward" />
+            <Button
+              size="small"
+              type="text"
+              icon={<ArrowRightOutlined />}
+              disabled={!nav.forward}
+              onClick={() => navigate(1)}
+              data-testid="nav-forward"
+            />
           </Tooltip>
         </Dropdown>
         <Tooltip title="刷新视图（重新拉取全部数据；不影响未保存的编辑）">
@@ -134,7 +163,13 @@ type Crumb = { title: React.ReactNode };
  *  第 26 轮教训：颜色/下划线等不能只写类规则（antd cssinjs 运行时注入会盖过），
  *  因此默认色用 color:inherit 显式声明，背景与圆角无覆盖冲突走类规则。 */
 function crumbLink(text: string, onClick: () => void): Crumb {
-  return { title: <a className="tt-crumb-link" style={{ color: 'inherit', cursor: 'pointer' }} onClick={onClick}>{text}</a> };
+  return {
+    title: (
+      <a className="tt-crumb-link" style={{ color: 'inherit', cursor: 'pointer' }} onClick={onClick}>
+        {text}
+      </a>
+    ),
+  };
 }
 
 /**
@@ -151,12 +186,20 @@ function buildCrumbs(tab: Tab | null): Crumb[] {
   const crumbs: Crumb[] = [crumbLink('工作台', () => goHome())];
   if (tab.kind === 'project' && tab.projectId !== null) {
     const projectId = tab.projectId;
-    crumbs.push(crumbLink(tab.title === '' ? '项目' : tab.title, () => openAt({ kind: 'project', projectId, targetPath: null, subTab: 'overview' })));
+    crumbs.push(
+      crumbLink(tab.title === '' ? '项目' : tab.title, () =>
+        openAt({ kind: 'project', projectId, targetPath: null, subTab: 'overview' }),
+      ),
+    );
     // 子页签（文件/Git/架构图/文档）可点：跳回该子页签并清 targetPath（关闭右侧编辑器）。
     // 用户报障：打开文件后点「文件」没有反应、回不去文件列表页——原来这段是纯文本。
     if (tab.subTab !== null) {
       const subTab = tab.subTab;
-      crumbs.push(crumbLink(subTabLabel(subTab), () => openAt({ kind: 'project', projectId, targetPath: null, subTab })));
+      crumbs.push(
+        crumbLink(subTabLabel(subTab), () =>
+          openAt({ kind: 'project', projectId, targetPath: null, subTab }),
+        ),
+      );
     }
   } else {
     if (tab.title !== '') crumbs.push({ title: tab.title });
@@ -171,10 +214,12 @@ function buildCrumbs(tab: Tab | null): Crumb[] {
     segs.forEach((seg, i) => {
       if (i < segs.length - 1) {
         const dir = segs.slice(0, i + 1).join('/');
-        crumbs.push(crumbLink(seg, () => {
-          openAt({ kind: 'project', projectId, targetPath: null, subTab: tab.subTab });
-          useAppStore.getState().setTreeLocate({ projectId, path: dir });
-        }));
+        crumbs.push(
+          crumbLink(seg, () => {
+            openAt({ kind: 'project', projectId, targetPath: null, subTab: tab.subTab });
+            useAppStore.getState().setTreeLocate({ projectId, path: dir });
+          }),
+        );
       } else {
         crumbs.push({ title: seg });
       }
@@ -212,12 +257,18 @@ function openAt(loc: Omit<TabLocation, 'scroll'>): void {
 
 function subTabLabel(sub: string): string {
   switch (sub) {
-    case 'overview': return '概览';
-    case 'files': return '文件';
-    case 'git': return 'Git';
-    case 'archives': return '架构图';
-    case 'docs': return '文档';
-    default: return sub;
+    case 'overview':
+      return '概览';
+    case 'files':
+      return '文件';
+    case 'git':
+      return 'Git';
+    case 'archives':
+      return '架构图';
+    case 'docs':
+      return '文档';
+    default:
+      return sub;
   }
 }
 

@@ -18,8 +18,16 @@ import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModa
 import { buildProjectMenu, useArchiveProject } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
-export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
-  p: ProjectSummary; onOpen: () => void; onPin: () => void; onAnalyze: () => void;
+export function ProjectCard({
+  p,
+  onOpen,
+  onPin,
+  onAnalyze,
+}: {
+  p: ProjectSummary;
+  onOpen: () => void;
+  onPin: () => void;
+  onAnalyze: () => void;
 }): React.JSX.Element {
   const { message, modal } = App.useApp();
   const queryClient2 = useQueryClient();
@@ -28,7 +36,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   // p.collections 只有 id，集合名走共享的 ['collections'] 缓存映射；最多展示 2 个 + 溢出计数。
   const { data: collections } = useQuery({
     queryKey: ['collections'],
-    queryFn: () => api.get<CollectionInfo[]>('/api/collections')
+    queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
   });
   const collectionNames = (collections ?? []).filter((c) => p.collections.includes(c.id)).map((c) => c.name);
   // 右键菜单（第 28 轮）：受控固定定位菜单——「…」图标的 Dropdown 只覆盖图标本身，
@@ -37,11 +45,12 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
   // 归属集合弹窗：条件渲染 + key=项目 id，每次打开全新挂载（勾选态取打开瞬间快照）
   const [pickerOpen, setPickerOpen] = useState(false);
   const remove = useMutation({
-    mutationFn: (mode: string) => api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
+    mutationFn: (mode: string) =>
+      api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
     onSuccess: () => {
       void message.success('已移除');
       void queryInvalidate();
-    }
+    },
   });
   const queryInvalidate = async (): Promise<void> => {
     await queryClient2.invalidateQueries({ queryKey: ['projects'] });
@@ -52,7 +61,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
       okText: '移除登记',
       okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync('unregister')
+      onOk: () => remove.mutateAsync('unregister'),
     });
   };
   const confirmDelete = (): void => {
@@ -61,14 +70,19 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
       content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
       okText: '移入回收站',
       okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync('delete')
+      onOk: () => remove.mutateAsync('delete'),
     });
   };
 
   // 「打开文件页」强制 files；「打开项目」跟随默认页签设置（onOpen）
   const openFiles = (): void => {
     useAppStore.getState().requestAutoOpenProject(p.id);
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 }, p.alias ?? p.diskName);
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'project', projectId: p.id, targetPath: null, subTab: 'files', scroll: 0 },
+        p.alias ?? p.diskName,
+      );
     void api.post(`/api/projects/${p.id}/open`);
   };
   // 菜单定义与分发收敛到共享模块（与表格视图共用一份，评审 P2）：确认类动作注入
@@ -83,7 +97,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
     onRelocate: () => setRelocateOpen(true),
     onUnregister: confirmUnregister,
     onDelete: confirmDelete,
-    message
+    message,
   });
 
   // 右键菜单打开时，点击任意其它位置/滚动/Esc 关闭（菜单容器 onMouseDown 已阻止冒泡，菜单内点击不受影响）
@@ -127,7 +141,7 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         // 边界收口：贴右边留菜单宽度、贴底下留菜单高度（14 项约 520px），小窗口下保底 8px
         setCtxMenu({
           x: Math.min(e.clientX, window.innerWidth - 232),
-          y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520))
+          y: Math.min(e.clientY, Math.max(8, window.innerHeight - 520)),
         });
       }}
       data-testid="project-card"
@@ -138,9 +152,15 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
           </Avatar>
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
           {p.alias !== null && <Tag style={{ flexShrink: 0 }}>别名</Tag>}
-          {p.pathOk === false
-            ? <Tag style={{ flexShrink: 0 }} color="error" icon={<WarningOutlined />}>目录失效</Tag>
-            : <Tag style={{ flexShrink: 0 }} color="blue">{typeLabel(p.type)}</Tag>}
+          {p.pathOk === false ? (
+            <Tag style={{ flexShrink: 0 }} color="error" icon={<WarningOutlined />}>
+              目录失效
+            </Tag>
+          ) : (
+            <Tag style={{ flexShrink: 0 }} color="blue">
+              {typeLabel(p.type)}
+            </Tag>
+          )}
         </span>
       }
       extra={
@@ -164,7 +184,9 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         </div>
         <div>
           {p.techStack.slice(0, 3).map((t) => (
-            <Tag key={t} style={{ marginRight: 4 }}>{t}</Tag>
+            <Tag key={t} style={{ marginRight: 4 }}>
+              {t}
+            </Tag>
           ))}
           {p.techStack.length > 3 && <Tag>+{p.techStack.length - 3}</Tag>}
         </div>
@@ -174,12 +196,20 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         </div>
         <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {collectionNames.slice(0, 2).map((n) => (
-            <Tag key={n} color="purple" style={{ marginRight: 0 }}>📁{n}</Tag>
+            <Tag key={n} color="purple" style={{ marginRight: 0 }}>
+              📁{n}
+            </Tag>
           ))}
-          {collectionNames.length > 2 && <Tag style={{ marginRight: 0 }}>+{collectionNames.length - 2} 集合</Tag>}
+          {collectionNames.length > 2 && (
+            <Tag style={{ marginRight: 0 }}>+{collectionNames.length - 2} 集合</Tag>
+          )}
           <Tag color={p.hasDocs ? 'success' : 'default'}>文档{p.hasDocs ? ' ✓' : ' ✗'}</Tag>
           <Tag color={p.hasArch ? 'success' : 'default'}>架构图{p.hasArch ? ' ✓' : ' ✗'}</Tag>
-          {p.pathOk === false && <Tag color="error" icon={<WarningOutlined />}>路径失效</Tag>}
+          {p.pathOk === false && (
+            <Tag color="error" icon={<WarningOutlined />}>
+              路径失效
+            </Tag>
+          )}
           {p.isPinned && <Tag icon={<StarFilled />}>已固定</Tag>}
           {p.status === 'archived' && <Tag>已归档</Tag>}
         </div>
@@ -194,15 +224,22 @@ export function ProjectCard({ p, onOpen, onPin, onAnalyze }: {
         open={relocateOpen}
         onClose={() => setRelocateOpen(false)}
       />
-      {pickerOpen && (
-        <CollectionPickerModal key={p.id} project={p} onClose={() => setPickerOpen(false)} />
-      )}
+      {pickerOpen && <CollectionPickerModal key={p.id} project={p} onClose={() => setPickerOpen(false)} />}
       {/* 受控右键菜单（第 28 轮，文件树 0.2.3 同款模式）：固定定位 + document mousedown 关闭，
           容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行；卡片 onClick 已排除本容器 */}
       {ctxMenu !== null && (
         <div
           data-testid="project-ctx-menu"
-          style={{ position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 1050, borderRadius: 8, background: SEMANTIC.layoutBg, boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)', padding: 4 }}
+          style={{
+            position: 'fixed',
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            zIndex: 1050,
+            borderRadius: 8,
+            background: SEMANTIC.layoutBg,
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)',
+            padding: 4,
+          }}
           onMouseDown={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
         >

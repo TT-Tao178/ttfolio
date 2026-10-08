@@ -10,7 +10,15 @@
  * 3) 底色原先全透明（html/body/#root/.ant-app 都是 rgba(0,0,0,0)）→ 深色模式下"面板深、底白"。
  *    现在由 applyThemeVars 在根元素写入 CSS 变量，并把令牌底色给到 .ant-app 与 body。
  */
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { theme as antdTheme, ConfigProvider, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { antdThemeConfig, applyThemeVars, componentSizeOf, SEMANTIC, type ThemeMode } from '@/theme/tokens';
@@ -55,7 +63,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   docRootBlacklist: [],
   keybindings: {},
   scanRootDirs: [],
-  uiLayout: {}
+  uiLayout: {},
 };
 
 /**
@@ -77,7 +85,7 @@ const SERVER_KEY: Record<string, string> = {
   docRootBlacklist: 'doc_root_blacklist_json',
   keybindings: 'keybindings_json',
   scanRootDirs: 'scan_root_dirs_json',
-  uiLayout: 'ui_layout_json'
+  uiLayout: 'ui_layout_json',
 };
 
 export type SettingKey = keyof SettingsShape;
@@ -129,7 +137,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     // 必须用 placeholderData 而不是 initialData：initialData 会把 dataUpdatedAt 记为「现在」，
     // 叠加全局 staleTime=15000 后 react-query 认为数据是新鲜的 → 根本不发 GET /api/settings
     // （实测：启动后只有 /api/health，服务端设置永远读不到，界面一直跑默认值）。
-    placeholderData: DEFAULT_SETTINGS
+    placeholderData: DEFAULT_SETTINGS,
   });
   const settings: SettingsShape = useMemo(() => ({ ...DEFAULT_SETTINGS, ...data }), [data]);
 
@@ -165,7 +173,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     (key, value) => {
       if (key === 'theme') setMode(value as ThemeMode);
       const prev = queryClient.getQueryData<Partial<SettingsShape>>(['settings']);
-      queryClient.setQueryData<Partial<SettingsShape>>(['settings'], (old) => ({ ...(old ?? {}), [key]: value }));
+      queryClient.setQueryData<Partial<SettingsShape>>(['settings'], (old) => ({
+        ...(old ?? {}),
+        [key]: value,
+      }));
       const serverKey = SERVER_KEY[key];
       if (serverKey === undefined) return;
       void api
@@ -183,12 +194,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
           toast.error(e instanceof ApiClientError ? `设置未保存：${e.message}` : '设置未保存（服务端拒绝）');
         });
     },
-    [queryClient]
+    [queryClient],
   );
 
   const value = useMemo<SettingsCtx>(
     () => ({ settings, dark, setSetting: coreSetSetting }),
-    [settings, dark, coreSetSetting]
+    [settings, dark, coreSetSetting],
   );
 
   return (
@@ -198,7 +209,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
       componentSize={componentSizeOf(settings.density)}
       theme={{
         algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        ...antdThemeConfig(dark)
+        ...antdThemeConfig(dark),
       }}
     >
       {/* height:100% 是必需的：AntD App 会额外渲染一层 div.ant-app，若不给高度，

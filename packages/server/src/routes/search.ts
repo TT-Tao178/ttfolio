@@ -16,29 +16,33 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/search', async (req) => {
     const q = req.query as { q?: string; projectId?: string; types?: string; limit?: string };
     const query = (q.q ?? '').trim();
-    if (query === '') return ok({ projects: [], files: [], contents: [], indexedProjects: [], unindexedProjects: [] });
+    if (query === '')
+      return ok({ projects: [], files: [], contents: [], indexedProjects: [], unindexedProjects: [] });
     const db = ctx.db();
     const types = (q.types ?? 'project,file,content').split(',');
     const limit = Math.min(Number(q.limit ?? '20'), 50);
     addSearchHistory(db, query.slice(0, 200));
 
     const projects = types.includes('project')
-      ? listProjects(db, { status: 'all', q: query }).slice(0, limit).map((p) => ({
-          projectId: p.id,
-          name: p.alias ?? p.diskName,
-          alias: p.alias,
-          dirPath: p.dirPath,
-          matched: p.diskName
-        }))
+      ? listProjects(db, { status: 'all', q: query })
+          .slice(0, limit)
+          .map((p) => ({
+            projectId: p.id,
+            name: p.alias ?? p.diskName,
+            alias: p.alias,
+            dirPath: p.dirPath,
+            matched: p.diskName,
+          }))
       : [];
 
     // 文件名搜索：遍历命中项目根（最多 8 个项目，每项目 30 条）
     const files: Array<{ projectId: string; name: string; relPath: string }> = [];
     const needle = query.toLowerCase();
     if (types.includes('file')) {
-      const targets = q.projectId !== undefined
-        ? listProjects(db, { status: 'all' }).filter((p) => p.id === q.projectId)
-        : listProjects(db, { status: 'all' }).slice(0, 8);
+      const targets =
+        q.projectId !== undefined
+          ? listProjects(db, { status: 'all' }).filter((p) => p.id === q.projectId)
+          : listProjects(db, { status: 'all' }).slice(0, 8);
       const matcher = buildMatcher(db, q.projectId ?? null);
       for (const p of targets) {
         if (files.length >= 30) break;
@@ -53,9 +57,10 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
     const indexedProjects: string[] = [];
     const unindexedProjects: string[] = [];
     if (types.includes('content')) {
-      const targets = q.projectId !== undefined
-        ? listProjects(db, { status: 'all' }).filter((p) => p.id === q.projectId)
-        : listProjects(db, { status: 'active' });
+      const targets =
+        q.projectId !== undefined
+          ? listProjects(db, { status: 'all' }).filter((p) => p.id === q.projectId)
+          : listProjects(db, { status: 'active' });
       for (const p of targets.slice(0, 30)) {
         const stats = ftsStats(db, p.id);
         if (stats.files > 0) {
@@ -121,7 +126,11 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
     const db = ctx.db();
     const all = listProjects(db, { status: 'active' });
     if (query === '') {
-      return ok(all.slice(0, 8).map((p) => ({ projectId: p.id, name: p.alias ?? p.diskName, dirPath: p.dirPath, score: 0 })));
+      return ok(
+        all
+          .slice(0, 8)
+          .map((p) => ({ projectId: p.id, name: p.alias ?? p.diskName, dirPath: p.dirPath, score: 0 })),
+      );
     }
     const nq = normalizeName(query);
     const scored = all
@@ -131,8 +140,8 @@ export const searchRoutes: FastifyPluginAsync = async (app) => {
         dirPath: p.dirPath,
         score: Math.max(
           matchScore(nq, normalizeName(p.diskName)),
-          p.alias !== null ? matchScore(nq, normalizeName(p.alias)) : 0
-        )
+          p.alias !== null ? matchScore(nq, normalizeName(p.alias)) : 0,
+        ),
       }))
       .filter((x) => x.score > 0)
       .sort((a, b) => b.score - a.score)
@@ -147,7 +156,7 @@ function collectFileHits(
   matcher: ReturnType<typeof buildMatcher>,
   projectId: string,
   out: Array<{ projectId: string; name: string; relPath: string }>,
-  limit: number
+  limit: number,
 ): void {
   const stack: string[] = [root];
   while (stack.length > 0 && out.length < limit) {

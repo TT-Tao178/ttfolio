@@ -1,7 +1,12 @@
 /** 域条（3.2）：项目/Git/架构图/文档/搜索/设置。 */
 import { Tooltip } from 'antd';
 import {
-  AppstoreOutlined, BranchesOutlined, ApartmentOutlined, BookOutlined, SearchOutlined, SettingOutlined
+  AppstoreOutlined,
+  BranchesOutlined,
+  ApartmentOutlined,
+  BookOutlined,
+  SearchOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import React from 'react';
 import { useAppStore, type Domain } from '@/app/store';
@@ -13,11 +18,19 @@ const DOMAINS: Array<{ key: Domain; icon: React.JSX.Element; label: string }> = 
   { key: 'archives', icon: <ApartmentOutlined />, label: '架构图' },
   { key: 'docs', icon: <BookOutlined />, label: '文档' },
   { key: 'search', icon: <SearchOutlined />, label: '搜索' },
-  { key: 'settings', icon: <SettingOutlined />, label: '设置' }
+  { key: 'settings', icon: <SettingOutlined />, label: '设置' },
 ];
 
-function RailButton({ active, onClick, label, children }: {
-  active: boolean; onClick: () => void; label: string; children: React.ReactNode;
+function RailButton({
+  active,
+  onClick,
+  label,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
 }): React.JSX.Element {
   return (
     <Tooltip title={label} placement="right">
@@ -26,10 +39,16 @@ function RailButton({ active, onClick, label, children }: {
         aria-label={label}
         style={{
           // 尺寸对齐《界面原型-AntD.html》#rail .d：40×40、圆角 8、字号 17
-          width: 40, height: 40, borderRadius: 8, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+          width: 40,
+          height: 40,
+          borderRadius: 8,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 17,
           background: active ? SEMANTIC.primaryBg : 'transparent',
-          color: active ? SEMANTIC.primary : 'inherit'
+          color: active ? SEMANTIC.primary : 'inherit',
         }}
       >
         {children}
@@ -44,9 +63,14 @@ export function DomainRail(): React.JSX.Element {
     <div
       style={{
         // 宽度/padding/gap 对齐原型 #body 第一列（56px）与 #rail（padding 12px 0, gap 4）
-        width: 56, flexShrink: 0,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-        padding: '12px 0', borderRight: `1px solid ${SEMANTIC.split}`
+        width: 56,
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
+        padding: '12px 0',
+        borderRight: `1px solid ${SEMANTIC.split}`,
       }}
     >
       {DOMAINS.map((d) => (
@@ -65,7 +89,11 @@ export function DomainRail(): React.JSX.Element {
                 const st = useAppStore.getState();
                 const existing = st.tabs.find((t) => t.kind === 'settings');
                 if (existing !== undefined) st.activateTab(existing.id);
-                else st.openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
+                else
+                  st.openTab(
+                    { kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                    '设置',
+                  );
               }
             }
           }}

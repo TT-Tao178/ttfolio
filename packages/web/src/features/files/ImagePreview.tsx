@@ -6,8 +6,11 @@
  */
 import { Button, Empty, Space, Tooltip } from 'antd';
 import {
-  CopyOutlined, DragOutlined, OneToOneOutlined,
-  ZoomInOutlined, ZoomOutOutlined
+  CopyOutlined,
+  DragOutlined,
+  OneToOneOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { rawUrl } from '@/lib/api';
@@ -23,7 +26,7 @@ const checkerBg: React.CSSProperties = {
     'linear-gradient(45deg, rgba(128,128,128,0.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,0.12) 75%),' +
     'linear-gradient(45deg, rgba(128,128,128,0.12) 25%, transparent 25%, transparent 75%, rgba(128,128,128,0.12) 75%)',
   backgroundSize: '16px 16px',
-  backgroundPosition: '0 0, 8px 8px'
+  backgroundPosition: '0 0, 8px 8px',
 };
 
 export function ImagePreview({ projectId, path }: { projectId: string; path: string }): React.JSX.Element {
@@ -62,43 +65,78 @@ export function ImagePreview({ projectId, path }: { projectId: string; path: str
   }, [failed]);
 
   const stepZoom = (dir: 1 | -1): void =>
-    setScale((prev) => Math.min(MAX, Math.max(MIN, Number(((prev ?? 1) * (dir === 1 ? STEP : 1 / STEP)).toFixed(3)))));
+    setScale((prev) =>
+      Math.min(MAX, Math.max(MIN, Number(((prev ?? 1) * (dir === 1 ? STEP : 1 / STEP)).toFixed(3)))),
+    );
 
   const dimText = natural !== null ? `${natural.w} × ${natural.h}` : '…';
   const percentText = scale === null ? '适应' : `${Math.round(scale * 100)}%`;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, padding: 8, minHeight: 0 }}>
+    <div
+      style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 6, padding: 8, minHeight: 0 }}
+    >
       {/* 工具栏 */}
       <Space size={4} wrap>
         <span className="tt-ellipsis" style={{ maxWidth: 260, fontSize: 12, fontWeight: 600 }} title={path}>
           {fileName}
         </span>
-        <span style={{ fontSize: 12, opacity: 0.6 }} data-testid="image-dim">{dimText}</span>
+        <span style={{ fontSize: 12, opacity: 0.6 }} data-testid="image-dim">
+          {dimText}
+        </span>
         <Space.Compact>
           <Tooltip title="缩小">
-            <Button size="small" icon={<ZoomOutOutlined />} onClick={() => stepZoom(-1)} data-testid="img-zoom-out" />
+            <Button
+              size="small"
+              icon={<ZoomOutOutlined />}
+              onClick={() => stepZoom(-1)}
+              data-testid="img-zoom-out"
+            />
           </Tooltip>
           <Tooltip title="点击回到 100%">
-            <Button size="small" style={{ minWidth: 56 }} onClick={() => setScale(1)} data-testid="img-zoom-label">
+            <Button
+              size="small"
+              style={{ minWidth: 56 }}
+              onClick={() => setScale(1)}
+              data-testid="img-zoom-label"
+            >
               {percentText}
             </Button>
           </Tooltip>
           <Tooltip title="放大">
-            <Button size="small" icon={<ZoomInOutlined />} onClick={() => stepZoom(1)} data-testid="img-zoom-in" />
+            <Button
+              size="small"
+              icon={<ZoomInOutlined />}
+              onClick={() => stepZoom(1)}
+              data-testid="img-zoom-in"
+            />
           </Tooltip>
           <Tooltip title="适应窗口（整图可见）">
-            <Button size="small" icon={<DragOutlined />} onClick={() => setScale(null)} data-testid="img-fit" />
+            <Button
+              size="small"
+              icon={<DragOutlined />}
+              onClick={() => setScale(null)}
+              data-testid="img-fit"
+            />
           </Tooltip>
           <Tooltip title="按原始尺寸 1:1 显示">
             <Button size="small" icon={<OneToOneOutlined />} onClick={() => setScale(1)} />
           </Tooltip>
         </Space.Compact>
         <Tooltip title="复制相对路径">
-          <Button size="small" icon={<CopyOutlined />} onClick={() => { void navigator.clipboard.writeText(path).catch(() => {}); }} data-testid="img-copy-path" />
+          <Button
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={() => {
+              void navigator.clipboard.writeText(path).catch(() => {});
+            }}
+            data-testid="img-copy-path"
+          />
         </Tooltip>
         <Tooltip title="在新窗口打开原图">
-          <Button size="small" onClick={() => window.open(url, '_blank')} data-testid="img-open-new">原图</Button>
+          <Button size="small" onClick={() => window.open(url, '_blank')} data-testid="img-open-new">
+            原图
+          </Button>
         </Tooltip>
         <span style={{ fontSize: 11, opacity: 0.5 }}>Ctrl+滚轮缩放</span>
       </Space>
@@ -112,12 +150,16 @@ export function ImagePreview({ projectId, path }: { projectId: string; path: str
           borderRadius: 8,
           border: `1px solid ${SEMANTIC.split}`,
           ...checkerBg,
-          display: 'flex'
+          display: 'flex',
         }}
         data-testid="image-canvas"
       >
         {failed ? (
-          <Empty description={'无法加载：' + path} image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ margin: 'auto' }} />
+          <Empty
+            description={'无法加载：' + path}
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            style={{ margin: 'auto' }}
+          />
         ) : (
           <img
             ref={imgRef}
@@ -132,8 +174,18 @@ export function ImagePreview({ projectId, path }: { projectId: string; path: str
             draggable={false}
             style={
               scale === null
-                ? { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', margin: 'auto', borderRadius: 4 }
-                : { width: (natural?.w ?? 0) * scale || undefined, imageRendering: scale > 2 ? 'pixelated' : 'auto', margin: 'auto' }
+                ? {
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain',
+                    margin: 'auto',
+                    borderRadius: 4,
+                  }
+                : {
+                    width: (natural?.w ?? 0) * scale || undefined,
+                    imageRendering: scale > 2 ? 'pixelated' : 'auto',
+                    margin: 'auto',
+                  }
             }
           />
         )}

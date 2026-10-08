@@ -22,7 +22,7 @@ function run(name, cmd, args, opts = {}) {
     // Windows 下 npm/npx 是 .cmd 批处理，Node≥18.20 必须 shell 才能启动（仅脚本使用，packages 内仍禁 shell）
     shell: isWin,
     env: process.env,
-    encoding: 'utf8'
+    encoding: 'utf8',
   });
   const ms = ((Date.now() - t0) / 1000).toFixed(1);
   if (r.status === 0) {
@@ -42,7 +42,19 @@ function run(name, cmd, args, opts = {}) {
   return false;
 }
 
-function walk(dir, fn, skip = new Set(['node_modules', 'dist', '.git', '.tmp-test', 'coverage', 'test-results', 'playwright-report'])) {
+function walk(
+  dir,
+  fn,
+  skip = new Set([
+    'node_modules',
+    'dist',
+    '.git',
+    '.tmp-test',
+    'coverage',
+    'test-results',
+    'playwright-report',
+  ]),
+) {
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir)) {
     if (skip.has(entry)) continue;
@@ -62,28 +74,31 @@ function mechanicalChecks() {
     {
       id: 'M1',
       desc: 'fs.(read|write|unlink|rename|copy|rm) 只允许出现在 server/src/core/ 之外不出现（C-01）',
-      test: (rel, code) => rel.startsWith('packages/server/src/') && !rel.startsWith('packages/server/src/core/') &&
-        /fs\.(readFile|writeFile|unlink|rename|copyFile|rm)\(/.test(code)
+      test: (rel, code) =>
+        rel.startsWith('packages/server/src/') &&
+        !rel.startsWith('packages/server/src/core/') &&
+        /fs\.(readFile|writeFile|unlink|rename|copyFile|rm)\(/.test(code),
     },
     {
       id: 'M2',
       desc: 'server 源码禁止 .startsWith(（C-02）',
-      test: (rel, code) => rel.startsWith('packages/server/src/') && /\.startsWith\(/.test(code)
+      test: (rel, code) => rel.startsWith('packages/server/src/') && /\.startsWith\(/.test(code),
     },
     {
       id: 'M3',
       desc: 'server 源码禁止 shell: true（C-21）',
-      test: (rel, code) => rel.startsWith('packages/server/src/') && /shell:\s*true/.test(code)
+      test: (rel, code) => rel.startsWith('packages/server/src/') && /shell:\s*true/.test(code),
     },
     {
       id: 'M4',
       desc: 'web 源码禁止 CDN/在线字体（C-10）',
-      test: (rel, code) => rel.startsWith('packages/web/src/') && /cdn\.|unpkg|jsdelivr|googleapis|gstatic/.test(code)
+      test: (rel, code) =>
+        rel.startsWith('packages/web/src/') && /cdn\.|unpkg|jsdelivr|googleapis|gstatic/.test(code),
     },
     {
       id: 'M5',
       desc: '全仓库禁止 monaco（C-28）',
-      test: (rel, code) => /monaco/i.test(code)
+      test: (rel, code) => /monaco/i.test(code),
     },
     {
       id: 'M6',
@@ -93,35 +108,38 @@ function mechanicalChecks() {
         if (!/localStorage|indexedDB/.test(code)) return false;
         // 主题缓存例外：同文件内必须有显式注释标记
         return !code.includes('TT-THEME-CACHE');
-      }
+      },
     },
     {
       id: 'M7',
       desc: '全仓库禁止 any / @ts-ignore',
-      test: (rel, code) => /: any\b|as any|@ts-ignore/.test(code)
+      test: (rel, code) => /: any\b|as any|@ts-ignore/.test(code),
     },
     {
       id: 'M8',
       desc: '测试禁止 .skip/.only/xdescribe/xit（C-45）',
-      test: (rel, code) => /\.(test|spec)\.(ts|tsx)$/.test(rel) && /\.skip\(|\.only\(|xdescribe\(|xit\(/.test(code)
+      test: (rel, code) =>
+        /\.(test|spec)\.(ts|tsx)$/.test(rel) && /\.skip\(|\.only\(|xdescribe\(|xit\(/.test(code),
     },
     {
       id: 'M9',
       desc: 'packages/*/src 禁止 console.log/error/warn（统一 pino / toast）',
-      test: (rel, code) => /^packages\/(shared|server|web)\/src\//.test(rel) && !/\.test\.(ts|tsx)$/.test(rel) &&
-        /console\.(log|error|warn)\(/.test(code)
+      test: (rel, code) =>
+        /^packages\/(shared|server|web)\/src\//.test(rel) &&
+        !/\.test\.(ts|tsx)$/.test(rel) &&
+        /console\.(log|error|warn)\(/.test(code),
     },
     {
       id: 'M10',
       desc: 'web 源码 hex 色值只允许出现在 theme 目录（C-50）',
-      test: (rel, code) => rel.startsWith('packages/web/src/') && !rel.includes('/theme/') &&
-        /#[0-9a-fA-F]{6}\b/.test(code)
+      test: (rel, code) =>
+        rel.startsWith('packages/web/src/') && !rel.includes('/theme/') && /#[0-9a-fA-F]{6}\b/.test(code),
     },
     {
       id: 'M11',
       desc: 'core/git.ts 禁止 push(/pull(/fetch(（C-56）',
-      test: (rel, code) => rel === 'packages/server/src/core/git.ts' && /push\(|pull\(|fetch\(/.test(code)
-    }
+      test: (rel, code) => rel === 'packages/server/src/core/git.ts' && /push\(|pull\(|fetch\(/.test(code),
+    },
   ];
   const hits = [];
   walk(join(ROOT, 'packages'), (p) => {
@@ -146,9 +164,7 @@ function mechanicalChecks() {
 
 // ---------- 主流程 ----------
 let e2eSkipNote = '';
-const e2eBrowserDir = process.env.LOCALAPPDATA
-  ? join(process.env.LOCALAPPDATA, 'ms-playwright')
-  : null;
+const e2eBrowserDir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'ms-playwright') : null;
 let e2eReady = false;
 if (e2eBrowserDir && existsSync(e2eBrowserDir)) {
   const hasChromium = readdirSync(e2eBrowserDir).some((d) => d.includes('chromium'));
@@ -156,7 +172,11 @@ if (e2eBrowserDir && existsSync(e2eBrowserDir)) {
 }
 if (!e2eReady) {
   process.stdout.write('\n=== 尝试安装 Playwright Chromium（失败则 e2e 记 SKIP）\n');
-  const inst = spawnSync(NPX, ['playwright', 'install', 'chromium'], { cwd: ROOT, stdio: 'inherit', shell: isWin });
+  const inst = spawnSync(NPX, ['playwright', 'install', 'chromium'], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: isWin,
+  });
   e2eReady = inst.status === 0;
 }
 
@@ -189,7 +209,9 @@ const fail = results.filter((r) => r.status === 'FAIL').length;
 const skip = results.filter((r) => r.status === 'SKIP').length;
 process.stdout.write('\n════════ verify 汇总 ════════\n');
 for (const r of results) {
-  process.stdout.write(`${r.status.padEnd(5)} ${r.name} (${r.ms}s) ${r.note ? '— ' + r.note.split('\n')[0] : ''}\n`);
+  process.stdout.write(
+    `${r.status.padEnd(5)} ${r.name} (${r.ms}s) ${r.note ? '— ' + r.note.split('\n')[0] : ''}\n`,
+  );
 }
 process.stdout.write(`\n通过 ${pass} / 失败 ${fail} / 跳过 ${skip}\n`);
 process.exitCode = fail === 0 ? 0 : 1;

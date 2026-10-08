@@ -8,8 +8,18 @@ import React, { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
-export function RelocateModal({ projectId, name, dirPath, open, onClose }: {
-  projectId: string; name: string; dirPath: string; open: boolean; onClose: () => void;
+export function RelocateModal({
+  projectId,
+  name,
+  dirPath,
+  open,
+  onClose,
+}: {
+  projectId: string;
+  name: string;
+  dirPath: string;
+  open: boolean;
+  onClose: () => void;
 }): React.JSX.Element {
   const [newPath, setNewPath] = useState('');
   const { message } = App.useApp();
@@ -25,7 +35,7 @@ export function RelocateModal({ projectId, name, dirPath, open, onClose }: {
       await queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       onClose();
     },
-    onError: (e) => void message.error(e instanceof Error ? e.message : '重新定位失败')
+    onError: (e) => void message.error(e instanceof Error ? e.message : '重新定位失败'),
   });
   const pick = async (): Promise<void> => {
     try {
@@ -46,7 +56,8 @@ export function RelocateModal({ projectId, name, dirPath, open, onClose }: {
       <div data-testid="relocate-modal">
         <p style={{ opacity: 0.75 }}>
           原路径已失效：<span className="tt-mono">{dirPath}</span>
-          <br />指向项目所在的新目录，原索引与分析数据将保留。
+          <br />
+          指向项目所在的新目录，原索引与分析数据将保留。
         </p>
         <Space.Compact style={{ width: '100%' }}>
           <Input
@@ -59,7 +70,13 @@ export function RelocateModal({ projectId, name, dirPath, open, onClose }: {
           <Button icon={<FolderOpenOutlined />} onClick={() => void pick()} data-testid="relocate-modal-pick">
             选择目录…
           </Button>
-          <Button type="primary" loading={relocate.isPending} disabled={newPath.trim() === ''} onClick={submit} data-testid="relocate-modal-ok">
+          <Button
+            type="primary"
+            loading={relocate.isPending}
+            disabled={newPath.trim() === ''}
+            onClick={submit}
+            data-testid="relocate-modal-ok"
+          >
             定位
           </Button>
         </Space.Compact>

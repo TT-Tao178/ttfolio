@@ -5,10 +5,23 @@ import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { AppError } from '../core/errors.js';
-import { docRootCreateSchema, docsContentPutSchema, mountCreateSchema, mountRelocateSchema } from '@ttfolio/shared';
 import {
-  listDocRoots, createDocRoot, deleteDocRoot, listMounts, createMount, deleteMount,
-  getMount, setMountExists, pathKey, listAllMounts
+  docRootCreateSchema,
+  docsContentPutSchema,
+  mountCreateSchema,
+  mountRelocateSchema,
+} from '@ttfolio/shared';
+import {
+  listDocRoots,
+  createDocRoot,
+  deleteDocRoot,
+  listMounts,
+  createMount,
+  deleteMount,
+  getMount,
+  setMountExists,
+  pathKey,
+  listAllMounts,
 } from '../db/repo/docsRepo.js';
 import { getProjectRow, listProjects } from '../db/repo/projectsRepo.js';
 import { logActivity, getSetting } from '../db/repo/metaRepo.js';
@@ -62,7 +75,12 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     const st = fsx.statSafe(abs);
     if (st === null || !st.isDir) return fail('NOT_FOUND', '文档根目录不存在', 404);
     const root = createDocRoot(ctx.db(), abs, parsed.data.label ?? null);
-    logActivity(ctx.db(), { kind: 'doc_root.add', level: 'L1', targetPath: abs, actor: currentActor().actor });
+    logActivity(ctx.db(), {
+      kind: 'doc_root.add',
+      level: 'L1',
+      targetPath: abs,
+      actor: currentActor().actor,
+    });
     return ok(root);
   });
 
@@ -90,7 +108,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     let subDirs: Array<{ name: string; path: string }> = [];
     try {
       const entries = fsx.listEntries(root.path);
-      subDirs = entries.filter((e) => e.isDir).map((e) => ({ name: e.name, path: path.join(root.path, e.name) }));
+      subDirs = entries
+        .filter((e) => e.isDir)
+        .map((e) => ({ name: e.name, path: path.join(root.path, e.name) }));
     } catch {
       subDirs = [];
     }
@@ -99,7 +119,14 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     for (const dir of subDirs) {
       const key = pathKey(dir.path);
       if (blacklist.includes(key)) {
-        matches.push({ dirName: dir.name, path: dir.path, score: 0, projectId: null, projectName: '', status: 'blacklisted' });
+        matches.push({
+          dirName: dir.name,
+          path: dir.path,
+          score: 0,
+          projectId: null,
+          projectName: '',
+          status: 'blacklisted',
+        });
         continue;
       }
       const name = normalizeName(dir.name);
@@ -129,7 +156,7 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         score: topScore,
         projectId,
         projectName: top?.p.alias ?? top?.p.diskName ?? '',
-        status
+        status,
       });
     }
     // 已绑定信息
@@ -148,7 +175,7 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
       path: b.path,
       label: path.basename(b.path),
       source: 'auto_root',
-      rootId: (req.params as { id: string }).id
+      rootId: (req.params as { id: string }).id,
     });
     ctx.sse.publish('project.updated', { projectId: b.projectId });
     return ok(mount);
@@ -167,9 +194,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     }
     const key = pathKey(b.path);
     if (!list.includes(key)) list.push(key);
-    db.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
-      SETTING_KEYS.docRootBlacklist, JSON.stringify(list), new Date().toISOString()
-    );
+    db.prepare(
+      'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    ).run(SETTING_KEYS.docRootBlacklist, JSON.stringify(list), new Date().toISOString());
     return ok({ blacklisted: true });
   });
 
@@ -198,9 +225,15 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
       path: abs,
       label: parsed.data.label ?? path.basename(abs),
       source: 'manual',
-      rootId: null
+      rootId: null,
     });
-    logActivity(ctx.db(), { kind: 'doc.mount', level: 'L1', projectId: id, targetPath: abs, actor: currentActor().actor });
+    logActivity(ctx.db(), {
+      kind: 'doc.mount',
+      level: 'L1',
+      projectId: id,
+      targetPath: abs,
+      actor: currentActor().actor,
+    });
     ctx.sse.publish('project.updated', { projectId: id });
     return ok(mount);
   });
@@ -223,9 +256,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         }
         const key = pathKey(m.path);
         if (!list.includes(key)) list.push(key);
-        db.prepare('INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
-          SETTING_KEYS.docRootBlacklist, JSON.stringify(list), new Date().toISOString()
-        );
+        db.prepare(
+          'INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        ).run(SETTING_KEYS.docRootBlacklist, JSON.stringify(list), new Date().toISOString());
       }
       ctx.sse.publish('project.updated', { projectId: m.projectId });
     }
@@ -240,9 +273,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     const st = fsx.statSafe(abs);
     if (st === null) return fail('NOT_FOUND', '新路径不存在', 404);
     const db = ctx.db();
-    db.prepare('UPDATE project_paths SET path = ?, path_key = ?, exists_ok = 1, last_checked_at = ? WHERE id = ?').run(
-      abs, pathKey(abs), new Date().toISOString(), id
-    );
+    db.prepare(
+      'UPDATE project_paths SET path = ?, path_key = ?, exists_ok = 1, last_checked_at = ? WHERE id = ?',
+    ).run(abs, pathKey(abs), new Date().toISOString(), id);
     return ok({ relocated: true });
   });
 
@@ -253,7 +286,14 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     const row = getProjectRow(db, id);
     if (row === undefined) return fail('NOT_FOUND', '项目不存在', 404);
     const matcher = buildMatcher(db, id);
-    const results: Array<{ path: string; mountId: string | null; source: 'project' | 'mount'; label: string; existsOk: boolean; refs: number }> = [];
+    const results: Array<{
+      path: string;
+      mountId: string | null;
+      source: 'project' | 'mount';
+      label: string;
+      existsOk: boolean;
+      refs: number;
+    }> = [];
     // 项目内：README* / docs/**、设计文档/** / 根下 *.md
     const docsDirs = ['docs', '设计文档', 'doc', 'Docs', 'DOCS'];
     const mdFiles = new Map<string, { label: string }>();
@@ -295,13 +335,27 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     for (const m of listMounts(db, id)) {
       const exists = fsx.exists(m.path);
       if (!exists) {
-        results.push({ path: m.path, mountId: m.id, source: m.source === 'manual' ? 'mount' : 'mount', label: m.label ?? m.path, existsOk: false, refs: allMounts.filter((x) => pathKey(x.path) === pathKey(m.path)).length });
+        results.push({
+          path: m.path,
+          mountId: m.id,
+          source: m.source === 'manual' ? 'mount' : 'mount',
+          label: m.label ?? m.path,
+          existsOk: false,
+          refs: allMounts.filter((x) => pathKey(x.path) === pathKey(m.path)).length,
+        });
         continue;
       }
       const st = fsx.statSafe(m.path);
       if (st === null) continue;
       if (!st.isDir) {
-        results.push({ path: m.path, mountId: m.id, source: 'mount', label: m.label ?? path.basename(m.path), existsOk: true, refs: allMounts.filter((x) => pathKey(x.path) === pathKey(m.path)).length });
+        results.push({
+          path: m.path,
+          mountId: m.id,
+          source: 'mount',
+          label: m.label ?? path.basename(m.path),
+          existsOk: true,
+          refs: allMounts.filter((x) => pathKey(x.path) === pathKey(m.path)).length,
+        });
         continue;
       }
       // 目录挂载：扫一层 md
@@ -316,11 +370,25 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         if (!e.isFile) continue;
         const lower = e.name.toLowerCase();
         if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt')) {
-          results.push({ path: path.join(m.path, e.name), mountId: m.id, source: 'mount', label: `${m.label ?? path.basename(m.path)}/${e.name}`, existsOk: true, refs });
+          results.push({
+            path: path.join(m.path, e.name),
+            mountId: m.id,
+            source: 'mount',
+            label: `${m.label ?? path.basename(m.path)}/${e.name}`,
+            existsOk: true,
+            refs,
+          });
         }
       }
       if (entries.length === 0) {
-        results.push({ path: m.path, mountId: m.id, source: 'mount', label: m.label ?? path.basename(m.path), existsOk: true, refs });
+        results.push({
+          path: m.path,
+          mountId: m.id,
+          source: 'mount',
+          label: m.label ?? path.basename(m.path),
+          existsOk: true,
+          refs,
+        });
       }
     }
     return ok({ docs: results });
@@ -331,7 +399,10 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     const q = req.query as { projectId?: string; path?: string; mountId?: string };
     if (q.projectId === undefined || q.path === undefined) return fail('BAD_REQUEST', '缺少参数');
     try {
-      const abs = q.mountId !== undefined ? resolveMountPath(ctx, q.mountId, q.path) : (await resolveInProject(ctx.db(), q.projectId, q.path, { mustExist: true })).real;
+      const abs =
+        q.mountId !== undefined
+          ? resolveMountPath(ctx, q.mountId, q.path)
+          : (await resolveInProject(ctx.db(), q.projectId, q.path, { mustExist: true })).real;
       const st = fsx.statSafe(abs);
       if (st === null) return fail('NOT_FOUND', '文档不存在', 404);
       const content = fsx.readTextFile(abs, 20 * 1024 * 1024);
@@ -343,7 +414,7 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         eol: content.eol,
         mtime: new Date(content.mtimeMs).toISOString(),
         size: content.size,
-        hash: content.hash
+        hash: content.hash,
       });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -355,20 +426,43 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const b = parsed.data;
     try {
-      const abs = b.mountId !== undefined ? resolveMountPath(ctx, b.mountId, b.path) : (await resolveInProject(ctx.db(), b.projectId, b.path, { mustExist: true })).real;
+      const abs =
+        b.mountId !== undefined
+          ? resolveMountPath(ctx, b.mountId, b.path)
+          : (await resolveInProject(ctx.db(), b.projectId, b.path, { mustExist: true })).real;
       fsx.accessSyncForWrite(abs);
       const st = fsx.statSafe(abs);
       if (st === null) return fail('NOT_FOUND', '文档不存在', 404);
       if (!b.force) {
         const disk = fsx.readTextFile(abs, 20 * 1024 * 1024);
-        if (disk.hash !== b.baseHash || st.size !== (b.baseSize ?? -1) || new Date(st.mtimeMs).toISOString() !== b.baseMtime) {
+        if (
+          disk.hash !== b.baseHash ||
+          st.size !== (b.baseSize ?? -1) ||
+          new Date(st.mtimeMs).toISOString() !== b.baseMtime
+        ) {
           return fail('MTIME_CONFLICT', '文档已在磁盘上被修改', 409, {
-            current: { mtime: new Date(st.mtimeMs).toISOString(), size: st.size, hash: disk.hash, content: disk.content }
+            current: {
+              mtime: new Date(st.mtimeMs).toISOString(),
+              size: st.size,
+              hash: disk.hash,
+              content: disk.content,
+            },
           });
         }
       }
-      fsx.atomicWriteText(abs, b.content, b.encoding as fsx.DetectedEncoding ?? 'utf8', b.eol === 'CRLF' ? 'CRLF' : 'LF');
-      logActivity(ctx.db(), { kind: 'fs.save', level: 'L2', projectId: b.projectId, targetPath: abs, actor: currentActor().actor });
+      fsx.atomicWriteText(
+        abs,
+        b.content,
+        (b.encoding as fsx.DetectedEncoding) ?? 'utf8',
+        b.eol === 'CRLF' ? 'CRLF' : 'LF',
+      );
+      logActivity(ctx.db(), {
+        kind: 'fs.save',
+        level: 'L2',
+        projectId: b.projectId,
+        targetPath: abs,
+        actor: currentActor().actor,
+      });
       return ok({ saved: true });
     } catch (err) {
       return fail(...toApiErrorTuple(err));

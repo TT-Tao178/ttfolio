@@ -23,7 +23,6 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-
 export function Dashboard(): React.JSX.Element {
   const { settings } = useSettings();
   const { message } = App.useApp();
@@ -31,7 +30,7 @@ export function Dashboard(): React.JSX.Element {
   const [page, setPage] = useState(1);
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', 'dashboard', settings.cardSort],
-    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort })
+    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort }),
   });
 
   const list = projects ?? [];
@@ -39,7 +38,9 @@ export function Dashboard(): React.JSX.Element {
   const noDocs = list.filter((p) => !p.hasDocs).length;
   const noArch = list.filter((p) => !p.hasArch).length;
   const todayKey = localDateKey(new Date());
-  const openedToday = list.filter((p) => p.lastOpenedAt !== null && localDateKey(new Date(String(p.lastOpenedAt))) === todayKey).length;
+  const openedToday = list.filter(
+    (p) => p.lastOpenedAt !== null && localDateKey(new Date(String(p.lastOpenedAt))) === todayKey,
+  ).length;
   const avgMs = (() => {
     const vals = list.map((p) => p.analyzeMs ?? 0).filter((v) => v > 0);
     return vals.length === 0 ? 0 : Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
@@ -82,19 +83,25 @@ export function Dashboard(): React.JSX.Element {
   const openProject = (p: ProjectSummary): void => {
     const sub = settings.defaultProjectTab === 'overview' ? 'overview' : 'files';
     if (sub === 'files') useAppStore.getState().requestAutoOpenProject(p.id);
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 }, p.alias ?? p.diskName);
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'project', projectId: p.id, targetPath: null, subTab: sub, scroll: 0 },
+        p.alias ?? p.diskName,
+      );
     void api.post(`/api/projects/${p.id}/open`);
   };
   const pin = useMutation({
-    mutationFn: (p: ProjectSummary) => api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
+    mutationFn: (p: ProjectSummary) =>
+      api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败')
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });
   const analyze = useMutation({
     mutationFn: (ids: string[]) => api.post('/api/projects/analyze', { projectIds: ids }),
-    onSuccess: () => void message.success('已开始重新分析')
+    onSuccess: () => void message.success('已开始重新分析'),
   });
 
   // ---- 「继续上次」：最近打开的 6 个项目，chips 直达 ----
@@ -109,7 +116,7 @@ export function Dashboard(): React.JSX.Element {
     { key: 'my-dirty', label: '有未提交改动', count: dirty },
     { key: 'my-nodocs', label: '缺文档', count: noDocs },
     { key: 'my-noarch', label: '缺架构图', count: noArch },
-    { key: 'my-unanalyzed', label: '未分析', count: unanalyzed }
+    { key: 'my-unanalyzed', label: '未分析', count: unanalyzed },
   ].filter((a) => a.count > 0);
   const goView = (key: string): void => {
     useAppStore.getState().updateActiveLocation({ subTab: `view:${key}` }, true);
@@ -118,13 +125,17 @@ export function Dashboard(): React.JSX.Element {
   // ---- 聚合语言占比：全部项目按字节聚合，GitHub 风格色条 + 图例（top6 + 其他） ----
   const langAgg = (() => {
     const m = new Map<string, number>();
-    for (const p of list) for (const l of p.languages ?? []) m.set(l.language, (m.get(l.language) ?? 0) + l.bytes);
+    for (const p of list)
+      for (const l of p.languages ?? []) m.set(l.language, (m.get(l.language) ?? 0) + l.bytes);
     const total = [...m.values()].reduce((a, b) => a + b, 0);
     if (total === 0) return null;
     const entries = [...m.entries()].sort((a, b) => b[1] - a[1]);
-    const rows = entries.slice(0, 6).map(([language, bytes]) => ({ language, percent: Math.round((bytes / total) * 100) }));
+    const rows = entries
+      .slice(0, 6)
+      .map(([language, bytes]) => ({ language, percent: Math.round((bytes / total) * 100) }));
     const rest = entries.slice(6).reduce((a, b) => a + b[1], 0);
-    if (rest > 0) rows.push({ language: 'Other', percent: Math.max(1, 100 - rows.reduce((s, r) => s + r.percent, 0)) });
+    if (rest > 0)
+      rows.push({ language: 'Other', percent: Math.max(1, 100 - rows.reduce((s, r) => s + r.percent, 0)) });
     return rows.filter((r) => r.percent > 0);
   })();
 
@@ -134,13 +145,21 @@ export function Dashboard(): React.JSX.Element {
     .sort((a, b) => String(b.gitLastCommitAt).localeCompare(String(a.gitLastCommitAt)))
     .slice(0, 8);
   const openGit = (p: ProjectSummary): void => {
-    useAppStore.getState().openTab({ kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 }, p.alias ?? p.diskName);
+    useAppStore
+      .getState()
+      .openTab(
+        { kind: 'project', projectId: p.id, targetPath: null, subTab: 'git', scroll: 0 },
+        p.alias ?? p.diskName,
+      );
   };
 
   return (
     // flex column：项目区 flex:1 吃掉剩余高度，分页器 margin-top:auto 恒贴其底——
     // 翻到内容不满一屏的页时分页器不再被顶得上下跳（用户反馈）
-    <div style={{ overflow: 'auto', height: '100%', paddingRight: 4, display: 'flex', flexDirection: 'column' }} data-testid="dashboard">
+    <div
+      style={{ overflow: 'auto', height: '100%', paddingRight: 4, display: 'flex', flexDirection: 'column' }}
+      data-testid="dashboard"
+    >
       {/* 总览屏也必须能直接添加项目：原先入口只在卡片墙分支里，默认落总览时"找不到添加入口" */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <Typography.Title level={4} style={{ margin: 0 }}>
@@ -159,7 +178,10 @@ export function Dashboard(): React.JSX.Element {
 
       {/* 「继续上次」：最近打开的项目 chips，一键直达 */}
       {recent.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }} data-testid="dash-recent">
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}
+          data-testid="dash-recent"
+        >
           <span style={{ fontSize: 12, color: SEMANTIC.textTertiary, flexShrink: 0 }}>继续上次：</span>
           {recent.map((p) => (
             <Button key={p.id} size="small" onClick={() => openProject(p)}>
@@ -177,7 +199,12 @@ export function Dashboard(): React.JSX.Element {
           <Statistic title="今天动过" value={openedToday} loading={isLoading} />
         </Card>
         <Card size="small">
-          <Statistic title="有未提交改动" value={dirty} loading={isLoading} valueStyle={dirty > 0 ? { color: SEMANTIC.warning } : undefined} />
+          <Statistic
+            title="有未提交改动"
+            value={dirty}
+            loading={isLoading}
+            valueStyle={dirty > 0 ? { color: SEMANTIC.warning } : undefined}
+          />
         </Card>
         <Card size="small">
           <Statistic title="缺设计文档" value={noDocs} loading={isLoading} />
@@ -192,10 +219,18 @@ export function Dashboard(): React.JSX.Element {
 
       {/* 「需要关注」行动条：只显示计数 > 0 的项，点击跳对应卡片墙视图 */}
       {attention.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }} data-testid="dash-attention">
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}
+          data-testid="dash-attention"
+        >
           <span style={{ fontSize: 12, color: SEMANTIC.warning, flexShrink: 0 }}>⚠ 需要关注：</span>
           {attention.map((a) => (
-            <Tag key={a.key} color="warning" style={{ cursor: 'pointer', marginInlineEnd: 0 }} onClick={() => goView(a.key)}>
+            <Tag
+              key={a.key}
+              color="warning"
+              style={{ cursor: 'pointer', marginInlineEnd: 0 }}
+              onClick={() => goView(a.key)}
+            >
               {a.label} {a.count}
             </Tag>
           ))}
@@ -205,16 +240,39 @@ export function Dashboard(): React.JSX.Element {
       {/* 聚合语言占比：全部项目按字节聚合（GitHub 风格色条 + 图例） */}
       {langAgg !== null && (
         <div style={{ marginTop: 12 }} data-testid="dash-langs">
-          <div style={{ fontSize: 12, color: SEMANTIC.textTertiary, marginBottom: 4 }}>语言构成（全部项目聚合）</div>
-          <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: SEMANTIC.split }}>
+          <div style={{ fontSize: 12, color: SEMANTIC.textTertiary, marginBottom: 4 }}>
+            语言构成（全部项目聚合）
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              height: 8,
+              borderRadius: 4,
+              overflow: 'hidden',
+              background: SEMANTIC.split,
+            }}
+          >
             {langAgg.map((r) => (
-              <div key={r.language} style={{ width: `${r.percent}%`, background: langColor(r.language) }} title={`${r.language} ${r.percent}%`} />
+              <div
+                key={r.language}
+                style={{ width: `${r.percent}%`, background: langColor(r.language) }}
+                title={`${r.language} ${r.percent}%`}
+              />
             ))}
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
             {langAgg.map((r) => (
               <span key={r.language} style={{ fontSize: 12 }}>
-                <i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: langColor(r.language), marginRight: 4 }} />
+                <i
+                  style={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    background: langColor(r.language),
+                    marginRight: 4,
+                  }}
+                />
                 {r.language} {r.percent}%
               </span>
             ))}
@@ -225,21 +283,46 @@ export function Dashboard(): React.JSX.Element {
       {/* 项目区：flex:1 吃掉剩余高度，分页器恒贴本区底部 */}
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-          <Typography.Title level={5} style={{ margin: 0 }}>项目</Typography.Title>
-          <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>共 {total} 个 · 每页 {PAGE_SIZE} 个</span>
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            项目
+          </Typography.Title>
+          <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
+            共 {total} 个 · 每页 {PAGE_SIZE} 个
+          </span>
         </div>
         {total === 0 ? (
           <Card size="small">
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有登记项目，点右上「添加项目」开始" />
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="还没有登记项目，点右上「添加项目」开始"
+            />
           </Card>
         ) : (
           <>
-            <div ref={gridRef} data-testid="dashboard-project-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, minHeight: gridMinH > 0 ? gridMinH : undefined }}>
+            <div
+              ref={gridRef}
+              data-testid="dashboard-project-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 12,
+                minHeight: gridMinH > 0 ? gridMinH : undefined,
+              }}
+            >
               {pageItems.map((p) => (
-                <ProjectCard key={p.id} p={p} onOpen={() => openProject(p)} onPin={() => pin.mutate(p)} onAnalyze={() => analyze.mutate([p.id])} />
+                <ProjectCard
+                  key={p.id}
+                  p={p}
+                  onOpen={() => openProject(p)}
+                  onPin={() => pin.mutate(p)}
+                  onAnalyze={() => analyze.mutate([p.id])}
+                />
               ))}
             </div>
-            <div data-testid="dashboard-project-pagination" style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+            <div
+              data-testid="dashboard-project-pagination"
+              style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}
+            >
               <Pagination
                 current={page}
                 pageSize={PAGE_SIZE}
@@ -270,7 +353,9 @@ export function Dashboard(): React.JSX.Element {
                   <span className="tt-ellipsis" style={{ flex: 1, fontSize: 12, opacity: 0.85 }}>
                     {p.gitLastCommitSubject ?? '（无提交主题）'}
                   </span>
-                  <span style={{ fontSize: 12, opacity: 0.55, flexShrink: 0 }}>{relTime(p.gitLastCommitAt)}</span>
+                  <span style={{ fontSize: 12, opacity: 0.55, flexShrink: 0 }}>
+                    {relTime(p.gitLastCommitAt)}
+                  </span>
                 </span>
               </List.Item>
             )}

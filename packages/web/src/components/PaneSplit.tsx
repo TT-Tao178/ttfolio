@@ -45,7 +45,7 @@ export function PaneSplit({
   collapsible = true,
   collapsed = false,
   onExpand,
-  testId
+  testId,
 }: Props): React.JSX.Element {
   const { size, setSize, commit } = usePaneSize(sizeKey, defaultSize);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,11 @@ export function PaneSplit({
   };
 
   return (
-    <div ref={wrapRef} style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }} data-testid={testId}>
+    <div
+      ref={wrapRef}
+      style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}
+      data-testid={testId}
+    >
       <Splitter
         style={{ height: '100%', width: '100%' }}
         onResizeStart={() => setDragging(true)}

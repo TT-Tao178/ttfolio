@@ -52,7 +52,7 @@ export function compileIgnore(rules: IgnoreRule[]): CompiledIgnore {
     matchers.push({
       regex: globToRegex(cleaned.toLowerCase()),
       mode: rule.mode,
-      hasSlash: cleaned.includes('/')
+      hasSlash: cleaned.includes('/'),
     });
   }
 
@@ -82,7 +82,7 @@ export function compileIgnore(rules: IgnoreRule[]): CompiledIgnore {
       if (SENSITIVE_FILE_PATTERNS.some((re) => re.test(fileName))) return true;
       if (SENSITIVE_FILE_PATTERNS.some((re) => re.test(lower))) return true;
       return false;
-    }
+    },
   };
 }
 
@@ -126,7 +126,7 @@ export const BUILTIN_IGNORE_PATTERNS: Array<{ pattern: string; mode: 'hide' | 'a
   '*.log',
   '*.tmp',
   'tmp',
-  'temp'
+  'temp',
 ].map((pattern) => ({ pattern, mode: 'hide' as const }));
 
 /** 敏感文件规则入库（mode 仅用于展示，敏感判定由 isSensitive 负责，且不从文件树隐藏） */
@@ -142,5 +142,5 @@ export const BUILTIN_SENSITIVE_PATTERNS: string[] = [
   '.aws',
   '.ssh',
   'credentials*',
-  'secrets*'
+  'secrets*',
 ];

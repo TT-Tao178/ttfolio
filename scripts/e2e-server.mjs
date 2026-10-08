@@ -14,6 +14,6 @@ const isWin = process.platform === 'win32';
 const child = spawn('npx', ['tsx', 'packages/server/src/index.ts'], {
   stdio: 'inherit',
   shell: isWin,
-  env: { ...process.env, TTFOLIO_DATA_DIR: dataDir, TTFOLIO_PORT: process.env['TTFOLIO_PORT'] ?? '7733' }
+  env: { ...process.env, TTFOLIO_DATA_DIR: dataDir, TTFOLIO_PORT: process.env['TTFOLIO_PORT'] ?? '7733' },
 });
 child.on('exit', (code) => process.exit(code ?? 0));

@@ -31,7 +31,12 @@ describe('打开日志的入参白名单（FR-11.6 / C-22）', () => {
 });
 
 describe('忽略规则', () => {
-  const compiled = compileIgnore([rule('node_modules'), rule('*.log'), rule('dist'), rule('.env*', 'analyze_only')]);
+  const compiled = compileIgnore([
+    rule('node_modules'),
+    rule('*.log'),
+    rule('dist'),
+    rule('.env*', 'analyze_only'),
+  ]);
   it('目录级命中（任意层级）', () => {
     expect(compiled.isHidden('a/node_modules/x/index.js')).toBe(true);
     expect(compiled.isHidden('node_modules')).toBe(true);
@@ -101,41 +106,89 @@ describe('语言统计（按字节，GitHub 口径）', () => {
 
 describe('类型识别优先级', () => {
   it('微服务：≥2 清单子目录 + compose 多服务', () => {
-    expect(detectProjectType({
-      manifestSubDirs: ['svc1', 'svc2'], composeServices: 2, hasGatewayDir: false,
-      frontendDepDirs: [], backendDepDirs: [], hasBackendFramework: false, hasServerTemplates: false,
-      frontendFramework: false, hasIndexHtmlWithPackageJson: false, scriptBytes: 0, totalBytes: 100, assetBytes: 0
-    })).toBe('microservice');
+    expect(
+      detectProjectType({
+        manifestSubDirs: ['svc1', 'svc2'],
+        composeServices: 2,
+        hasGatewayDir: false,
+        frontendDepDirs: [],
+        backendDepDirs: [],
+        hasBackendFramework: false,
+        hasServerTemplates: false,
+        frontendFramework: false,
+        hasIndexHtmlWithPackageJson: false,
+        scriptBytes: 0,
+        totalBytes: 100,
+        assetBytes: 0,
+      }),
+    ).toBe('microservice');
   });
   it('前后端分离：前端子目录 + 后端子目录', () => {
-    expect(detectProjectType({
-      manifestSubDirs: ['web', 'server'], composeServices: 0, hasGatewayDir: false,
-      frontendDepDirs: ['web'], backendDepDirs: ['server'], hasBackendFramework: true, hasServerTemplates: false,
-      frontendFramework: true, hasIndexHtmlWithPackageJson: false, scriptBytes: 0, totalBytes: 100, assetBytes: 0
-    })).toBe('split');
+    expect(
+      detectProjectType({
+        manifestSubDirs: ['web', 'server'],
+        composeServices: 0,
+        hasGatewayDir: false,
+        frontendDepDirs: ['web'],
+        backendDepDirs: ['server'],
+        hasBackendFramework: true,
+        hasServerTemplates: false,
+        frontendFramework: true,
+        hasIndexHtmlWithPackageJson: false,
+        scriptBytes: 0,
+        totalBytes: 100,
+        assetBytes: 0,
+      }),
+    ).toBe('split');
   });
   it('前端：前端框架且无后端', () => {
-    expect(detectProjectType({
-      manifestSubDirs: [], composeServices: 0, hasGatewayDir: false,
-      frontendDepDirs: [], backendDepDirs: [], hasBackendFramework: false, hasServerTemplates: false,
-      frontendFramework: true, hasIndexHtmlWithPackageJson: false, scriptBytes: 0, totalBytes: 100, assetBytes: 0
-    })).toBe('frontend');
+    expect(
+      detectProjectType({
+        manifestSubDirs: [],
+        composeServices: 0,
+        hasGatewayDir: false,
+        frontendDepDirs: [],
+        backendDepDirs: [],
+        hasBackendFramework: false,
+        hasServerTemplates: false,
+        frontendFramework: true,
+        hasIndexHtmlWithPackageJson: false,
+        scriptBytes: 0,
+        totalBytes: 100,
+        assetBytes: 0,
+      }),
+    ).toBe('frontend');
   });
   it('脚本工具：脚本字节占比 ≥ 40%', () => {
-    expect(detectProjectType({
-      manifestSubDirs: [], composeServices: 0, hasGatewayDir: false,
-      frontendDepDirs: [], backendDepDirs: [], hasBackendFramework: false, hasServerTemplates: false,
-      frontendFramework: false, hasIndexHtmlWithPackageJson: false, scriptBytes: 50, totalBytes: 100, assetBytes: 0
-    })).toBe('script');
+    expect(
+      detectProjectType({
+        manifestSubDirs: [],
+        composeServices: 0,
+        hasGatewayDir: false,
+        frontendDepDirs: [],
+        backendDepDirs: [],
+        hasBackendFramework: false,
+        hasServerTemplates: false,
+        frontendFramework: false,
+        hasIndexHtmlWithPackageJson: false,
+        scriptBytes: 50,
+        totalBytes: 100,
+        assetBytes: 0,
+      }),
+    ).toBe('script');
   });
 });
 
 describe('技术栈提取', () => {
   it('package.json 依赖映射', () => {
-    const tags = extractFromManifest('package.json', JSON.stringify({
-      dependencies: { react: '^18', 'better-sqlite3': '*' },
-      devDependencies: { vite: '^5', vitest: '*' }
-    }), 100);
+    const tags = extractFromManifest(
+      'package.json',
+      JSON.stringify({
+        dependencies: { react: '^18', 'better-sqlite3': '*' },
+        devDependencies: { vite: '^5', vitest: '*' },
+      }),
+      100,
+    );
     expect(tags).toContain('React');
     expect(tags).toContain('Vite');
     expect(tags).toContain('Vitest');
@@ -156,7 +209,7 @@ describe('git status porcelain=v2 -z 解析', () => {
       '# branch.upstream origin/main',
       '1 .M N... 100644 100644 100644 abc123 def456 修改 的文件.txt',
       `2 R. N... 100644 100644 100644 abc123 def456 R100 新 名.txt${z}旧 名.txt`,
-      '? untracked.txt'
+      '? untracked.txt',
     ].join(z);
     const parsed = parseStatusV2(raw);
     expect(parsed.header['branch.head']).toBe('main');
@@ -226,11 +279,15 @@ describe('登记可打开性（P0-1：登记与打开必须同一套规则，防
   });
 
   it('UNC 路径被拒绝，且提示改用映射盘符/复制到本地', async () => {
-    await expect(validateRegistrableRoot('\\\\localhost\\share\\proj')).rejects.toThrow(/UNC[\s\S]*(映射|本地)/);
+    await expect(validateRegistrableRoot('\\\\localhost\\share\\proj')).rejects.toThrow(
+      /UNC[\s\S]*(映射|本地)/,
+    );
   });
 
   it('不存在的目录给出 NOT_FOUND 而不是危险段错误', async () => {
-    await expect(validateRegistrableRoot(path.join(tmp, 'nope-not-exist'))).rejects.toThrow(/不存在或不可访问/);
+    await expect(validateRegistrableRoot(path.join(tmp, 'nope-not-exist'))).rejects.toThrow(
+      /不存在或不可访问/,
+    );
   });
 });
 
@@ -243,8 +300,12 @@ describe('符号链接类型判定（P0-3：junction 不能被当成文件）', 
   writeFileSync(path.join(outside, 'x.txt'), 'x');
   const canJunction = process.platform === 'win32';
   if (canJunction) {
-    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-dir'), path.join(proj, 'src')], { stdio: 'ignore' });
-    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-broken'), path.join(outside, 'nope')], { stdio: 'ignore' });
+    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-dir'), path.join(proj, 'src')], {
+      stdio: 'ignore',
+    });
+    execFileSync('cmd', ['/c', 'mklink', '/J', path.join(proj, 'link-broken'), path.join(outside, 'nope')], {
+      stdio: 'ignore',
+    });
   }
 
   it('目录型 junction 判为 dir 且标记 isSymlink（可展开）', () => {

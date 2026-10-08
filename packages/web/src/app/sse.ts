@@ -70,7 +70,17 @@ export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) =
         }
       };
 
-      for (const name of ['hello', 'analysis.progress', 'project.analyzed', 'project.updated', 'fs.changed', 'git.changed', 'search.index.progress', 'trash.changed', 'notice']) {
+      for (const name of [
+        'hello',
+        'analysis.progress',
+        'project.analyzed',
+        'project.updated',
+        'fs.changed',
+        'git.changed',
+        'search.index.progress',
+        'trash.changed',
+        'notice',
+      ]) {
         es.addEventListener(name, handle(name) as EventListener);
       }
       es.onopen = () => onState('open');

@@ -25,7 +25,7 @@ function spawnChild(name, cmd, args, opts = {}) {
     cwd: opts.cwd ?? ROOT,
     env: { ...process.env, ...opts.env },
     shell: isWin,
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
   const pipe = (stream) => {
     stream.setEncoding('utf8');
@@ -67,7 +67,11 @@ process.on('SIGTERM', shutdown);
 // 1) 先起 server（tsx watch）。起之前清掉上次运行留下的 runtime.json——
 //    否则下方轮询会立即读到旧端口（server 尚未重启完成），vite 代理指向死端口（ECONNREFUSED）
 for (const p of runtimeCandidates()) {
-  try { if (existsSync(p)) unlinkSync(p); } catch { /* 被占用时忽略，轮询仍会等 mtime 更新 */ }
+  try {
+    if (existsSync(p)) unlinkSync(p);
+  } catch {
+    /* 被占用时忽略，轮询仍会等 mtime 更新 */
+  }
 }
 spawnChild('server', 'npx', ['tsx', 'watch', 'packages/server/src/index.ts']);
 
@@ -96,6 +100,6 @@ while (Date.now() < deadline) {
 
 // 3) 起 vite，代理 /api 与 /raw 到实际端口并注入 token
 spawnChild('web', 'npx', ['vite', '--config', 'packages/web/vite.config.ts'], {
-  env: { TTFOLIO_PROXY_TARGET: `http://127.0.0.1:${port || '7717'}`, TTFOLIO_TOKEN: token }
+  env: { TTFOLIO_PROXY_TARGET: `http://127.0.0.1:${port || '7717'}`, TTFOLIO_TOKEN: token },
 });
 process.stdout.write(`\nttFolio dev: web http://localhost:5173  api http://127.0.0.1:${port || '7717'}\n`);

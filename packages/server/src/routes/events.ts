@@ -11,7 +11,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-store',
       Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no'
+      'X-Accel-Buffering': 'no',
     });
     reply.raw.write(': connected\n\n');
 
@@ -24,7 +24,7 @@ export const eventsRoute: FastifyPluginAsync = async (app) => {
     const { id, replay } = ctx.sse.subscribe(
       (chunk) => reply.raw.write(chunk),
       () => reply.raw.end(),
-      Number.isFinite(lastEventId) ? lastEventId : Number.isFinite(lastFromQuery) ? lastFromQuery : undefined
+      Number.isFinite(lastEventId) ? lastEventId : Number.isFinite(lastFromQuery) ? lastFromQuery : undefined,
     );
     for (const evt of replay) {
       reply.raw.write(`id: ${evt.id}\nevent: ${evt.event}\ndata: ${JSON.stringify(evt.data)}\n\n`);

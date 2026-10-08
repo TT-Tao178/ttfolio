@@ -29,7 +29,7 @@ const MIME: Record<string, string> = {
   '.pdf': 'application/pdf',
   '.md': 'text/plain; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
-  '.xml': 'application/xml'
+  '.xml': 'application/xml',
 };
 
 export function startUserContentServer(ctx: AppContext): Promise<number> {
@@ -38,12 +38,15 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
   // token + Host 校验（与主服务一致）
   server.addHook('onRequest', async (req, reply) => {
     const host = req.headers.host ?? '';
-    const hostOk = host.indexOf('127.0.0.1:') === 0 || host === '127.0.0.1' || host.indexOf('localhost:') === 0;
+    const hostOk =
+      host.indexOf('127.0.0.1:') === 0 || host === '127.0.0.1' || host.indexOf('localhost:') === 0;
     if (!hostOk) {
       void reply.code(403).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '非法 Host' } });
       return;
     }
-    const token = (req.headers['x-ttfolio-token'] as string | undefined) ?? (req.query as Record<string, string> | undefined)?.['token'];
+    const token =
+      (req.headers['x-ttfolio-token'] as string | undefined) ??
+      (req.query as Record<string, string> | undefined)?.['token'];
     if (token !== ctx.token) {
       void reply.code(401).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'token 无效' } });
     }
@@ -52,7 +55,9 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
   // 只读：非 GET 一律 405（C-13）
   server.addHook('onRequest', async (req, reply) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      void reply.code(405).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '用户内容服务只读' } });
+      void reply
+        .code(405)
+        .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '用户内容服务只读' } });
     }
   });
 
@@ -79,7 +84,7 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
       }
       const guarded = await guardPath(
         { userPath: path.join(archive.dir_path, requested), allowedRoots: [archive.dir_path] },
-        { mustExist: true }
+        { mustExist: true },
       );
       const buf = await fsp.readFile(guarded.real);
       const ext = path.extname(guarded.real).toLowerCase();
@@ -107,7 +112,7 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
     try {
       const guarded = await guardPath(
         { userPath: path.join(project.dir_path, relPath), allowedRoots: [project.dir_path] },
-        { mustExist: true }
+        { mustExist: true },
       );
       const st = await fsp.stat(guarded.real);
       if (st.isDirectory()) {

@@ -12,11 +12,18 @@ import { SEMANTIC } from '@/theme/tokens';
 
 export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'closed' }): React.JSX.Element {
   const { settings } = useSettings();
-  const { data: health } = useQuery({ queryKey: ['health'], queryFn: () => api.get<HealthInfo>('/api/health'), refetchInterval: 30000 });
+  const { data: health } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => api.get<HealthInfo>('/api/health'),
+    refetchInterval: 30000,
+  });
   const { data: tasks } = useQuery({
     queryKey: ['tasks'],
-    queryFn: () => api.get<{ running: TaskInfo[]; stats: { files: number; bytes: number } | null }>('/api/search/index/status'),
-    refetchInterval: 5000
+    queryFn: () =>
+      api.get<{ running: TaskInfo[]; stats: { files: number; bytes: number } | null }>(
+        '/api/search/index/status',
+      ),
+    refetchInterval: 5000,
   });
 
   const running: TaskInfo[] = tasks?.running ?? [];
@@ -25,21 +32,35 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 16,
-        height: 28, padding: '0 16px', fontSize: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        height: 28,
+        padding: '0 16px',
+        fontSize: 12,
         borderTop: `1px solid ${SEMANTIC.split}`,
-        opacity: 0.85
+        opacity: 0.85,
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <i style={{ width: 6, height: 6, borderRadius: 3, background: SEMANTIC.success, display: 'inline-block' }} />
+        <i
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            background: SEMANTIC.success,
+            display: 'inline-block',
+          }}
+        />
         本地模式 · 仅 127.0.0.1
       </span>
       <span className="tt-ellipsis" style={{ maxWidth: 320 }} data-testid="status-db">
         索引库 {health?.dbPath ?? '…'}（{fmtBytes(health?.dbSize ?? 0)}）
       </span>
       <span>项目 {health?.projectCount ?? '—'}</span>
-      <span data-testid="status-last-analyze">最近分析 {lastAnalyze === null ? '—' : relTime(lastAnalyze)}</span>
+      <span data-testid="status-last-analyze">
+        最近分析 {lastAnalyze === null ? '—' : relTime(lastAnalyze)}
+      </span>
       <span data-testid="status-watch" style={{ opacity: 0.75 }}>
         文件监听 {settings.watchEnabled ? '开' : '关'}
       </span>
@@ -48,7 +69,11 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
           <span data-testid="status-task" className="tt-ellipsis" style={{ maxWidth: 200 }}>
             {running[0]?.title}
           </span>
-          <Progress percent={Math.round(((running[0]?.done ?? 0) / Math.max(running[0]?.total ?? 1, 1)) * 100)} size="small" style={{ width: 120 }} />
+          <Progress
+            percent={Math.round(((running[0]?.done ?? 0) / Math.max(running[0]?.total ?? 1, 1)) * 100)}
+            size="small"
+            style={{ width: 120 }}
+          />
           <Button
             size="small"
             type="text"

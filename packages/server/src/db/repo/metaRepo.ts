@@ -14,7 +14,7 @@ export function setSetting(db: Database.Database, key: string, value: string): v
     db,
     `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-    [key, value, new Date().toISOString()]
+    [key, value, new Date().toISOString()],
   );
 }
 
@@ -27,7 +27,14 @@ export function getAllSettings(db: Database.Database): Record<string, string> {
 
 export function logActivity(
   db: Database.Database,
-  entry: { kind: string; level: 'L1' | 'L2' | 'L3'; projectId?: string | null; targetPath?: string | null; detail?: unknown; actor?: string }
+  entry: {
+    kind: string;
+    level: 'L1' | 'L2' | 'L3';
+    projectId?: string | null;
+    targetPath?: string | null;
+    detail?: unknown;
+    actor?: string;
+  },
 ): void {
   run(
     db,
@@ -40,15 +47,19 @@ export function logActivity(
       entry.projectId ?? null,
       entry.targetPath ?? null,
       entry.detail === undefined ? null : JSON.stringify(entry.detail),
-      entry.actor ?? 'local'
-    ]
+      entry.actor ?? 'local',
+    ],
   );
 }
 
 export function listActivity(db: Database.Database, limit: number, projectId?: string): ActivityEntry[] {
   const rows =
     projectId !== undefined
-      ? getAll<ActivityRow>(db, 'SELECT * FROM activity_log WHERE project_id = ? ORDER BY at DESC, id DESC LIMIT ?', [projectId, limit])
+      ? getAll<ActivityRow>(
+          db,
+          'SELECT * FROM activity_log WHERE project_id = ? ORDER BY at DESC, id DESC LIMIT ?',
+          [projectId, limit],
+        )
       : getAll<ActivityRow>(db, 'SELECT * FROM activity_log ORDER BY at DESC, id DESC LIMIT ?', [limit]);
   return rows.map((r) => ({
     id: r.id,
@@ -58,7 +69,7 @@ export function listActivity(db: Database.Database, limit: number, projectId?: s
     projectId: r.project_id,
     targetPath: r.target_path,
     detail: safeParse(r.detail_json),
-    actor: r.actor
+    actor: r.actor,
   }));
 }
 
@@ -76,7 +87,11 @@ export function addSearchHistory(db: Database.Database, query: string): void {
 }
 
 export function listSearchHistory(db: Database.Database, limit: number): string[] {
-  const rows = getAll<{ query: string }>(db, 'SELECT DISTINCT query FROM search_history ORDER BY id DESC LIMIT ?', [limit]);
+  const rows = getAll<{ query: string }>(
+    db,
+    'SELECT DISTINCT query FROM search_history ORDER BY id DESC LIMIT ?',
+    [limit],
+  );
   return rows.map((r) => r.query);
 }
 
@@ -85,15 +100,23 @@ export function recordRecentFile(db: Database.Database, projectId: string, path:
     db,
     `INSERT INTO recent_files (project_id, path, opened_at, open_count) VALUES (?, ?, ?, 1)
      ON CONFLICT(project_id, path) DO UPDATE SET opened_at = excluded.opened_at, open_count = open_count + 1`,
-    [projectId, path, new Date().toISOString()]
+    [projectId, path, new Date().toISOString()],
   );
 }
 
-export function listRecentFiles(db: Database.Database, limit: number): Array<{ projectId: string; path: string; openedAt: string; openCount: number }> {
+export function listRecentFiles(
+  db: Database.Database,
+  limit: number,
+): Array<{ projectId: string; path: string; openedAt: string; openCount: number }> {
   const rows = getAll<{ project_id: string; path: string; opened_at: string; open_count: number }>(
     db,
     'SELECT project_id, path, opened_at, open_count FROM recent_files ORDER BY opened_at DESC LIMIT ?',
-    [limit]
+    [limit],
   );
-  return rows.map((r) => ({ projectId: r.project_id, path: r.path, openedAt: r.opened_at, openCount: r.open_count }));
+  return rows.map((r) => ({
+    projectId: r.project_id,
+    path: r.path,
+    openedAt: r.opened_at,
+    openCount: r.open_count,
+  }));
 }

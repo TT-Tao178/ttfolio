@@ -22,7 +22,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'templates', label: '命令模板', title: '命令模板' },
   { key: 'watch', label: '文件监听与保存', title: '文件监听与保存' },
   { key: 'data', label: '数据与备份', title: '数据与备份' },
-  { key: 'about', label: '关于', title: '关于' }
+  { key: 'about', label: '关于', title: '关于' },
 ];
 
 export function sectionTitle(key: string): string {

@@ -20,7 +20,11 @@ export function listDocRoots(db: Database.Database): DocRoot[] {
 
 export function createDocRoot(db: Database.Database, path: string, label: string | null): DocRoot {
   const id = ulid();
-  run(db, 'INSERT INTO doc_roots (id, label, path, path_key, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)', [id, label, path, pathKey(path), new Date().toISOString()]);
+  run(
+    db,
+    'INSERT INTO doc_roots (id, label, path, path_key, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+    [id, label, path, pathKey(path), new Date().toISOString()],
+  );
   const row = getOne<DocRootRow>(db, 'SELECT * FROM doc_roots WHERE id = ?', [id]);
   if (row === undefined) throw new Error('insert doc root failed');
   return mapDocRoot(row);
@@ -40,28 +44,58 @@ function mapMount(r: ProjectPathRow): MountInfo {
     label: r.label,
     source: r.source === 'auto_root' ? 'auto_root' : 'manual',
     existsOk: r.exists_ok === 1,
-    lastCheckedAt: r.last_checked_at
+    lastCheckedAt: r.last_checked_at,
   };
 }
 
 export function listMounts(db: Database.Database, projectId: string): MountInfo[] {
-  return getAll<ProjectPathRow>(db, 'SELECT * FROM project_paths WHERE project_id = ? ORDER BY created_at', [projectId]).map(mapMount);
+  return getAll<ProjectPathRow>(db, 'SELECT * FROM project_paths WHERE project_id = ? ORDER BY created_at', [
+    projectId,
+  ]).map(mapMount);
 }
 
 export function listAllMounts(db: Database.Database): Array<MountInfo & { projectId: string }> {
-  return getAll<ProjectPathRow>(db, 'SELECT * FROM project_paths ORDER BY created_at').map((r) => ({ ...mapMount(r), projectId: r.project_id }));
+  return getAll<ProjectPathRow>(db, 'SELECT * FROM project_paths ORDER BY created_at').map((r) => ({
+    ...mapMount(r),
+    projectId: r.project_id,
+  }));
 }
 
-export function createMount(db: Database.Database, data: { projectId: string; kind: 'dir' | 'file'; path: string; label: string | null; source: 'auto_root' | 'manual'; rootId: string | null }): MountInfo {
+export function createMount(
+  db: Database.Database,
+  data: {
+    projectId: string;
+    kind: 'dir' | 'file';
+    path: string;
+    label: string | null;
+    source: 'auto_root' | 'manual';
+    rootId: string | null;
+  },
+): MountInfo {
   const id = ulid();
   run(
     db,
     `INSERT INTO project_paths (id, project_id, kind, path, path_key, label, source, root_id, exists_ok, last_checked_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
      ON CONFLICT(project_id, path_key) DO NOTHING`,
-    [id, data.projectId, data.kind, data.path, pathKey(data.path), data.label, data.source, data.rootId, new Date().toISOString(), new Date().toISOString()]
+    [
+      id,
+      data.projectId,
+      data.kind,
+      data.path,
+      pathKey(data.path),
+      data.label,
+      data.source,
+      data.rootId,
+      new Date().toISOString(),
+      new Date().toISOString(),
+    ],
   );
-  const row = getOne<ProjectPathRow>(db, 'SELECT * FROM project_paths WHERE project_id = ? AND path_key = ?', [data.projectId, pathKey(data.path)]);
+  const row = getOne<ProjectPathRow>(
+    db,
+    'SELECT * FROM project_paths WHERE project_id = ? AND path_key = ?',
+    [data.projectId, pathKey(data.path)],
+  );
   if (row === undefined) throw new Error('insert mount failed');
   return mapMount(row);
 }
@@ -78,32 +112,60 @@ export function getMount(db: Database.Database, id: string): (MountInfo & { proj
 }
 
 export function setMountExists(db: Database.Database, id: string, ok: boolean): void {
-  run(db, 'UPDATE project_paths SET exists_ok = ?, last_checked_at = ? WHERE id = ?', [ok ? 1 : 0, new Date().toISOString(), id]);
+  run(db, 'UPDATE project_paths SET exists_ok = ?, last_checked_at = ? WHERE id = ?', [
+    ok ? 1 : 0,
+    new Date().toISOString(),
+    id,
+  ]);
 }
 
 // ---------- 架构图 ----------
 export function listArchives(db: Database.Database, projectId: string): ArchiveRow[] {
-  return getAll<ArchiveRow>(db, 'SELECT * FROM archives WHERE project_id = ? ORDER BY is_default DESC, created_at', [projectId]);
+  return getAll<ArchiveRow>(
+    db,
+    'SELECT * FROM archives WHERE project_id = ? ORDER BY is_default DESC, created_at',
+    [projectId],
+  );
 }
 
 export function getArchive(db: Database.Database, id: string): ArchiveRow | undefined {
   return getOne<ArchiveRow>(db, 'SELECT * FROM archives WHERE id = ?', [id]);
 }
 
-export function upsertArchive(db: Database.Database, data: {
-  projectId: string;
-  dirPath: string;
-  label: string | null;
-  isDefault: boolean;
-  htmlCount: number;
-  totalBytes: number;
-  entryRel: string | null;
-  entrySource: 'index_html' | 'manual' | 'list';
-}): ArchiveRow {
-  const existing = getOne<ArchiveRow>(db, 'SELECT * FROM archives WHERE project_id = ? AND dir_path_key = ?', [data.projectId, pathKey(data.dirPath)]);
+export function upsertArchive(
+  db: Database.Database,
+  data: {
+    projectId: string;
+    dirPath: string;
+    label: string | null;
+    isDefault: boolean;
+    htmlCount: number;
+    totalBytes: number;
+    entryRel: string | null;
+    entrySource: 'index_html' | 'manual' | 'list';
+  },
+): ArchiveRow {
+  const existing = getOne<ArchiveRow>(
+    db,
+    'SELECT * FROM archives WHERE project_id = ? AND dir_path_key = ?',
+    [data.projectId, pathKey(data.dirPath)],
+  );
   const now = new Date().toISOString();
   if (existing !== undefined) {
-    run(db, 'UPDATE archives SET label = ?, html_count = ?, total_bytes = ?, entry_rel = ?, entry_source = ?, is_default = ?, last_seen_at = ? WHERE id = ?', [data.label, data.htmlCount, data.totalBytes, data.entryRel, data.entrySource, data.isDefault ? 1 : 0, now, existing.id]);
+    run(
+      db,
+      'UPDATE archives SET label = ?, html_count = ?, total_bytes = ?, entry_rel = ?, entry_source = ?, is_default = ?, last_seen_at = ? WHERE id = ?',
+      [
+        data.label,
+        data.htmlCount,
+        data.totalBytes,
+        data.entryRel,
+        data.entrySource,
+        data.isDefault ? 1 : 0,
+        now,
+        existing.id,
+      ],
+    );
     const updated = getArchive(db, existing.id);
     if (updated === undefined) throw new Error('archive update failed');
     return updated;
@@ -113,14 +175,36 @@ export function upsertArchive(db: Database.Database, data: {
     db,
     `INSERT INTO archives (id, project_id, label, dir_path, dir_path_key, entry_rel, entry_source, html_count, total_bytes, is_default, last_seen_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, data.projectId, data.label, data.dirPath, pathKey(data.dirPath), data.entryRel, data.entrySource, data.htmlCount, data.totalBytes, data.isDefault ? 1 : 0, now, now]
+    [
+      id,
+      data.projectId,
+      data.label,
+      data.dirPath,
+      pathKey(data.dirPath),
+      data.entryRel,
+      data.entrySource,
+      data.htmlCount,
+      data.totalBytes,
+      data.isDefault ? 1 : 0,
+      now,
+      now,
+    ],
   );
   const created = getArchive(db, id);
   if (created === undefined) throw new Error('archive insert failed');
   return created;
 }
 
-export function patchArchive(db: Database.Database, id: string, fields: { entryRel?: string | null; entrySource?: 'index_html' | 'manual' | 'list'; isDefault?: boolean; label?: string | null }): boolean {
+export function patchArchive(
+  db: Database.Database,
+  id: string,
+  fields: {
+    entryRel?: string | null;
+    entrySource?: 'index_html' | 'manual' | 'list';
+    isDefault?: boolean;
+    label?: string | null;
+  },
+): boolean {
   const row = getArchive(db, id);
   if (row === undefined) return false;
   run(db, 'UPDATE archives SET entry_rel = ?, entry_source = ?, is_default = ?, label = ? WHERE id = ?', [
@@ -128,7 +212,7 @@ export function patchArchive(db: Database.Database, id: string, fields: { entryR
     fields.entrySource ?? row.entry_source,
     (fields.isDefault ?? row.is_default === 1) ? 1 : 0,
     fields.label !== undefined ? fields.label : row.label,
-    id
+    id,
   ]);
   return true;
 }
@@ -148,7 +232,7 @@ export function toArchiveInfo(
   sourceJsonFiles: string[],
   changed: boolean,
   imageFiles: ArchiveEntryFile[] = [],
-  textFiles: ArchiveEntryFile[] = []
+  textFiles: ArchiveEntryFile[] = [],
 ): ArchiveInfo {
   return {
     id: row.id,
@@ -167,6 +251,6 @@ export function toArchiveInfo(
     htmlFiles,
     imageFiles,
     textFiles,
-    sourceJsonFiles
+    sourceJsonFiles,
   };
 }

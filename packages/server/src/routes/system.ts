@@ -4,13 +4,25 @@ import type { AppContext } from '../context.js';
 import { ok, fail } from './helpers.js';
 import { getSetting, setSetting, getAllSettings, logActivity, listActivity } from '../db/repo/metaRepo.js';
 import {
-  listIgnoreRules, createIgnoreRule, updateIgnoreRule, deleteIgnoreRule,
-  listCommandTemplates, createCommandTemplate, updateCommandTemplate, deleteCommandTemplate
+  listIgnoreRules,
+  createIgnoreRule,
+  updateIgnoreRule,
+  deleteIgnoreRule,
+  listCommandTemplates,
+  createCommandTemplate,
+  updateCommandTemplate,
+  deleteCommandTemplate,
 } from '../db/repo/rulesRepo.js';
 import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
 import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
-import { SETTING_KEYS, TRASH_RETENTION_DAYS, GITHUB_REPO, GITHUB_RELEASES_URL, semverNewer } from '@ttfolio/shared';
+import {
+  SETTING_KEYS,
+  TRASH_RETENTION_DAYS,
+  GITHUB_REPO,
+  GITHUB_RELEASES_URL,
+  semverNewer,
+} from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
 import { join } from 'node:path';
@@ -27,17 +39,24 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       mode: 'web',
       dbPath: ctx.layout.dbFile,
       dbSize: ctx.dbSize(),
-      projectCount: ctx.db().prepare<[], { c: number }>('SELECT COUNT(*) AS c FROM projects WHERE deleted_at IS NULL').get()?.c ?? 0,
+      projectCount:
+        ctx
+          .db()
+          .prepare<[], { c: number }>('SELECT COUNT(*) AS c FROM projects WHERE deleted_at IS NULL')
+          .get()?.c ?? 0,
       // 状态栏要显示「最近分析」（对齐界面原型）；空库时为 null
       lastAnalyzeAt:
-        ctx.db().prepare<[], { t: string | null }>(
-          'SELECT MAX(analyzed_at) AS t FROM projects WHERE deleted_at IS NULL'
-        ).get()?.t ?? null,
+        ctx
+          .db()
+          .prepare<[], { t: string | null }>(
+            'SELECT MAX(analyzed_at) AS t FROM projects WHERE deleted_at IS NULL',
+          )
+          .get()?.t ?? null,
       uptime: Math.floor((Date.now() - ctx.startedAt) / 1000),
       dataDir: ctx.layout.dataDir,
       trashDir: ctx.layout.trashDir,
       backupDir: ctx.layout.backupDir,
-      logDir: ctx.layout.logDir
+      logDir: ctx.layout.logDir,
     });
   });
 
@@ -56,16 +75,20 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       cardSort: all[SETTING_KEYS.cardSort] ?? 'last_opened',
       showIgnored: (all[SETTING_KEYS.showIgnored] ?? '0') === '1',
       defaultProjectTab: all[SETTING_KEYS.defaultProjectTab] ?? 'files',
-      docRootBlacklist: docBlacklist !== null && docBlacklist !== '' ? JSON.parse(docBlacklist) as string[] : [],
+      docRootBlacklist:
+        docBlacklist !== null && docBlacklist !== '' ? (JSON.parse(docBlacklist) as string[]) : [],
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
       scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
-      uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}')
+      uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}'),
     });
   });
 
   app.patch('/api/settings', async (req) => {
     const db = ctx.db();
-    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
+    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<
+      string,
+      unknown
+    >;
     const allowed: Record<string, (v: unknown) => string> = {
       theme: (v) => String(v),
       density: (v) => String(v),
@@ -80,7 +103,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       doc_root_blacklist_json: (v) => JSON.stringify(v),
       keybindings_json: (v) => JSON.stringify(v),
       scan_root_dirs_json: (v) => JSON.stringify(v),
-      ui_layout_json: (v) => JSON.stringify(v)
+      ui_layout_json: (v) => JSON.stringify(v),
     };
     for (const [k, v] of Object.entries(body)) {
       const fn = allowed[k];
@@ -104,7 +127,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       currentVersion: ctx.version,
       repo: GITHUB_REPO,
       releaseUrl: GITHUB_RELEASES_URL,
-      tokenSet: token !== null && token !== ''
+      tokenSet: token !== null && token !== '',
     });
   });
 
@@ -114,13 +137,24 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     if (token !== '') {
       // 宽松校验：GitHub Token 形态（ghp_/gho_/github_pat_ 开头）且无空白；长度下限防手滑
       if (token.length < 20 || /\s/.test(token) || !/^(ghp_|gho_|ghub_|github_pat_)/.test(token)) {
-        return fail('BAD_REQUEST', '不像 GitHub Token：应以 ghp_ / gho_ / github_pat_ 开头、无空白、长度 ≥ 20');
+        return fail(
+          'BAD_REQUEST',
+          '不像 GitHub Token：应以 ghp_ / gho_ / github_pat_ 开头、无空白、长度 ≥ 20',
+        );
       }
       setSetting(ctx.db(), SETTING_KEYS.githubToken, token);
-      logActivity(ctx.db(), { kind: 'settings.change', level: 'L1', detail: { key: SETTING_KEYS.githubToken, action: 'set' } });
+      logActivity(ctx.db(), {
+        kind: 'settings.change',
+        level: 'L1',
+        detail: { key: SETTING_KEYS.githubToken, action: 'set' },
+      });
     } else {
       setSetting(ctx.db(), SETTING_KEYS.githubToken, '');
-      logActivity(ctx.db(), { kind: 'settings.change', level: 'L1', detail: { key: SETTING_KEYS.githubToken, action: 'clear' } });
+      logActivity(ctx.db(), {
+        kind: 'settings.change',
+        level: 'L1',
+        detail: { key: SETTING_KEYS.githubToken, action: 'clear' },
+      });
     }
     return ok({ saved: true, tokenSet: token !== '' });
   });
@@ -137,7 +171,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'ttFolio-update-check',
-      'X-GitHub-Api-Version': '2022-11-28'
+      'X-GitHub-Api-Version': '2022-11-28',
     };
     if (token !== null && token !== '') headers.Authorization = `Bearer ${token}`;
     try {
@@ -147,10 +181,22 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     } catch {
       /* 落到 curl 回退 */
     }
-    const args = ['-sS', '--max-time', '10', '-w', '\n%{http_code}', '-H', 'Accept: application/vnd.github+json', '-H', 'User-Agent: ttFolio-update-check'];
+    const args = [
+      '-sS',
+      '--max-time',
+      '10',
+      '-w',
+      '\n%{http_code}',
+      '-H',
+      'Accept: application/vnd.github+json',
+      '-H',
+      'User-Agent: ttFolio-update-check',
+    ];
     if (token !== null && token !== '') args.push('-H', `Authorization: Bearer ${token}`);
     args.push(url);
-    const r = await runCommand(process.platform === 'win32' ? 'curl.exe' : 'curl', args, { timeoutMs: 15000 });
+    const r = await runCommand(process.platform === 'win32' ? 'curl.exe' : 'curl', args, {
+      timeoutMs: 15000,
+    });
     const idx = r.stdout.lastIndexOf('\n');
     const code = parseInt(r.stdout.slice(idx + 1).trim(), 10) || 0;
     let data: unknown = null;
@@ -169,27 +215,54 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     try {
       res = await githubGetLatestRelease(token !== null && token !== '' ? token : null);
     } catch {
-      return fail('IO_ERROR', '访问 GitHub 失败（网络/加速器原因）。可稍后重试，或直接打开 Releases 页面查看。', 502);
+      return fail(
+        'IO_ERROR',
+        '访问 GitHub 失败（网络/加速器原因）。可稍后重试，或直接打开 Releases 页面查看。',
+        502,
+      );
     }
     if (res.status === 401 || res.status === 403) {
-      return fail('PERMISSION_DENIED', 'GitHub 返回无权限：Token 无效/过期，或触发 API 限流（私有仓库需要能读本仓库的 Token）。', res.status === 401 ? 401 : 429);
+      return fail(
+        'PERMISSION_DENIED',
+        'GitHub 返回无权限：Token 无效/过期，或触发 API 限流（私有仓库需要能读本仓库的 Token）。',
+        res.status === 401 ? 401 : 429,
+      );
     }
     if (res.status === 404) {
-      return ok({ currentVersion: ctx.version, latestVersion: null, hasUpdate: false, releaseUrl: GITHUB_RELEASES_URL, assets: [] as string[], note: '没有查到 Release：可能是还没有发布过，或仓库为私有且未配置（或配置了无权限的）Token' });
+      return ok({
+        currentVersion: ctx.version,
+        latestVersion: null,
+        hasUpdate: false,
+        releaseUrl: GITHUB_RELEASES_URL,
+        assets: [] as string[],
+        note: '没有查到 Release：可能是还没有发布过，或仓库为私有且未配置（或配置了无权限的）Token',
+      });
     }
     if (res.status === 0 || res.status >= 500) {
-      return fail('IO_ERROR', `访问 GitHub 失败（状态 ${res.status}）。可稍后重试，或直接打开 Releases 页面查看。`, 502);
+      return fail(
+        'IO_ERROR',
+        `访问 GitHub 失败（状态 ${res.status}）。可稍后重试，或直接打开 Releases 页面查看。`,
+        502,
+      );
     }
-    const data = (res.data ?? {}) as { tag_name?: string; html_url?: string; assets?: Array<{ name: string }> };
+    const data = (res.data ?? {}) as {
+      tag_name?: string;
+      html_url?: string;
+      assets?: Array<{ name: string }>;
+    };
     const latestVersion = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/i, '') : '';
     const hasUpdate = latestVersion !== '' && semverNewer(latestVersion, ctx.version);
     return ok({
       currentVersion: ctx.version,
       latestVersion: latestVersion === '' ? null : latestVersion,
       hasUpdate,
-      releaseUrl: typeof data.html_url === 'string' && data.html_url !== '' ? data.html_url : GITHUB_RELEASES_URL,
+      releaseUrl:
+        typeof data.html_url === 'string' && data.html_url !== '' ? data.html_url : GITHUB_RELEASES_URL,
       assets: (data.assets ?? []).map((a) => a.name),
-      note: hasUpdate && !(data.assets ?? []).some((a) => a.name.endsWith('.exe')) ? '新版本尚未上传安装包资产（ Releases 页可能只有源码）' : null
+      note:
+        hasUpdate && !(data.assets ?? []).some((a) => a.name.endsWith('.exe'))
+          ? '新版本尚未上传安装包资产（ Releases 页可能只有源码）'
+          : null,
     });
   });
 
@@ -203,14 +276,20 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/ignore-rules', async () => ok(listIgnoreRules(ctx.db())));
 
   app.post('/api/ignore-rules', async (req) => {
-    const b = (req.body ?? {}) as { scope?: string; projectId?: string | null; pattern?: string; mode?: string; enabled?: boolean };
+    const b = (req.body ?? {}) as {
+      scope?: string;
+      projectId?: string | null;
+      pattern?: string;
+      mode?: string;
+      enabled?: boolean;
+    };
     if (b.pattern === undefined || b.pattern.trim() === '') return fail('INVALID_NAME', '忽略规则不能为空');
     const rule = createIgnoreRule(ctx.db(), {
       scope: b.scope === 'project' ? 'project' : 'global',
       projectId: b.projectId ?? null,
       pattern: b.pattern.trim(),
       mode: b.mode === 'analyze_only' ? 'analyze_only' : 'hide',
-      enabled: b.enabled ?? true
+      enabled: b.enabled ?? true,
     });
     return ok(rule);
   });
@@ -221,7 +300,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     const found = updateIgnoreRule(ctx.db(), id, {
       pattern: b.pattern,
       mode: b.mode === 'analyze_only' ? 'analyze_only' : b.mode === 'hide' ? 'hide' : undefined,
-      enabled: b.enabled
+      enabled: b.enabled,
     });
     if (!found) return fail('NOT_FOUND', '规则不存在', 404);
     return ok({ updated: true });
@@ -238,7 +317,15 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/command-templates', async () => ok(listCommandTemplates(ctx.db())));
 
   app.post('/api/command-templates', async (req) => {
-    const b = (req.body ?? {}) as { label?: string; executable?: string; argsJson?: string[]; needsConfirm?: boolean; platforms?: string | null; enabled?: boolean; sortOrder?: number };
+    const b = (req.body ?? {}) as {
+      label?: string;
+      executable?: string;
+      argsJson?: string[];
+      needsConfirm?: boolean;
+      platforms?: string | null;
+      enabled?: boolean;
+      sortOrder?: number;
+    };
     if (b.label === undefined || b.executable === undefined || b.argsJson === undefined) {
       return fail('INVALID_NAME', '模板必须包含 label、executable、argsJson');
     }
@@ -250,14 +337,21 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       needsConfirm: b.needsConfirm ?? true,
       platforms: b.platforms ?? null,
       enabled: b.enabled ?? true,
-      sortOrder: b.sortOrder ?? 100
+      sortOrder: b.sortOrder ?? 100,
     });
     return ok(t);
   });
 
   app.patch('/api/command-templates/:id', async (req) => {
     const { id } = req.params as { id: string };
-    const b = (req.body ?? {}) as { label?: string; executable?: string; argsJson?: string[]; needsConfirm?: boolean; enabled?: boolean; sortOrder?: number };
+    const b = (req.body ?? {}) as {
+      label?: string;
+      executable?: string;
+      argsJson?: string[];
+      needsConfirm?: boolean;
+      enabled?: boolean;
+      sortOrder?: number;
+    };
     if (b.argsJson !== undefined) validateTemplateArgs(b.argsJson, false);
     const found = updateCommandTemplate(ctx.db(), id, {
       label: b.label,
@@ -265,7 +359,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       args: b.argsJson,
       needsConfirm: b.needsConfirm,
       enabled: b.enabled,
-      sortOrder: b.sortOrder
+      sortOrder: b.sortOrder,
     });
     if (!found) return fail('NOT_FOUND', '模板不存在', 404);
     return ok({ updated: true });
@@ -284,7 +378,11 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/backup', async () => {
     const r = createBackup(ctx.layout.dbFile, ctx.layout.backupDir);
     setSetting(ctx.db(), SETTING_KEYS.lastBackupAt, new Date().toISOString());
-    logActivity(ctx.db(), { kind: 'library.backup', level: 'L1', detail: { file: r.file, integrity: r.integrity } });
+    logActivity(ctx.db(), {
+      kind: 'library.backup',
+      level: 'L1',
+      detail: { file: r.file, integrity: r.integrity },
+    });
     return ok(r);
   });
 
@@ -310,10 +408,19 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     const head = '别名,目录名,路径,类型,主语言,文件数,体积,技术栈,Git分支,是否脏,最近提交,最后打开';
     const lines = projects.map((p) =>
       [
-        esc(p.alias ?? ''), esc(p.diskName), esc(p.dirPath), esc(p.type), esc(p.primaryLanguage ?? ''),
-        String(p.fileCount), String(p.sizeBytes), esc(p.techStack.join('|')), esc(p.gitBranch ?? ''),
-        p.gitDirty ? '是' : '否', esc(p.gitLastCommitAt ?? ''), esc(p.lastOpenedAt ?? '')
-      ].join(',')
+        esc(p.alias ?? ''),
+        esc(p.diskName),
+        esc(p.dirPath),
+        esc(p.type),
+        esc(p.primaryLanguage ?? ''),
+        String(p.fileCount),
+        String(p.sizeBytes),
+        esc(p.techStack.join('|')),
+        esc(p.gitBranch ?? ''),
+        p.gitDirty ? '是' : '否',
+        esc(p.gitLastCommitAt ?? ''),
+        esc(p.lastOpenedAt ?? ''),
+      ].join(','),
     );
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     reply.header('Content-Disposition', 'attachment; filename="ttfolio-projects.csv"');
@@ -328,10 +435,30 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     }
     const db = ctx.db();
     const tx = db.transaction(() => {
-      for (const t of ['projects', 'language_stats', 'analysis_runs', 'collections', 'collection_members', 'tags', 'project_tags', 'doc_roots', 'project_paths', 'archives', 'todos', 'editor_drafts', 'sessions', 'session_tabs', 'recent_files', 'content_fts', 'content_index_state']) {
+      for (const t of [
+        'projects',
+        'language_stats',
+        'analysis_runs',
+        'collections',
+        'collection_members',
+        'tags',
+        'project_tags',
+        'doc_roots',
+        'project_paths',
+        'archives',
+        'todos',
+        'editor_drafts',
+        'sessions',
+        'session_tabs',
+        'recent_files',
+        'content_fts',
+        'content_index_state',
+      ]) {
         db.prepare(`DELETE FROM ${t}`).run();
       }
-      db.prepare(`INSERT INTO sessions (id, name, is_active, created_at, updated_at) VALUES ('default', '默认会话', 1, ?, ?)`).run(new Date().toISOString(), new Date().toISOString());
+      db.prepare(
+        `INSERT INTO sessions (id, name, is_active, created_at, updated_at) VALUES ('default', '默认会话', 1, ?, ?)`,
+      ).run(new Date().toISOString(), new Date().toISOString());
     });
     tx();
     logActivity(db, { kind: 'library.reset', level: 'L3', detail: { note: '仅清空索引数据，项目文件未动' } });
@@ -346,7 +473,12 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/api/data-stats', async () => {
     const dbSize = ctx.dbSize();
-    const trash = ctx.db().prepare<[], { c: number; b: number }>('SELECT COUNT(*) AS c, COALESCE(SUM(size_bytes),0) AS b FROM trash').get();
+    const trash = ctx
+      .db()
+      .prepare<[], { c: number; b: number }>(
+        'SELECT COUNT(*) AS c, COALESCE(SUM(size_bytes),0) AS b FROM trash',
+      )
+      .get();
     const backups = listBackups(ctx.layout.backupDir);
     return ok({
       dbPath: ctx.layout.dbFile,
@@ -357,7 +489,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       backupDir: ctx.layout.backupDir,
       backups: backups.slice(0, 20),
       logDir: ctx.layout.logDir,
-      logSize: statSafe(join(ctx.layout.logDir, 'ttfolio.log'))?.size ?? 0
+      logSize: statSafe(join(ctx.layout.logDir, 'ttfolio.log'))?.size ?? 0,
     });
   });
 };

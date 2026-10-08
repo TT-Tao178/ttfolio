@@ -59,12 +59,12 @@ export function usePaneSize(key: keyof UiLayout, def: number): PaneSize {
         const merged = { ...cached, [key]: rounded };
         queryClient.setQueryData(SETTINGS_QUERY_KEY, (old: unknown) => ({
           ...(typeof old === 'object' && old !== null ? old : {}),
-          uiLayout: merged
+          uiLayout: merged,
         }));
         setSetting('uiLayout', merged);
       }, 400);
     },
-    [key, setSetting, queryClient]
+    [key, setSetting, queryClient],
   );
 
   return { size, setSize, commit };

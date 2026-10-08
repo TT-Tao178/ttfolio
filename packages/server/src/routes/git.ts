@@ -2,7 +2,23 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
-import { gitAvailable, status, diff, stage, unstage, discard, commit, log, commitDetail, branches, checkout, createBranch, isRepo, inProgress, identity } from '../core/git.js';
+import {
+  gitAvailable,
+  status,
+  diff,
+  stage,
+  unstage,
+  discard,
+  commit,
+  log,
+  commitDetail,
+  branches,
+  checkout,
+  createBranch,
+  isRepo,
+  inProgress,
+  identity,
+} from '../core/git.js';
 import { runCommand } from '../core/exec.js';
 import { getProjectRow, listProjects } from '../db/repo/projectsRepo.js';
 import { logActivity } from '../db/repo/metaRepo.js';
@@ -25,7 +41,10 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     try {
       const dir = projectDir(projectId);
       const st = await status(dir);
-      ctx.db().prepare('UPDATE projects SET git_is_repo = ? WHERE id = ?').run(st.isRepo ? 1 : 0, projectId);
+      ctx
+        .db()
+        .prepare('UPDATE projects SET git_is_repo = ? WHERE id = ?')
+        .run(st.isRepo ? 1 : 0, projectId);
       return ok(st);
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -50,7 +69,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { paths?: string[]; all?: boolean };
     try {
       const dir = projectDir(projectId);
-      await stage(dir, b.all === true ? null : b.paths ?? []);
+      await stage(dir, b.all === true ? null : (b.paths ?? []));
       invalidateGitMarks(projectId);
       ctx.sse.publish('git.changed', { projectId });
       return ok({ done: true });
@@ -64,7 +83,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { paths?: string[]; all?: boolean };
     try {
       const dir = projectDir(projectId);
-      await unstage(dir, b.all === true ? null : b.paths ?? []);
+      await unstage(dir, b.all === true ? null : (b.paths ?? []));
       invalidateGitMarks(projectId);
       ctx.sse.publish('git.changed', { projectId });
       return ok({ done: true });
@@ -93,7 +112,14 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
         ctx.trash.moveToTrash(db, [g.real], projectId, dir);
       }
       invalidateGitMarks(projectId);
-      logActivity(db, { kind: 'git.discard', level: 'L3', projectId, detail: { paths: b.paths }, targetPath: dir, actor: currentActor().actor });
+      logActivity(db, {
+        kind: 'git.discard',
+        level: 'L3',
+        projectId,
+        detail: { paths: b.paths },
+        targetPath: dir,
+        actor: currentActor().actor,
+      });
       ctx.sse.publish('git.changed', { projectId });
       ctx.sse.publish('trash.changed', {});
       return ok({ done: true });
@@ -110,7 +136,14 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
       const dir = projectDir(projectId);
       const r = await commit(dir, b.message);
       invalidateGitMarks(projectId);
-      logActivity(ctx.db(), { kind: 'git.commit', level: 'L2', projectId, detail: { short: r.short }, targetPath: dir, actor: currentActor().actor });
+      logActivity(ctx.db(), {
+        kind: 'git.commit',
+        level: 'L2',
+        projectId,
+        detail: { short: r.short },
+        targetPath: dir,
+        actor: currentActor().actor,
+      });
       ctx.sse.publish('git.changed', { projectId });
       return ok(r);
     } catch (err) {
@@ -127,7 +160,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
         limit: Math.min(Number(q.limit ?? '50'), 200),
         skip: q.skip !== undefined ? Number(q.skip) : undefined,
         path: q.path,
-        author: q.author
+        author: q.author,
       });
       return ok(entries);
     } catch (err) {
@@ -170,7 +203,14 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
       }
       await checkout(dir, b.branch);
       invalidateGitMarks(projectId);
-      logActivity(ctx.db(), { kind: 'git.checkout', level: 'L2', projectId, detail: { branch: b.branch }, targetPath: dir, actor: currentActor().actor });
+      logActivity(ctx.db(), {
+        kind: 'git.checkout',
+        level: 'L2',
+        projectId,
+        detail: { branch: b.branch },
+        targetPath: dir,
+        actor: currentActor().actor,
+      });
       ctx.sse.publish('git.changed', { projectId });
       ctx.sse.publish('fs.changed', { projectId, paths: [], kind: 'update' });
       return ok({ done: true });
@@ -209,7 +249,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
           dirty: false,
           untracked: 0,
           lastCommitAt: null,
-          pathOk: p.pathOk
+          pathOk: p.pathOk,
         });
         continue;
       }
@@ -221,7 +261,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
         dirty: p.gitDirty,
         untracked: p.gitUntracked,
         lastCommitAt: p.gitLastCommitAt,
-        pathOk: p.pathOk
+        pathOk: p.pathOk,
       });
     }
     return ok({ gitAvailable: available, items });
@@ -245,9 +285,13 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
 };
 
 async function diffForCommit(dir: string, hash: string): Promise<string> {
-  const r = await runCommand('git', ['show', '--no-color', '--no-ext-diff', '--unified=3', '--format=', hash], {
-    cwd: dir
-  });
+  const r = await runCommand(
+    'git',
+    ['show', '--no-color', '--no-ext-diff', '--unified=3', '--format=', hash],
+    {
+      cwd: dir,
+    },
+  );
   return r.stdout.slice(0, 200000);
 }
 

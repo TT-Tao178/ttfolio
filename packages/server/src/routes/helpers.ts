@@ -6,7 +6,12 @@ export function ok<T>(data: T): { ok: true; data: T } {
   return { ok: true, data };
 }
 
-export function fail(code: ErrorCode, message: string, status?: number, detail?: unknown): { ok: false; error: { code: ErrorCode; message: string; detail?: unknown }; __status?: number } {
+export function fail(
+  code: ErrorCode,
+  message: string,
+  status?: number,
+  detail?: unknown,
+): { ok: false; error: { code: ErrorCode; message: string; detail?: unknown }; __status?: number } {
   return { ok: false, error: { code, message, detail }, __status: status };
 }
 
@@ -14,7 +19,12 @@ import type { FastifyRequest } from 'fastify';
 export type RouteRequest = FastifyRequest;
 
 /** 把任意错误转成 {code, message, detail} 与 HTTP 状态。 */
-export function toApiError(err: unknown): { code: ErrorCode; message: string; detail?: unknown; status: number } {
+export function toApiError(err: unknown): {
+  code: ErrorCode;
+  message: string;
+  detail?: unknown;
+  status: number;
+} {
   if (err instanceof AppError) {
     return { code: err.code, message: err.message, detail: err.detail, status: err.httpStatus };
   }

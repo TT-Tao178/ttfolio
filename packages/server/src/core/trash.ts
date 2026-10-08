@@ -16,7 +16,12 @@ export class TrashService {
   constructor(private readonly trashDir: string) {}
 
   /** 把若干路径移入回收站，返回回收站条目 id。 */
-  moveToTrash(db: Database.Database, paths: string[], projectId: string | null, originProjectPath: string | null): string[] {
+  moveToTrash(
+    db: Database.Database,
+    paths: string[],
+    projectId: string | null,
+    originProjectPath: string | null,
+  ): string[] {
     const ids: string[] = [];
     for (const p of paths) {
       const st = statSync(p);
@@ -27,7 +32,7 @@ export class TrashService {
         originProjectPath,
         trashRelPath: '', // 先占位，拿到 id 后更新
         kind,
-        sizeBytes: st.size
+        sizeBytes: st.size,
       });
       const destDir = path.join(this.trashDir, id);
       fsx.ensureDir(destDir);
@@ -51,10 +56,7 @@ export class TrashService {
         }
       }
       fsx.markSelfWrite(dest);
-      db.prepare('UPDATE trash SET trash_rel_path = ? WHERE id = ?').run(
-        path.join(id, path.basename(p)),
-        id
-      );
+      db.prepare('UPDATE trash SET trash_rel_path = ? WHERE id = ?').run(path.join(id, path.basename(p)), id);
       ids[ids.length] = id;
     }
     return ids;
@@ -71,7 +73,7 @@ export class TrashService {
         kind: r.kind === 'dir' ? 'dir' : 'file',
         sizeBytes: r.size_bytes,
         deletedAt: r.deleted_at,
-        name: segs[segs.length - 1] ?? r.origin_path
+        name: segs[segs.length - 1] ?? r.origin_path,
       };
     });
   }
@@ -106,7 +108,11 @@ export class TrashService {
   }
 
   /** 恢复到原路径；目标被占用时返回 'taken'。 */
-  restore(db: Database.Database, id: string, targetDir?: string): { status: 'ok' | 'taken'; restoredTo?: string } {
+  restore(
+    db: Database.Database,
+    id: string,
+    targetDir?: string,
+  ): { status: 'ok' | 'taken'; restoredTo?: string } {
     const row = getTrashRow(db, id);
     if (row === undefined) throw new AppError('NOT_FOUND', '回收站条目不存在');
     const src = path.join(this.trashDir, row.trash_rel_path);
@@ -155,7 +161,10 @@ export class TrashService {
   }
 
   /** 清空（可取消，逐条删除，失败项保留）。 */
-  empty(db: Database.Database, ctx: { checkCancelled(): void; progress(done: number, total: number): void }): { removed: number; failed: number } {
+  empty(
+    db: Database.Database,
+    ctx: { checkCancelled(): void; progress(done: number, total: number): void },
+  ): { removed: number; failed: number } {
     const rows = db.prepare<[], TrashRow>('SELECT * FROM trash').all();
     let removed = 0;
     let failed = 0;
@@ -178,7 +187,9 @@ export class TrashService {
   purgeOlderThan(db: Database.Database, retentionDays: number): number {
     if (retentionDays <= 0) return 0;
     const cutoff = Date.now() - retentionDays * 24 * 3600 * 1000;
-    const rows = getAll<TrashRow>(db, 'SELECT * FROM trash WHERE deleted_at < ?', [new Date(cutoff).toISOString()]);
+    const rows = getAll<TrashRow>(db, 'SELECT * FROM trash WHERE deleted_at < ?', [
+      new Date(cutoff).toISOString(),
+    ]);
     let removed = 0;
     for (const row of rows) {
       this.purge(db, row.id);
@@ -189,11 +200,7 @@ export class TrashService {
 }
 
 function isExdev(err: unknown): boolean {
-  return (
-    typeof err === 'object' &&
-    err !== null &&
-    (err as { code?: unknown }).code === 'EXDEV'
-  );
+  return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'EXDEV';
 }
 
 function getTrashRowCompat(_dir: string, id: string): TrashRow | null {
