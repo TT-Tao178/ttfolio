@@ -26,6 +26,7 @@ import {
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { listProjects } from '../db/repo/projectsRepo.js';
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
@@ -270,6 +271,35 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     await openUrlInBrowser(GITHUB_RELEASES_URL);
     logActivity(ctx.db(), { kind: 'open.external', level: 'L1', detail: { target: 'releases' } });
     return ok({ opened: true });
+  });
+
+  // ---- 渲染层异常落盘（第 33 轮 M9）：白屏时用户与日志均无从诊断——
+  // 前端把未捕获 error/rejection POST 到这里，进 pino 日志（7×10MB 滚动）
+  // 与活动记录（L2）。日志通道自身绝不能成为新错误源：校验失败/落盘异常一律静默 200。----
+  const clientErrorSchema = z.object({
+    message: z.string().min(1).max(2000),
+    stack: z.string().max(8000).optional(),
+    source: z.enum(['error', 'unhandledrejection']).default('error'),
+  });
+
+  app.post('/api/log/client-error', async (req, reply) => {
+    try {
+      const parsed = clientErrorSchema.safeParse(req.body);
+      if (parsed.success) {
+        ctx.logger.warn(
+          { mod: 'client', msg: parsed.data.message, stack: parsed.data.stack, source: parsed.data.source },
+          '渲染层未捕获异常',
+        );
+        logActivity(ctx.db(), {
+          kind: 'client.error',
+          level: 'L2',
+          detail: { message: parsed.data.message.slice(0, 300), source: parsed.data.source },
+        });
+      }
+    } catch {
+      /* 落盘失败不抛——见节首注释 */
+    }
+    return await reply.code(200).send({ ok: true });
   });
 
   // ---- 忽略规则 ----

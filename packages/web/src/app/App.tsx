@@ -76,6 +76,34 @@ function Shell(): React.JSX.Element {
     }
   });
 
+  // 渲染层未捕获异常落盘（第 33 轮 M9）：window.onerror + unhandledrejection
+  // → POST /api/log/client-error（pino 日志），白屏可诊断。节流：同消息 10 秒
+  // 一次，防错误风暴；上报自身任何失败静默吞掉（不产生新错误、不打扰用户）。
+  useEffect(() => {
+    const lastByMsg = new Map<string, number>();
+    const report = (source: 'error' | 'unhandledrejection', message: string, stack?: string): void => {
+      const key = `${source}|${message}`;
+      const now = Date.now();
+      const last = lastByMsg.get(key) ?? 0;
+      if (now - last < 10000) return;
+      lastByMsg.set(key, now);
+      void api.post('/api/log/client-error', { message: message.slice(0, 2000), stack: stack?.slice(0, 8000), source }).catch(() => {});
+    };
+    const onError = (e: ErrorEvent): void => {
+      report('error', e.message ?? String(e.error ?? 'unknown'), e.error?.stack);
+    };
+    const onRejection = (e: PromiseRejectionEvent): void => {
+      const r = e.reason;
+      report('unhandledrejection', r instanceof Error ? r.message : String(r ?? 'unknown rejection'), r instanceof Error ? r.stack : undefined);
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
   // 会话恢复（FR-1.4）：启动时 GET /api/session；变更 1s 防抖 PUT
   useEffect(() => {
     void api

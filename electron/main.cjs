@@ -136,6 +136,17 @@ async function boot() {
   win.on('close', () => {
     if (win !== null) rememberWindowBounds(win);
   });
+  // 渲染进程崩溃兜底（第 33 轮 M9）：reason/exitCode 落 userData/renderer-crash.log，
+  // 静默不弹窗（诊断走日志）；载入前挂上，崩溃后不自动重载（避免错误循环）
+  win.webContents.on('render-process-gone', (_event, details) => {
+    try {
+      const line = `${new Date().toISOString()} reason=${details.reason} exitCode=${details.exitCode}
+`;
+      require('node:fs').appendFileSync(path.join(app.getPath('userData'), 'renderer-crash.log'), line);
+    } catch {
+      /* 落盘失败不抛 */
+    }
+  });
   win.on('closed', () => {
     win = null;
   });
