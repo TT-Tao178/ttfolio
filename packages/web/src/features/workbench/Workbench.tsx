@@ -19,6 +19,8 @@ import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
 import { buildProjectMenu, useArchiveProject } from './projectMenu';
+import { parseSubTab } from './parseSubTab';
+export { parseSubTab };
 import { SEMANTIC } from '@/theme/tokens';
 
 /** 已消费过的「添加项目」信号值：跨挂载保留，避免重新挂载时重复弹窗。 */
@@ -428,32 +430,6 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-export function parseSubTab(subTab: string | null): Record<string, string> {
-  if (subTab === null) return { status: 'active' };
-  if (subTab === 'view:recent') return { status: 'active', sort: 'last_opened' };
-  if (subTab === 'view:pinned') return { status: 'active' };
-  if (subTab.startsWith('view:my-')) {
-    const key = subTab.slice(8);
-    switch (key) {
-      case 'dirty': return { status: 'active', dirty: '1' };
-      case 'nodocs': return { status: 'active', hasDocs: '0' };
-      case 'noarch': return { status: 'active', hasArch: '0' };
-      case 'unanalyzed': return { status: 'active', analyzed: '0' };
-      case 'stale': return { status: 'active', stale: '30' };
-      case 'archived': return { status: 'archived' };
-      default: return { status: 'active' };
-    }
-  }
-  if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };
-  if (subTab.startsWith('{')) {
-    try {
-      return JSON.parse(subTab) as Record<string, string>;
-    } catch {
-      return { status: 'active' };
-    }
-  }
-  return { status: 'active' };
-}
 
 export function Empty_(props: { text: string }): React.JSX.Element {
   return <Empty description={props.text} />;

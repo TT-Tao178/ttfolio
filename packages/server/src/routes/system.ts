@@ -10,7 +10,7 @@ import {
 import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
 import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
-import { SETTING_KEYS, TRASH_RETENTION_DAYS, GITHUB_REPO, GITHUB_RELEASES_URL } from '@ttfolio/shared';
+import { SETTING_KEYS, TRASH_RETENTION_DAYS, GITHUB_REPO, GITHUB_RELEASES_URL, semverNewer } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
 import { join } from 'node:path';
@@ -97,14 +97,6 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   // ---- 检查更新（轻方案）：只经 api.github.com 查 Releases 元数据（加速器不拦该域），
   // 不做自动下载——安装包按现行惯例由用户手动下载/浏览器拖传。仓库私有，需要能读该
   // 仓库的 Token（存 settings.github_token，仅写不回显）。 ----
-
-  /** 语义化版本比较：a 大于 b 返回 true（只认数字段，忽略 v 前缀与预发布后缀） */
-  function semverNewer(a: string, b: string): boolean {
-    const p = (s: string): number[] => s.replace(/^v/i, '').split(/[.+-]/).slice(0, 3).map((x) => parseInt(x, 10) || 0);
-    const [a1 = 0, a2 = 0, a3 = 0] = p(a);
-    const [b1 = 0, b2 = 0, b3 = 0] = p(b);
-    return a1 !== b1 ? a1 > b1 : a2 !== b2 ? a2 > b2 : a3 > b3;
-  }
 
   app.get('/api/update/status', async () => {
     const token = getSetting(ctx.db(), SETTING_KEYS.githubToken);
