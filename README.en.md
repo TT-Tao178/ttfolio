@@ -14,8 +14,6 @@
 
 ttFolio brings the project folders on your disk into a single workspace: browse code, inspect Git, manage docs and architecture diagrams, search across everything.
 
-**The disk is the source of truth; the database is only an index.** Project files stay where they are — ttFolio layers indexing, entry points and relationships on top.
-
 ## Features
 
 - **Register & analyze** — paste paths / folder dialog / batch-register children; automatic project type, language breakdown (Linguist-compatible), tech stack and Git summary
