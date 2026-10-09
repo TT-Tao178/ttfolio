@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](../../releases)
-[![Version](https://img.shields.io/badge/version-0.2.12-1677ff.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.13-1677ff.svg)](CHANGELOG.md)
 
 </div>
 
