@@ -63,47 +63,9 @@ npm run dev        # backend 127.0.0.1:7717 + frontend localhost:5173
 
 > Packaging flips better-sqlite3 in your local `node_modules` to the Electron ABI — run `npm rebuild better-sqlite3` before continuing development.
 
-## Layout
-
-```
-packages/
-  shared/   types, Zod schemas, constants (shared by frontend & backend)
-  server/   Fastify + better-sqlite3
-    core/   path guard, atomic writes, git, trash, analyzer, dialogs, watcher
-    db/     SQLite connection, migrations (append-only + auto snapshot), repositories
-    routes/ REST endpoints
-  web/      React 18 + Vite + Ant Design 5 + CodeMirror 6
-electron/   desktop main process (in-process server + native dialog bridge)
-scripts/    dev & build scripts
-```
-
-## Design principles
-
-- Migrations are append-only; a database snapshot is taken before every upgrade, corruption self-heals
-- All file access goes through a single path guard: traversal, UNC, symlinks and Windows reserved names are rejected
-- File changes are pushed over SSE; draft and version guards never silently overwrite modifications
-- The desktop build runs the server in-process — no system Node required
-
-## Security & privacy
-
-- Server binds to `127.0.0.1` only; single user, no telemetry, no CDN
-- No network access except explicit user actions (update check, reveal in Explorer)
-- Registered directories are untouched outside user actions; wiping the index never touches project files
-- Data & backups: `%APPDATA%\ttFolio\` (daily auto-snapshot + manual backup/restore + JSON/CSV export); override with `TTFOLIO_DATA_DIR`, `TTFOLIO_PORT`
-
-## Scope
-
-Explicitly out of scope: Git push/pull and credential management, multi-user and permissions, cloud sync, directory auto-scanning, AI generation, IDE capabilities (build/debug/LSP), embedded terminal. ttFolio is a project repository and workbench — it does not compete with your IDE.
-
-## Roadmap
-
-- Tag-filtered project views
-- Manual collection ordering
-- Auto-update (under evaluation; currently manual check + guided download)
-
 ## Feedback
 
-[Issues](../../issues) welcome — please include the app version and reproduction steps.
+[Issues](../../issues) welcome.
 
 ## License
 
