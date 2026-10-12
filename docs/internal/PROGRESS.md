@@ -5,7 +5,7 @@
 > 三项需求先出规划文档（PLAN-第26轮-交互三件套.md，未随本轮提交）经用户批准后实施；
 > 全部按小步提交法拆分，共 9 个功能/修复提交 + 1 个版本提交。
 
-### ① 面包屑逐级可点（121f57a + be60aa7）
+### ① 面包屑逐级可点（57d0a18 + f4914c2）
 
 - **取证反转**：点击功能第 7/19 轮就有且好使（verify-round19 重跑通过），真实痛点是
   **可点段渲染成灰色纯文本**（round26 探针实测 rgba(0,0,0,0.45)+cursor:auto）——没有
@@ -17,7 +17,7 @@
 - **实测**：可点段 rgb(22,119,255)+pointer；点目录段后编辑器关闭、树展开到该目录并
   高亮；点「文件」回列表（第 19 轮行为回归通过）。
 
-### ② 架构图软件内直接查看（056092a + 38c62f8 + 73fc738 + 6c09161 + 6d16389）
+### ② 架构图软件内直接查看（37fa9ce + d52d180 + ab0e3f3 + b27df63 + 62cb2a2）
 
 - **真实根因**：取证用户真实架构图目录（D:\<工作区>\架构图\ttFolio）——产物共
   25 个文件四类（3 主图 HTML + 3 visual-check HTML + 12 PNG + 7 md/json + json 源），
@@ -35,7 +35,7 @@
 - **实测（真实目录，零 mock）**：25 项三类计数 6/12/7 全对；MD 预览 3384 字符真实
   内容（架构分析说明文档）；PNG naturalWidth 加载成功；HTML iframe 正常。
 
-### ③ 文件树右键菜单（540f239 + f2c6475）
+### ③ 文件树右键菜单（ffd11e7 + cced99a）
 
 - **取证**：后端三项能力全部现成——复制=fs/move 的 copy 模式、移动=同接口、
   资源管理器=/api/open 已支持可选 path（explorer /select 可定位选中），后端零改动。
@@ -56,13 +56,13 @@
   未强杀以避免误伤用户可能开着的安装版）；0.1.0~0.1.8 全部保留。
 - 探针 verify-round26（route 合成）ROUND26 PASS + round26-real（真实目录零 mock）
   全过；inspect-data 复核 drafts=0、trash=0、忽略规则无禁用。
-- **追记（0.1.10）**：0.1.9 出包后落地的面包屑颜色内联修复（256cdbf）不在包内——
+- **追记（0.1.10）**：0.1.9 出包后落地的面包屑颜色内联修复（9af0b8d）不在包内——
   按「每修一个问题出包 +0.0.1」补出 0.1.10。绕过 EBUSY 直接打包时漏了前置
   electron-rebuild，node-ABI 的 .node 进包被自检启动冒烟当场拦截（0.1.1 教训
   第二次应验）；补 rebuild 后重打包自检 7 项全绿。教训固化：**绕过 dist:win 时
   electron-rebuild 必须手动补**。
 
-### 检查优化轮（0.2.1，2566a6b）
+### 检查优化轮（0.2.1，d6addf5）
 
 - **移动/复制后整树强制重读**：自查发现树是懒加载本地 state，移动/复制成功后
   invalidate 根查询清不掉已展开子层——已移走的文件仍显示。MoveCopyModal 增加成功
@@ -74,7 +74,7 @@
   用户节奏 dispatch，Playwright 三事件连发会与 React mousedown 重渲染竞争；该结论
   已写入探针注释，产品代码无此问题）。门禁三绿；inspect-data 零残留。
 
-### 样式反馈修复轮（0.2.2，9daea83 + 548ca7c）
+### 样式反馈修复轮（0.2.2，b1016f4 + 0d6fe9c）
 
 - **面包屑按用户反馈定稿**：去品牌色回归默认文字色（color:inherit 抗
   cssinjs 注入）、去 hover 下划线、hover 改 currentColor 8% 浅背景块
@@ -88,7 +88,7 @@
 - 实测：span 恢复 inline、节点 24px 正常单行、icon 与文字同行；截图
   目视文件树排版整齐；inspect-data 零残留。
 
-### 右键可用性修复轮（0.2.3，b0bf0d9）
+### 右键可用性修复轮（0.2.3，8831a86）
 
 - **用户实测 0.2.2 右键文件无菜单**——推翻上一轮「仅测试工具时序问题」的结论，
   真实机器复现证明产品确不可用。取证定位两个失效路径：①Dropdown 包在 title 文字
@@ -116,12 +116,12 @@
   六个元数据字段缺失（author 缺失致 exe Publisher 空）、README 单语且品牌三叫法混用、
   仓库 topics/homepage 空；B 级无 CI/模板/截图（CI 用户此前明确不加）；C 级敏感信息
   （真实路径/项目名在 5 个 tracked 文件 + 1 条提交信息）与根目录 7 份内部文档混杂。
-- **提交**：2a06ea3 元数据补全（author=TT-Tao178/license=MIT/repository/bugs/homepage/
-  keywords/英文 description）；5c69800 playwright e2e 目录改相对解析（去本机绝对路径，
-  amend 修正 ../ 层级）；8af456c 七份内部文档 git mv 入 docs/internal/（根目录只留
-  开源门面）；a8583f3 artifactName 改 ttFolio-Setup（productName/shortcutName/appId
-  按拍板不动）；6174dc4 README 中文主重写（语言切换行+三徽章+品牌统一+新包名）；
-  a491411 README.en.md 英文同构；90457c2 userData 随数据目录隔离。
+- **提交**：ba6f26e 元数据补全（author=TT-Tao178/license=MIT/repository/bugs/homepage/
+  keywords/英文 description）；7cc682f playwright e2e 目录改相对解析（去本机绝对路径，
+  amend 修正 ../ 层级）；6f47e95 七份内部文档 git mv 入 docs/internal/（根目录只留
+  开源门面）；c6965e9 artifactName 改 ttFolio-Setup（productName/shortcutName/appId
+  按拍板不动）；be7609d README 中文主重写（语言切换行+三徽章+品牌统一+新包名）；
+  34a0c16 README.en.md 英文同构；f1b0571 userData 随数据目录隔离。
 - **过程事故（已修）**：0.2.4 首次自检「启动冒烟失败」——取证为用户开着的安装版
   （4 进程）持单实例锁，冒烟实例启动即退出码 0；此前多次冒烟通过只是碰巧用户未开
   应用。修法：TTFOLIO_DATA_DIR 隔离时 setPath('userData') 同步隔离，锁随数据目录
@@ -132,7 +132,7 @@
 - **发布**：tag v0.2.4 + GitHub Release 挂安装包 + topics/description 更新（首个
   桌面版 Release，README 的 Releases 链接自此有效）。
 
-### 顶栏品牌区去除轮（0.2.5，fcd2866 + e81319d）
+### 顶栏品牌区去除轮（0.2.5，bbf905a + 135ea2f）
 
 - **用户反馈**：窗口内顶栏的品牌图标与名称和系统窗口标题栏/任务栏
   （0.2.3 起为 TT 品牌图标 + 名称）重复。
@@ -143,7 +143,7 @@
   （EBUSY 第五次——按既定流程换全新输出目录 tmp3 通过）。
 - **发布**：ttFolio-Setup-0.2.5.exe（16 个安装包全保留）。
 
-### 图片查看器与副标题精简轮（0.2.6，8a82828 + a405bdc + 3469dfb）
+### 图片查看器与副标题精简轮（0.2.6，550c210 + 4406350 + ea5c24a）
 
 - **副标题精简**：顶栏说明只保留 a local project workbench（「TT项目管理工作台」
   字样仍与窗口标题栏重复，用户点名去掉）。
@@ -157,7 +157,7 @@
   tmp2/tmp3 残留 asar 锁未释放，目录留在磁盘可稍后手动删）。
 - **发布**：ttFolio-Setup-0.2.6.exe（17 个安装包全保留）。
 
-### 树缩略图轮（0.2.7，84ac995 + a0be03f）
+### 树缩略图轮（0.2.7，03bf806 + 18cf5eb）
 
 - **用户两项反馈**：①文件树图片文件名旁要显示缩略图（强调「别改乱」）；
   ②右键菜单在软件里仍不弹。
@@ -181,14 +181,14 @@
 - **取证反转（集合）**：后端 `/api/collections/:id/members`（追加/全量替换双语义）
   与 `ProjectSummary.collections` 字段早在首轮就有，但**前端零调用**——集合成员维护
   根本没有 UI（设置页只能建/删集合本身）。「移不进去」不是交互绕，是能力缺失。
-- **连带真 bug（4823f5d）**：侧栏点集合打开 `col:<id>` 卡片墙时 parseSubTab 只返回
+- **连带真 bug（e657ec9）**：侧栏点集合打开 `col:<id>` 卡片墙时 parseSubTab 只返回
   status，没传 `collection` 查询参数——集合视图显示的是**全部项目**。一行修复。
-- **项目卡片右键菜单（fe47de1）**：文件树 0.2.3 同款「受控固定定位菜单 + document 级
+- **项目卡片右键菜单（ab9a6f0）**：文件树 0.2.3 同款「受控固定定位菜单 + document 级
   关闭监听」搬进 ProjectCard——卡片任意位置右键弹出；菜单 items 抽纯数据 +
   handleMenuAction 统一分发，「…」图标 Dropdown 与受控菜单共用一份定义，「…」触发
   收窄为纯点击避免两种右键并存；卡片 onClick 增加 project-ctx-menu 容器排除防菜单项
   点击冒泡误开项目；贴边收口（右留 232 / 下留 520）。
-- **归属集合弹窗（59b216c）**：新增 CollectionPickerModal——勾选列表（勾选态=当前
+- **归属集合弹窗（20aba06）**：新增 CollectionPickerModal——勾选列表（勾选态=当前
   所属，取打开瞬间快照）+ 底部快捷新建（创建即勾选）+ 无集合空态跳设置页；保存只对
   有变化的集合发请求（加入=追加语义 replace:false；移出=全量替换 replace:true 减去
   本项目——移除无专门接口）；完成刷新 projects/collections 两路缓存（卡片归属、
@@ -196,13 +196,13 @@
   key=项目 id 防缓存串台。
 - **实测**：typecheck / lint（0 警告）/ test 62 条全绿；界面行为交用户手测
   （手测要点见提交信息）。
-- **发布（0.2.8）**：版本提交 0a13d99 后走 dist:win 全链路——build/rebuild 一次过，
+- **发布（0.2.8）**：版本提交 ff3dc1a 后走 dist:win 全链路——build/rebuild 一次过，
   packaging 阶段 EBUSY 第 6 次（杀软锁旧 win-unpacked 的 app.asar，unlink 失败），
   按既定流程换全新输出目录 dist-electron-tmp5 出包 + VERIFY_DIST 指向其 win-unpacked
   自检 7 项全绿（含真实启动冒烟 health 200），安装包与 blockmap 移回 dist-electron
   （共 19 个，旧包一律保留）。
 
-### 侧栏项目右键菜单轮（0.2.9，fde6f61 + 0d3ecad）
+### 侧栏项目右键菜单轮（0.2.9，756c327 + 5540ec6）
 
 - **用户纠正**：「项目那里右键没有菜单」指的是**左侧栏项目列表**——第 28 轮做的是
   总览/卡片墙的项目卡片，侧栏项目条目右键仍是浏览器默认菜单。
@@ -220,7 +220,7 @@
   换 dist-electron-tmp6 出包 + 自检 7 项全绿（含真实启动冒烟），安装包与 blockmap
   移回 dist-electron（共 20 个，旧包一律保留）。
 
-### 侧栏集合折叠列表轮（0.2.10，dc55710 + 48c38bd）
+### 侧栏集合折叠列表轮（0.2.10，da235d1 + 1051b64）
 
 - **用户需求**：加入集合的项目要在左侧栏直接可见，且列表可打开/关闭。
 - **改动**：集合项从平面条目改为 antd 子菜单（收起为默认态）——点集合名=原生
@@ -243,46 +243,46 @@
   4 个"后端就绪前端断头"死功能（文件重命名/标签/备注/归档）、9 类点击不一致、
   若干确认标准不统一与文案失实。KNOWN-GAPS #2（树右键菜单）就此闭合、#7 文案
   矛盾修正，新增 #8（按标签过滤视图）/#9（集合手动排序）两个延期项。
-- **P0**：f9cbf46 snippet 转义+[ ]→\<mark\>；645e1de 删集合/清超期回收站补确认。
-- **P1**：8eab3d4 文件重命名/删除入口（树右键+F2/Delete 实装，RenameModal 从死代码
-  复活）；fd0e535 搜索目录结果可点（treeLocate 通道）；d936767 卡片「打开文件页」
-  强制 files；2448059 三处失实文案/命令（拖拽提示/cmd.add/作用域回落说明）；
-  510c51e 侧栏补 /open 计数 + selected 高亮重算（四域映射，删无操作 replace）。
-- **P2**：a83ce43 项目菜单抽 projectMenu 共享模块 + 表格视图操作列/行右键补齐
-  （卡片与表格从此共用一份菜单定义）；9adb0ba 卡片集合徽标（最多 2 个+溢出计数）；
-  85fe2c1 集合移出改专用 DELETE /api/collections/:id/members/:projectId（弃快照
-  全量替换）+ 弹窗新建竞态修复（createdCols 本地并入保存 diff）；87020b4 标签栏
+- **P0**：0e71ddf snippet 转义+[ ]→\<mark\>；7e38f8d 删集合/清超期回收站补确认。
+- **P1**：62ab9ca 文件重命名/删除入口（树右键+F2/Delete 实装，RenameModal 从死代码
+  复活）；a0acfc1 搜索目录结果可点（treeLocate 通道）；e714855 卡片「打开文件页」
+  强制 files；f6bd496 三处失实文案/命令（拖拽提示/cmd.add/作用域回落说明）；
+  27aede9 侧栏补 /open 计数 + selected 高亮重算（四域映射，删无操作 replace）。
+- **P2**：44d5c07 项目菜单抽 projectMenu 共享模块 + 表格视图操作列/行右键补齐
+  （卡片与表格从此共用一份菜单定义）；32ce253 卡片集合徽标（最多 2 个+溢出计数）；
+  17c0c77 集合移出改专用 DELETE /api/collections/:id/members/:projectId（弃快照
+  全量替换）+ 弹窗新建竞态修复（createdCols 本地并入保存 diff）；d775d03 标签栏
   菜单扩 7 项（恢复已关闭/关闭其他/右侧/全部，closedTabs 栈 + moveTab 固定区钳制
-  + useCloseTab 共享 hook）；3387608 Ctrl+W 关脏标签补确认 + 四处右键菜单
+  + useCloseTab 共享 hook）；96e3f81 Ctrl+W 关脏标签补确认 + 四处右键菜单
   Esc/滚动关闭（仅 Esc，避免吞菜单键盘导航）。
-- **P3**：8f591ad 归档/取消归档入口（useArchiveProject + 卡片墙工具栏「已归档」
-  按钮——归档找回入口，已归档侧栏项按用户此前要求不加回）；967b4fb「今天动过」
-  本地时区；c4a57d5 回收站恢复指定目录（后端 targetDir/TRASH_PATH_TAKEN 本就
-  支持，前端接 pick-folder 重试）；815ce41 详情栏标签+备注编辑（标签按名 diff、
-  删除经 id 映射；备注失焦保存）；cef8776 集合管理（CollectionEditModal 重命名/
+- **P3**：162b32c 归档/取消归档入口（useArchiveProject + 卡片墙工具栏「已归档」
+  按钮——归档找回入口，已归档侧栏项按用户此前要求不加回）；6c2bda6「今天动过」
+  本地时区；e3b6d48 回收站恢复指定目录（后端 targetDir/TRASH_PATH_TAKEN 本就
+  支持，前端接 pick-folder 重试）；7ff78d9 详情栏标签+备注编辑（标签按名 diff、
+  删除经 id 映射；备注失焦保存）；279c5c1 集合管理（CollectionEditModal 重命名/
   备注 + 设置卡行式布局 + 侧栏集合右键 4 项菜单，ctx 扩展双类型）。
 - **过程事故（已修）**：①gitignore `trash/` 无根锚定误伤 features/trash 源码目录
-  （TrashPage.tsx 因先跟踪才幸免）——5d6ea4b 加根锚定；②门禁管道 `| tail` 吞掉
+  （TrashPage.tsx 因先跟踪才幸免）——5c29977 加根锚定；②门禁管道 `| tail` 吞掉
   typecheck 退出码，ArchiveOutlined（不存在的图标）带着编译错误进了 6067abe——
-  改 InboxOutlined 后 amend 为 8f591ad，此后门禁一律真实退出码判定。
+  改 InboxOutlined 后 amend 为 162b32c，此后门禁一律真实退出码判定。
 - **延期（入 KNOWN-GAPS #8/#9）**：按标签过滤视图（ListFilters 需加 tag 参数）；
   集合手动排序（PATCH 需加 sort_order）。
 - **实测**：每个提交 typecheck/lint/test 真实退出码 0（62 条全绿）；界面行为交
   用户装包手测。
 
-### 检查更新轮（0.2.12，74f5828 + 8914147 + 6aea8f2 + 928b29c）
+### 检查更新轮（0.2.12，0d65188 + bfafb77 + 67331a0 + e69e9d5）
 
 - **需求**：用户要「手动从 GitHub 检查更新」。评审 C10 的轻方案：完整 electron-updater
   需走 github.com 下载域（网络受限环境拦截，不可行），退为「查 Releases 元数据
   （api.github.com，api 域正常）+ 一键打开下载页 + 手动下载」，与现行手动拖传
   Release 资产的惯例一致。
-- **后端（74f5828/6aea8f2/928b29c）**：shared 常量 GITHUB_REPO/GITHUB_RELEASES_URL
+- **后端（0d65188/67331a0/e69e9d5）**：shared 常量 GITHUB_REPO/GITHUB_RELEASES_URL
   + SETTING_KEYS.githubToken；openExternal.openUrlInBrowser（仅 https，rundll32）；
   system 路由四端点——status（版本/Token 是否已设置，不回显本体）/token（宽松校验
   ghp_/gho_/github_pat_ 前缀，空串清除；**刻意不进 PATCH settings 通用通道**，
   杜绝 GET /api/settings 回显密钥）/check（8s 超时查 releases/latest，语义化版本
   比较，404 双情形文案）/open-release（L1 日志）。
-- **前端（8914147）**：UpdateCheck 组件挂「关于」卡——当前版本 + 检查更新
+- **前端（bfafb77）**：UpdateCheck 组件挂「关于」卡——当前版本 + 检查更新
   （新版本/已最新/无 Release 三态 + 安装包资产缺失提示）+ 打开下载页 + Token
   配置（Password 输入，tokenSet 状态 Tag）。
 - **过程取证（本轮最有价值的发现）**：冒烟时 fetch 直连 api.github.com 报
@@ -303,35 +303,35 @@
 > 按用户批准的 PLAN-第33轮-工程补强.md 执行（该文档本轮入库）。M3 删脏 tag、
 > M13 HANDOVER-legacy.md 处置两项按约定留待用户单独确认。
 
-- **M1（da25fc2）**：删除未使用的 @fastify/static——第二份评审误判其为静态服务
+- **M1（677061c）**：删除未使用的 @fastify/static——第二份评审误判其为静态服务
   组件，本轮核准全仓零引用（前端 app.ts 手写 readFile、7817 走 userContent.ts
   PathGuard），删除即消除四条 high 通告，audit 清零。
-- **M2（ec24e51）**：KNOWN-GAPS 入册三条决策——Token 明文取舍（#10）/ i18n
+- **M2（90666f1）**：KNOWN-GAPS 入册三条决策——Token 明文取舍（#10）/ i18n
   明确不做 / e2e 冻结资产。
 - **M3**：补 tag v0.2.5~v0.2.12（哈希逐条核准）并推送；删 v0.1.0-p0/v0.3.0-p2/
   v1.0.0 三个脏 tag 待用户确认（远端删除不可逆）。
-- **M4（629705d）**：Release 备忘稿 0.2.5~0.2.12（Title/Notes/安装包名，浏览器
+- **M4（01a2b95）**：Release 备忘稿 0.2.5~0.2.12（Title/Notes/安装包名，浏览器
   建页拖资产用）；拖传完成后「检查更新」数据面闭环。
-- **M5（45f0906 + ca85b3d）**：parseSubTab / semverNewer 抽纯函数 + 三份测试
+- **M5（925d1eb + 1851d02）**：parseSubTab / semverNewer 抽纯函数 + 三份测试
   30 条（store 全家桶 / parseSubTab 全分支 / semver 进位与脏输入）——
   62→92 条，一次全绿。
-- **M6（2d12677 + 6cf169b）**：format/format:check script 接线 + 全仓 prettier
+- **M6（b867260 + 2580e96）**：format/format:check script 接线 + 全仓 prettier
   规范化（110 文件，纯格式，门禁全绿可证行为不变）。
-- **M7（3588eb0）**：audit:prod 入 dist:win 链头（high 即 fail-fast）——本轮
+- **M7（204660d）**：audit:prod 入 dist:win 链头（high 即 fail-fast）——本轮
   dist:win 首次实战通过。
-- **M8（09ec35b）**：窗口状态记忆（userData/window-state.json + 上屏校验 +
+- **M8（c8fa2f9）**：窗口状态记忆（userData/window-state.json + 上屏校验 +
   最大化还原 + 尺寸下限）。
-- **M9（2f0aa5e）**：渲染层异常落盘（前端监听 → POST /api/log/client-error →
+- **M9（7598ebb）**：渲染层异常落盘（前端监听 → POST /api/log/client-error →
   pino + 活动 L2，10 秒节流、静默 200）+ 主进程 render-process-gone 追加
   renderer-crash.log。
-- **M10（03ebbb4）**：迁移 0004——collection_members(project_id) 索引；隔离
+- **M10（5f11cd6）**：迁移 0004——collection_members(project_id) 索引；隔离
   目录实测 user_version 3→4、索引就位。
-- **M11（df20dae）**：CONTRIBUTING / SECURITY / issue×2 与 PR 模板。
-- **M12（1273c1c）**：README 三张界面截图（隔离目录 + 演示项目 demo-web/
+- **M11（f9fa873）**：CONTRIBUTING / SECURITY / issue×2 与 PR 模板。
+- **M12（d665773）**：README 三张界面截图（隔离目录 + 演示项目 demo-web/
   demo-api + 探针 shot-readme.mjs；逐张目检，无真实路径泄漏；演示数据零残留）。
 - **M13**：dist-electron-tmp~tmp6 六目录与 test-results 清空（杀软本次未锁）；
   HANDOVER-legacy.md 处置待用户选择（归档 or 删除）。
-- **发布（af15ae3 起）**：0.2.13 dist:win 连续第四次一次过——audit:prod 前置
+- **发布（2ceeeed 起）**：0.2.13 dist:win 连续第四次一次过——audit:prod 前置
   首次实战、自检 7 项全绿、24 个安装包；出包后 better-sqlite3 翻回 Node ABI
   （92 条复绿）。
 
@@ -343,17 +343,17 @@
   就有，缺的是**入口与体验**——重新定位藏在详情页且只收粘贴路径；卡片菜单的移除
   点击即执行无确认；总览/卡片层无任何操作入口。
 - **改动（5 个小步提交 + 版本提交，按用户小步提交法拆分）**：
-  - `353ba6b` RelocateModal 共用组件：粘贴路径 + 系统目录对话框双入口（与添加项目同模式）；
-  - `eab374e` 卡片菜单新增「重新定位到新目录…」首项；两个移除动作改 modal.confirm
+  - `d756982` RelocateModal 共用组件：粘贴路径 + 系统目录对话框双入口（与添加项目同模式）；
+  - `d4f3a9d` 卡片菜单新增「重新定位到新目录…」首项；两个移除动作改 modal.confirm
     二次确认；失效时禁用「移除并删除文件」（目录不存在无法进回收站）与资源管理器/
     终端/重新分析；标题以「目录失效」Tag 强化可见性；
-  - `f69c181` **修一个存量交互 bug**：卡片 onClick 会收到 Dropdown 菜单项（弹层挂卡片内）
+  - `8c9b072` **修一个存量交互 bug**：卡片 onClick 会收到 Dropdown 菜单项（弹层挂卡片内）
     与 Modal 弹窗按钮（React 合成事件沿组件树冒泡）两类「不是点卡片」的点击，顺带
     触发 onOpen 切页、把弹窗面板卸载——双重排除后点菜单/弹窗不再切页（该 bug 影响
     所有卡片菜单项，非本轮新增代码独有）；
-  - `6682f2d` 详情失效页新增「选择目录…」（pick-folder 回填）与「移除登记…」（确认后
+  - `a379e4e` 详情失效页新增「选择目录…」（pick-folder 回填）与「移除登记…」（确认后
     DELETE ?mode=unregister 并自动关闭失效标签）；
-  - `eeb4280` 补仓储链路用例（检测→定位→移除，此前零覆盖，61→62 条）。
+  - `9749bb0` 补仓储链路用例（检测→定位→移除，此前零覆盖，61→62 条）。
 - **排查中顺带确认的两个测试性坑（已记入探针注释）**：route 的 glob `*` 不跨 `/`
   （列表/子路径要分别注册，否则详情 404 触发面板降级、卡片被卸载，干扰判断）；
   testid 不能放在 `<Modal>` 上（落在零高 `.ant-modal-root`，visible 判定恒 false）。
@@ -370,7 +370,7 @@
 
 - **用户需求**：左上角蓝白色 TT（界面方形 Avatar：`tt-primary` #1677ff 底 + 白色粗体字）
   要成为安装后的桌面图标——此前 exe/安装包/快捷方式一直是 Electron 默认图标。
-- **改动（e7949c1）**：
+- **改动（74a323b）**：
   - `electron/build/icon.svg` 作为图标**单一真源**：按 26px 头像等比放大（圆角 4px→40、
     字号约 0.52 倍边长、微收字距），改 logo 只改这一个文件；
   - `scripts/make-icon.mjs`：无头 Chromium 矢量渲染 16/24/32/48/64/128/256 七个尺寸，
@@ -388,7 +388,7 @@
   win-unpacked exe 与 Setup-0.1.6.exe 图标均为蓝底白 TT、与界面 logo 一致；
   0.1.0~0.1.5 旧包全部保留。
 
-### 迭代① 圆角加大 + 去除四角白底，版本 0.1.7（0227668）
+### 迭代① 圆角加大 + 去除四角白底，版本 0.1.7（c71bbe0）
 
 - **用户反馈**：圆角设计好、要更大；图标四角露出白底。
 - **根因**：make-icon.mjs 的 Playwright 截图未开 `omitBackground`，透明背景被
@@ -404,7 +404,7 @@
 > 本节为后续收口时补记，证据取自各提交正文与当时的探针/自检输出。
 > 安装包 0.1.0~0.1.5 全部保留于 `dist-electron/`。
 
-### ① 安装版启动报 Cannot find module 'better-sqlite3'（fix 383ed38）
+### ① 安装版启动报 Cannot find module 'better-sqlite3'（fix 0d26248）
 
 - **根因**：依赖声明在 packages/server（workspaces 子包），根 package.json 无
   dependencies；electron-builder 按根声明收包 → 收集为空；files: 里手写
@@ -416,7 +416,7 @@
   electron-rebuild（electron-builder 本会自动按 electron ABI 重编译）。
 - **验证**：重出包自检全过；win-unpacked GUI 冒烟 health 200、真实数据加载正常。
 
-### ② 安装版打开提示「前端尚未构建」，版本升至 0.1.1（fix d7d1e35）
+### ② 安装版打开提示「前端尚未构建」，版本升至 0.1.1（fix 0619c36）
 
 - **根因**：服务端只从 `process.cwd()` 定位 packages/web/dist，安装版 cwd 是
   安装目录、且前端产物根本没进 asar（electron-builder files 漏收）。
@@ -428,7 +428,7 @@
   会解析到缓存旧包，必须用项目本地 node_modules/.bin。
 - **验证**：自检 7 项全绿；0.1.0 旧安装包保留未删。
 
-### ③ Git「加载更多」点击闪空跳顶，版本升至 0.1.2（fix e94cbb6）
+### ③ Git「加载更多」点击闪空跳顶，版本升至 0.1.2（fix 2049f51）
 
 - **根因（三件叠加）**：limit 变化 → queryKey 变化 → data 先变 undefined
   （列表闪空、页面高度骤减把滚动钳回顶部）；antd List 无 rowKey 整列重建；
@@ -445,7 +445,7 @@
 > 本节为后续收口时补记。总览从「KPI + 卡片」扩为四模块，并围绕窗口宽度
 > 连修三轮；迁移 0003（projects.git_last_commit_subject，只增不改）随 0.1.3 落地。
 
-### ① 总览新增四个模块 + 分页器防漂移，版本升至 0.1.3（feat 7b7e24d）
+### ① 总览新增四个模块 + 分页器防漂移，版本升至 0.1.3（feat 66978bd）
 
 - **为什么**：用户反馈总览下半部分太空（卡片只有两行），翻到内容不满的页时
   分页器「共 N 个项目」会被往上顶。经用户确认四模块全做。
@@ -462,7 +462,7 @@
 - **实测**：verify-round22 真实数据四模块全过；迁移 0003 自动执行、快照生成、
   项目完好；门禁三绿；0.1.3 安装包自检 7 项全绿。
 
-### ② 窗口适配失效 + 刷新按钮无反馈，版本升至 0.1.4（fix 5836df0）
+### ② 窗口适配失效 + 刷新按钮无反馈，版本升至 0.1.4（fix 9900466）
 
 - **根因**：①的 minHeight 锁定不随窗口宽度失效——放大窗口后列数变多、内容
   变矮，仍锁旧高值 → 大片空白；刷新按钮点了没有任何可见反馈，感知是「跟没用一样」。
@@ -472,7 +472,7 @@
 - **实测**：verify-round23——1280 宽翻三页分页器恒 1241；切 1920 后第 3 页
   minHeight 立即清零、回第 1 页校准 557 与内容贴合；门禁三绿；0.1.4 自检全绿。
 
-### ③ 小窗口下「最近提交」叠到项目卡片上，版本升至 0.1.5（fix 606ade7）
+### ③ 小窗口下「最近提交」叠到项目卡片上，版本升至 0.1.5（fix 2afe957）
 
 - **根因**：项目区 wrapper 用 flex:1——小窗口时 flex 盒被压到远小于内容，
   溢出内容不被后续兄弟避让，「最近提交」按压缩后的盒高排布、叠进卡片区域。
@@ -487,7 +487,7 @@
 
 ## 第二十轮：总览收敛 + 提交详情 + 历史下拉 + 自动打开首文件 + Electron 桌面版（已修，待用户手测）
 
-### ① 总览移除三张卡（5aa4ead）② 提交详情视图（70a5e23）③ 历史下拉（2b4a0c4）④ 自动打开首文件（af3e7be）
+### ① 总览移除三张卡（a0c5fc9）② 提交详情视图（f436b0e）③ 历史下拉（b169795）④ 自动打开首文件（bc9c048）
 
 | # | 用户反馈 | 根因 | 改动 | 探针实测（verify-round20，合成数据） |
 | --- | --- | --- | --- | --- |
@@ -496,7 +496,7 @@
 | 3 | 前进/后退莫名其妙 | 纯按钮，不知道会去哪 | 按钮包历史下拉（最近 15 条，「● 当前」置灰，可读位置摘要），点条目直达；单击/快捷键/置灰不变 | 下拉出现「● 当前：nav-demo · 文件 · README.md」+ 目标条目 |
 | 4 | 项目点进去默认是空的 | 打开项目只落「文件」页签不打开文件 | 三个打开入口设置 pendingAutoOpenProject 标记，FilesTab 消费：自动选中第一个文本文件；面包屑「文件」回列表不触发（保持第十九轮行为） | 打开项目 → 编辑器自动打开 README.md；回列表后不回弹 |
 
-### ⑤ Electron 桌面版（8512c28，产物 dist-electron/TT项目管理工作台-Setup-0.1.0.exe）
+### ⑤ Electron 桌面版（6d5dbed，产物 dist-electron/TT项目管理工作台-Setup-0.1.0.exe）
 
 - **先想清楚的问题**（用户点名要求）：
   1. **spawn PowerShell 弹窗 = 杀软误报高危** → 换成原生对话框桥：主进程起 127.0.0.1+随机
@@ -521,7 +521,7 @@
 ## 第十九轮：面包屑子页签可点击（已修，待用户手测）
 
 - **用户反馈**：在工作台/项目/文件/子路径 下点「文件」回不去文件列表页。
-- **改动（f362610）**：项目标签的子页签段（文件/Git/架构图/文档）从纯文本改为可点击——
+- **改动（9ce721c）**：项目标签的子页签段（文件/Git/架构图/文档）从纯文本改为可点击——
   跳到对应子页签并清 targetPath（关闭编辑器）；点项目名仍跳项目概览；同位置重复点击
   不压历史栈。文件树的中间目录段保持纯文本（目录无编辑器语义）。
 - **实测**（verify-round19，route 伪造 fs/file）：打开文件 → 点「文件」面包屑 → 编辑器
@@ -535,7 +535,7 @@
 - **判定口径（typeDetect，未改）**：微服务 → 前后端分离 → 单体 → 纯前端（前端框架依赖或
   index.html+package.json）→ 后端 → 脚本（脚本字节≥40%）→ 素材仓库（媒体字节≥80%）→ 未识别；
   手动改类型优先。
-- **本轮改动（86da54e）**：语言映射 ~50 → ~90 扩展名 + **按文件名识别**（Makefile/Dockerfile/
+- **本轮改动（d4c9e0a）**：语言映射 ~50 → ~90 扩展名 + **按文件名识别**（Makefile/Dockerfile/
   CMakeLists.txt/Rakefile/Gemfile/Vagrantfile/Procfile/.env*）；前端色表补全至 90 个 GitHub
   官方语言色；新增单测（61 条全绿）。
 - **实测**：对 11 个已登记项目全量重分析（只读扫描），3 个项目新识别出 Dockerfile 占比，
@@ -549,14 +549,14 @@
 
 ## 第十六轮：文档大纲点击跳转 + 设置页全部卡片占满（已修，待用户手测）
 
-### ① 文档大纲支持点击定位（feat 6011d3f）
+### ① 文档大纲支持点击定位（feat 5bc0386）
 
 - **改动**：DocsTab 预览容器加 ref；大纲条目（按内容顺序提取 h1-h4）与渲染 DOM 中的
   h1-h4 顺序一一对应，点击第 i 条平滑滚动到第 i 个标题。
 - **实测**（route 合成带 6 个标题的 md，零真实读取）：大纲 6 条；点第 4 条后预览滚动
   2099px、目标标题进入可视区；r16-outline-jump.png 目视核对。
 
-### ② 设置页全部卡片占满内容区（feat c6e961d）
+### ② 设置页全部卡片占满内容区（feat 30a9b47）
 
 - **改动**：应"所有选项卡片都像数据与备份/关于那样占满"的要求，栅格改单列 flex，
   8 张分组卡等宽占满；移除上一轮的固定 320 卡体（恢复自然高度）；锚点 id 与 testid 不变。
@@ -571,7 +571,7 @@
 
 ## 第十五轮：编辑器外部修改提示收敛 + 侧栏视图项移除 + 挂载文档多选（已修，待用户手测）
 
-### ① 「文件已在磁盘上被外部修改」只在有未保存改动时出现（fix bd6078a）
+### ① 「文件已在磁盘上被外部修改」只在有未保存改动时出现（fix 2dceb8c）
 
 - **根因**：干净状态下磁盘变化本就由载入 effect 静默整块重载（无内容可丢），但另有一个
   effect 在 `file.mtime !== base.mtime` 时置警告，与静默重载叠加 → 打开/刷新时就弹警告。
@@ -580,13 +580,13 @@
 - **实测**（route 伪造 fs/file 版本，零磁盘写入）：干净刷新 → 内容静默更新 0 警告；
   有未保存圆点时磁盘变化 → 警告出现且改动保留；重新加载 → 警告消失、载入新版本。
 
-### ② 侧栏项目域移除 7 个「我的视图」入口（feat 94d25ba）
+### ② 侧栏项目域移除 7 个「我的视图」入口（feat d1d4518）
 
 - 移除：已固定/有未提交改动/缺文档/缺架构图/未分析/30 天没打开/已归档；保留：工作台总览、
   最近打开、集合、项目列表。视图本身保留——工作台总览「需要处理」卡片仍可跳到对应卡片墙。
 - **实测**：侧栏 7 项全部消失、保留项与 12 个项目项正常。
 
-### ③ 挂载外部文档支持多选文件（feat 6bf1104）
+### ③ 挂载外部文档支持多选文件（feat 21c4634）
 
 - 弹窗新增「选择文件…」（pick-file 多选 + 即时提示/Alt+Tab 指引/loading）；输入框改多行
   TextArea；确认后按行逐个挂载，成功提示「已挂载 N 个路径」，失败逐条报错不影响其余。
@@ -601,7 +601,7 @@
 
 ## 第十四轮：设置页统一卡片 + 界面去 FR 编号 + 别名与原名同显（已修，待用户手测）
 
-### ① 设置页前五张分组卡统一尺寸 + 移除 FR 编号（feat 5eeaf90）
+### ① 设置页前五张分组卡统一尺寸 + 移除 FR 编号（feat e96e5cf）
 
 - **改动**：外观/数据源与根目录/集合（工作集）/忽略规则/命令模板五张卡卡体固定 320px
   （内容多的内部滚动），五张完全等大；文件监听与保存/数据与备份/关于保持自然高度。
@@ -610,7 +610,7 @@
 - **实测**：探针量五卡卡体均 320（watch=88/data=380/about=175 原样）；设置页渲染文本
   0 处 "FR-"；r14-settings.png 目视核对。
 
-### ② 别名与原始名同时展示（feat e26e5d8）
+### ② 别名与原始名同时展示（feat 083f066）
 
 - **改动**：ProjectCard 起了别名时卡体首行显示「原名 \<diskName\>」；侧栏项目列表两行展示
   （上=别名、下=原名小字等宽）。未起别名不重复显示；标签标题逻辑不变。

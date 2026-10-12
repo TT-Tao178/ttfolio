@@ -44,7 +44,7 @@
 9. **敏感信息在 tracked 文件里**（私有可接受，开源前必须清理）：
    - 真实路径 `D:\<工作区>/2`、用户名 `<用户名>`：HANDOVER / PROGRESS / DELIVERY-REPORT / PROJECT-CONTEXT / playwright.config.ts（e2e 数据目录默认值）
    - 你的真实项目名（爱莉希雅png、B站热门分析、杂-一些可爱的表情等）：HANDOVER / PROGRESS 的台账记录
-   - 1 条提交信息含真实路径（73fc738 正文）
+   - 1 条提交信息含真实路径（ab0e3f3 正文）
    - 处置建议（分叉点 3）：playwright.config.ts 的默认值改为相对路径（必做、无风险）；
      交接文档本轮**移入 docs/internal/** 并在 README 不引用（开源时可整目录从新历史剔除或仅保留脱敏版）。
 10. **DELIVERY-REPORT.md / PROJECT-CONTEXT.md 已过时**（v1.0.0 时代产物，内容被 PROGRESS 取代）——

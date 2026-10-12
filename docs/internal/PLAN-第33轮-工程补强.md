@@ -119,14 +119,14 @@ chore(deps): 移除未使用的 @fastify/static——消除 high 级审计漏洞
 
 | tag | 提交 |
 | --- | --- |
-| v0.2.5 | e81319d |
-| v0.2.6 | 3469dfb |
-| v0.2.7 | a0be03f |
-| v0.2.8 | 0a13d99 |
-| v0.2.9 | 0d3ecad |
-| v0.2.10 | 48c38bd |
-| v0.2.11 | 06d26fb |
-| v0.2.12 | ed92c47 |
+| v0.2.5 | 135ea2f |
+| v0.2.6 | ea5c24a |
+| v0.2.7 | 18cf5eb |
+| v0.2.8 | ff3dc1a |
+| v0.2.9 | 5540ec6 |
+| v0.2.10 | 1051b64 |
+| v0.2.11 | 2b523fe |
+| v0.2.12 | dfa0186 |
 
 - 规划性脏 tag 三个：`v0.1.0-p0`、`v0.3.0-p2`、`v1.0.0`（Web 阶段里程碑占位，
   与桌面版版本线无关，误导 `git tag` 阅读）。
@@ -134,9 +134,9 @@ chore(deps): 移除未使用的 @fastify/static——消除 high 级审计漏洞
 ### 操作清单（纯 Git，无代码提交）
 
 ```bash
-git tag v0.2.5 e81319d && git tag v0.2.6 3469dfb && git tag v0.2.7 a0be03f \
-  && git tag v0.2.8 0a13d99 && git tag v0.2.9 0d3ecad && git tag v0.2.10 48c38bd \
-  && git tag v0.2.11 06d26fb && git tag v0.2.12 ed92c47
+git tag v0.2.5 135ea2f && git tag v0.2.6 ea5c24a && git tag v0.2.7 18cf5eb \
+  && git tag v0.2.8 ff3dc1a && git tag v0.2.9 5540ec6 && git tag v0.2.10 1051b64 \
+  && git tag v0.2.11 2b523fe && git tag v0.2.12 dfa0186
 git push origin v0.2.5 v0.2.6 v0.2.7 v0.2.8 v0.2.9 v0.2.10 v0.2.11 v0.2.12
 # 删脏 tag（本地 + 远端；远端删除不可逆，需你点头）
 git tag -d v0.1.0-p0 v0.3.0-p2 v1.0.0
@@ -217,7 +217,7 @@ git push origin :refs/tags/v0.1.0-p0 :refs/tags/v0.3.0-p2 :refs/tags/v1.0.0
    - serializeSession：navHistoryJson 截断至 30 的往返一致性。
 5. `packages/web/src/features/workbench/parseSubTab.test.ts`（新）：null/view:recent/
    view:my-*（dirty/nodocs/noarch/unanalyzed/stale/archived）/col: 前缀（**集合过滤
-   修复 4823f5d 的回归锚点**）/JSON 分支 / 非法 JSON 回落。
+   修复 e657ec9 的回归锚点**）/JSON 分支 / 非法 JSON 回落。
 6. `packages/shared/src/semver.test.ts`（新）：v 前缀、两段/三段、进位
    （0.2.9 < 0.2.10——parseInt 数值比较回归锚点）、预发布后缀忽略、非法输入。
 
