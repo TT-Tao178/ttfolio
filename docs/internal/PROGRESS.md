@@ -65,6 +65,23 @@
      asar 仍被杀软锁定暂未删净（无可见锁源进程，不强杀，后续手动删即可）。
 - 出包后 npm rebuild better-sqlite3 翻回 Node ABI，门禁复跑三绿。
 
+### 收口补漏：版本常量漏改 + v0.3.0 tag（9002fed）
+
+- 0.3.0 收口提交漏改发布策略要求同步的第二处
+  `packages/server/src/index.ts` 的 version 常量（/api/health 与检查更新
+  currentVersion 的来源），包内会显示 v0.2.13 且检查更新误报有新版本。
+- 起因：用户要求补打 v0.3.0 tag 时顺带澄清——此前会话把 brief 转述成
+  「不打 tag」系**误读**，真实约定是「tag 照打，仅 Release 安装包资产不
+  程序化上传（用户浏览器手动拖）」。
+- 处置：fix 提交补常量（9002fed）→ v0.3.0 tag 移至该提交并强推
+  （lightweight 指针修正，Release 未建、无人消费）；按原版本号重打安装包
+  替换（0.3.0 从未发布未交付，不占 0.3.1），重打包复用两坑预案
+  （TLS 镜像 + 输出 dist-electron-tmp2），自检 7 项全绿，bundle 实查
+  `version = "0.3.0"`。
+- 教训与备忘：chore(release) 收口必须带 index.ts 常量（历届皆如此，本轮
+  漏捡）；verify 自检 7 项不覆盖版本值——冒烟可加 currentVersion 与根
+  package.json 的比对断言（后续可选加固）。
+
 ### 待用户手测（装 ttFolio-Setup-0.3.0.exe）
 
 1. 深色/OLED 主题下窗口标题栏是否变深色（浏览器模式无原生标题栏，只能装版验）
