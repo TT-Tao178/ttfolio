@@ -25,7 +25,7 @@
 | M10 | 迁移 0004：collection_members(project_id) 索引 | 数据库 | P3 | 否 | 1 |
 | M11 | 社区文件（CONTRIBUTING / SECURITY.md / issue+PR 模板） | 文档 | P3 | 否 | 1 |
 | M12 | README 截图 | 文档 | P3 | 否（探针截图） | 1 |
-| M13 | 磁盘与仓库卫生（tmp 目录 / test-results / HANDOVER-GLM.md） | 卫生 | P3 | **是** | 1 |
+| M13 | 磁盘与仓库卫生（tmp 目录 / test-results / HANDOVER-legacy.md） | 卫生 | P3 | **是** | 1 |
 | R | 升版 0.2.12 → 0.2.13 + dist:win + 台账 + 推送 | 发布 | — | 否 | 3 |
 
 依赖关系：M7 依赖 M1（先删掉现有 high，门禁才能绿）；M4 依赖 M3（Release 页对应 tag）。
@@ -160,7 +160,7 @@ git push origin :refs/tags/v0.1.0-p0 :refs/tags/v0.3.0-p2 :refs/tags/v1.0.0
 
 ### 背景与约束
 
-- uploads.github.com 被加速器拦 → 资产只能你浏览器拖（既定事实）。
+- uploads.github.com 受网络限制 → 资产只能你浏览器拖（既定事实）。
 - api.github.com 正常但 Release 页创建需要 Token 前台注入（后台取 token 401，记忆在案），
   且你已有手动建页习惯 → **分工：我出内容稿，你建页拖资产**。
 - 「检查更新」功能（0.2.12）依赖 `releases/latest`——当前 GitHub 最新停在 v0.2.4，
@@ -431,9 +431,9 @@ GitHub 侧建 Issue 时模板自动出现（推送后你侧可见）。
 | --- | --- | --- | --- |
 | `dist-electron-tmp`~`tmp6` 六目录 | 杀软/残留进程曾锁 | 尝试 `rm -rf`；仍锁则列出持锁进程（handle.exe 无则跳过）留待手动 | 否（纯磁盘） |
 | `test-results/` | Playwright 残留 | 删（已被 ignore） | 否 |
-| 根目录 `HANDOVER-GLM.md` | 未跟踪游离文件 | **你此前说勿动**——给两个选项：a) `git mv` 进 docs/internal/ 归档 b) 删除 | **是** |
+| 根目录 `HANDOVER-legacy.md` | 未跟踪游离文件 | **你此前说勿动**——给两个选项：a) `git mv` 进 docs/internal/ 归档 b) 删除 | **是** |
 
-处置结果（删了几个/剩几个谁锁着）写入本轮台账；不产生代码提交（除非 HANDOVER-GLM.md
+处置结果（删了几个/剩几个谁锁着）写入本轮台账；不产生代码提交（除非 HANDOVER-legacy.md
 选 a，则一个 `chore(repo)` 提交）。
 
 ---
@@ -475,7 +475,7 @@ M9  feat(web,server): 渲染层异常落盘 + 主进程崩溃兜底
 M10 feat(db):        迁移 0004 collection_members 索引
 M11 docs:            CONTRIBUTING/SECURITY/模板
 M12 docs:            README 截图
-M13 chore(repo):     卫生清理（HANDOVER-GLM.md 处置待点头）
+M13 chore(repo):     卫生清理（HANDOVER-legacy.md 处置待点头）
 R   chore(release):  0.2.13 + dist:win + docs(internal) 台账 + push
 ```
 

@@ -10,7 +10,7 @@
 
 - 产品：**ttFolio · tt项目仓库（a local project workbench）**——本地优先的项目工作台（不是 Jira 式 PM）。
 - 代码：`D:\<工作区>\code\ttfolio`（npm workspaces：`packages/shared|server|web`）
-- 文档：`D:\<工作区>\设计文档\ttFolio设计文档\`（设计文档/约束/规范/实现提示词/GLM 开工提示词/AntD 原型/ASCII 原型/对比页/契约模板）
+- 文档：`D:\<工作区>\设计文档\ttFolio设计文档\`（设计文档/约束/规范/实现提示词/开工提示词/AntD 原型/ASCII 原型/对比页/契约模板）
 
 ## 1. 用户明确要求的工作方式（务必遵守）
 
@@ -62,11 +62,11 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   v0.2.5~v0.2.12 / Release 备忘稿 / parseSubTab+semverNewer 抽纯函数并补 30 条
   测试（62→92）/ format script + 全仓 prettier / audit:prod 入 dist:win 链头 /
   窗口状态记忆 / 渲染层异常落盘+主进程崩溃兜底 / 迁移 0004 索引 / 社区文件
-  四件套 / README 三截图 / 磁盘卫生。待用户拍板：删三个脏 tag、HANDOVER-GLM.md 处置
+  四件套 / README 三截图 / 磁盘卫生。待用户拍板：删三个脏 tag、HANDOVER-legacy.md（根目录遗留交接文档）处置
 - 第三十二轮（0.2.12，已出包待手测）：**手动检查更新**（评审 C10 轻方案——
-  api.github.com 元数据 + 引导手动下载，完整 updater 因下载域被加速器拦不可行）。
+  api.github.com 元数据 + 引导手动下载，完整 updater 因下载域受网络限制不可行）。
   设置→关于：检查更新三态 + Token 配置（github_token 设置键只写不回显）+
-  打开下载页。**重要取证**：加速器对 github 域做 TLS 中间人，Node fetch 报
+  打开下载页。**重要取证**：本地网络环境对 github 域做 TLS 中间人，Node fetch 报
   UNABLE_TO_VERIFY_LEAF_SIGNATURE 必败——check 已做系统 curl.exe 回退
   （Schannel 系统证书库），打包版进程内 require 使 NODE_USE_SYSTEM_CA env
   不可靠，回退必须在代码层。冒烟用 TTFOLIO_DATA_DIR 隔离目录完成、零触碰
@@ -104,7 +104,7 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   改写归一（2026-09-25）
 - 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push；
   GitHub 已开源规范化（topics/description/双语 README/Release v0.2.4），但
-  **全部 15 个 Release 均未挂安装包资产**——uploads.github.com 被用户加速器精确
+  **全部 15 个 Release 均未挂安装包资产**——uploads.github.com 受网络限制
   拦截（直连/HTTP 代理/socks/借道 github 入口 IP 四通道全试不通，第四通道能
   建连但 POST 被 301 重定向到主站），用户选择浏览器手动拖（dist-electron 下
   文件名与 Release 版本号一一对应）；v0.2.4 Release 页面：
@@ -114,7 +114,7 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
      安装版生效，闭案）
   2. 安装版 Electron 实例登记接口返回 ok 却不落库
   2b. **待用户拍板两件**：删 v0.1.0-p0 / v0.3.0-p2 / v1.0.0 三个脏 tag（远端不可逆）；
-     根目录 HANDOVER-GLM.md 归档进 docs/internal 还是删除（elec-verify 测试库 0 行，
+     根目录 HANDOVER-legacy.md 归档进 docs/internal 还是删除（elec-verify 测试库 0 行，
      原因未定位）——仅影响测试数据目录，用户真实库未复现，待查
   4. dev.mjs 已根治 runtime.json 旧端口竞态（起 server 前清旧文件）
   5. 第 28~32 轮全部改动——装 ttFolio-Setup-0.2.13.exe 手测（0.2.13 已含全部；
@@ -181,7 +181,7 @@ $src -match 'function sameLocation'   # 若为 False 而源码里有 → 就是�
 ```
 
 **出包时 electron-builder 在 packaging 阶段挂死（zip 100% 后长时间超时）**：
-加速器对 `github.com/.../releases/download` 路径返回 400 时，卡的多半是 electron zip 的
+网络受限环境对 `github.com/.../releases/download` 路径返回 400 时，卡的多半是 electron zip 的
 `SHASUMS256.txt` 校验文件（zip 本体通常已在 `%LOCALAPPDATA%\electron\Cache\<hash>\`）。
 **处置**：从 npmmirror 手动取 SHASUMS 放进对应缓存目录，并用
 `NODE_USE_SYSTEM_CA=1 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/

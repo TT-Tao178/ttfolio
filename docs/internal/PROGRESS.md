@@ -273,7 +273,7 @@
 ### 检查更新轮（0.2.12，74f5828 + 8914147 + 6aea8f2 + 928b29c）
 
 - **需求**：用户要「手动从 GitHub 检查更新」。评审 C10 的轻方案：完整 electron-updater
-  需走 github.com 下载域（用户加速器精确拦截，不可行），退为「查 Releases 元数据
+  需走 github.com 下载域（网络受限环境拦截，不可行），退为「查 Releases 元数据
   （api.github.com，api 域正常）+ 一键打开下载页 + 手动下载」，与现行手动拖传
   Release 资产的惯例一致。
 - **后端（74f5828/6aea8f2/928b29c）**：shared 常量 GITHUB_REPO/GITHUB_RELEASES_URL
@@ -286,9 +286,9 @@
   （新版本/已最新/无 Release 三态 + 安装包资产缺失提示）+ 打开下载页 + Token
   配置（Password 输入，tokenSet 状态 Tag）。
 - **过程取证（本轮最有价值的发现）**：冒烟时 fetch 直连 api.github.com 报
-  **UNABLE_TO_VERIFY_LEAF_SIGNATURE**——加速器对 github 域做 TLS 中间人（出包
+  **UNABLE_TO_VERIFY_LEAF_SIGNATURE**——本地网络环境对 github 域做 TLS 中间人（出包
   NODE_USE_SYSTEM_CA=1 的根因同源）；同 URL curl 直连 404/0.6s 正常（系统证书库
-  信任加速器 CA）。而打包版 server 进程内跑在 Electron 里，NODE_USE_SYSTEM_CA
+  信任本地网络环境 CA）。而打包版 server 进程内跑在 Electron 里，NODE_USE_SYSTEM_CA
   启动期 env 注入不可靠 → **代码级回退**：fetch 异常一律回退系统 curl.exe
   （Schannel 走系统证书库；-w 附加状态码；C-21 executable+args 口径）。
 - **冒烟（隔离数据目录 TTFOLIO_DATA_DIR，零触碰真实数据）**：status→tokenSet:false；
@@ -301,7 +301,7 @@
 ### 第三十三轮：工程补强（0.2.13，14 个提交 + 8 tag）
 
 > 按用户批准的 PLAN-第33轮-工程补强.md 执行（该文档本轮入库）。M3 删脏 tag、
-> M13 HANDOVER-GLM.md 处置两项按约定留待用户单独确认。
+> M13 HANDOVER-legacy.md 处置两项按约定留待用户单独确认。
 
 - **M1（da25fc2）**：删除未使用的 @fastify/static——第二份评审误判其为静态服务
   组件，本轮核准全仓零引用（前端 app.ts 手写 readFile、7817 走 userContent.ts
@@ -330,7 +330,7 @@
 - **M12（1273c1c）**：README 三张界面截图（隔离目录 + 演示项目 demo-web/
   demo-api + 探针 shot-readme.mjs；逐张目检，无真实路径泄漏；演示数据零残留）。
 - **M13**：dist-electron-tmp~tmp6 六目录与 test-results 清空（杀软本次未锁）；
-  HANDOVER-GLM.md 处置待用户选择（归档 or 删除）。
+  HANDOVER-legacy.md 处置待用户选择（归档 or 删除）。
 - **发布（af15ae3 起）**：0.2.13 dist:win 连续第四次一次过——audit:prod 前置
   首次实战、自检 7 项全绿、24 个安装包；出包后 better-sqlite3 翻回 Node ABI
   （92 条复绿）。
@@ -379,7 +379,7 @@
   - `.gitignore` 的 `build/` 根锚定为 `/build/`——旧规则误伤 `electron/build`
     （buildResources 源资产目录，非构建产物）。
 - **出包网络事故（如实记录）**：本次 electron-builder 在 packaging 阶段反复挂死
-  （zip 100% 后等待 600s 超时）。取证：GitHub releases/download 路径被加速器返回
+  （zip 100% 后等待 600s 超时）。取证：GitHub releases/download 路径被网络受限环境返回
   400，卡的是 electron zip 的 **SHASUMS256.txt 校验文件**（zip 本体有缓存）。
   处置：从 npmmirror 手动取 SHASUMS 放入 `%LOCALAPPDATA%\electron\Cache\<hash>\`，
   并以 `NODE_USE_SYSTEM_CA=1` + `ELECTRON_MIRROR`/`ELECTRON_BUILDER_BINARIES_MIRROR`

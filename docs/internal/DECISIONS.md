@@ -3,7 +3,6 @@
 格式：日期 | 决策 | 原因 | 备选方案
 
 - 2026-09-21 | 运行时 Node 使用本机已安装的 v24（engines 声明 >=22） | 环境只有 Node 24.19，better-sqlite3/chokidar/fastify 均支持 | 安装 Node 22（用户环境不可控）
-- 2026-09-21 | git 身份仅在本仓库设置 user.name=GLM Agent / agent@local | 按第十六节 A.2 要求，全局身份已存在不动 | 修改全局配置（禁止）
 - 2026-09-21 | server 运行统一走 tsx（dev=tsx watch，start=tsx src），build 对 server 执行 noEmit 类型检查、对 web 产出真实 dist | 避免维护 ESM/CJS 双构建产物；tsx 为常规运行时，行为与 node 一致且支持 TS 直跑 | tsc emit + node（需要为 dist 补 .js 后缀解析与 shared 产物接线，复杂度高、收益低）
 - 2026-09-21 | shared 包以源码形式被消费（main/types 指向 src/index.ts） | workspaces 软链下 vite/tsx/vitest 都可直接编译 TS 源，开发期改动即时生效 | 维护 shared 的 dist 产物并在开发期 watch
 - 2026-09-21 | 鉴权 token 通过 HTTP 头 X-TTFolio-Token 传递；服务端把 token 注入所托管 index.html 的 window.__TTFOLIO_TOKEN__；vite 代理在请求头补 token；SSE 用 ?token= 查询参数（EventSource 无法带自定义头） | 纯浏览器 EventSource 限制 | cookie（易受同源策略与用户内容端口干扰）
@@ -39,4 +38,4 @@
 - 2026-09-23 | Git 历史加载：keepPreviousData + rowKey=hash + 返回数<limit 判末尾 | 闪空/整列重建/无用功三件叠加是「加载更多跳顶」根因 | 服务端分页+总数接口（为几十条提交加接口不值）
 - 2026-09-23 | 总览分页防漂移演进：0.1.3 第 1 页栅格高度锁定 → 0.1.4 收紧为随窗口宽度失效清零 → 0.1.5 项目区改顺流布局 + 弹性垫片 | 分页器位置恒定与内容永不重叠两个目标要同时成立；写死 min-height 在窗口变化时必然失效（0.1.3 实际踩坑） | min-height 写死（全屏↔窗口切换即大片空白）
 - 2026-09-23 | 出包遇杀软 EBUSY：临时目录出包、自检通过后移回，自检支持 VERIFY_DIST 指定待检目录 | 杀软实时扫描锁 asar 是环境现实，绕过而非对抗 | 关杀软实时防护（不该让用户降级防护）
-- 2026-09-24 | 提交作者从 GLM Agent &lt;agent@local&gt; 切换为 TT-Tao178 &lt;GitHub noreply 邮箱&gt;（仓库级 config，全局配置不动） | agent@local 未关联 GitHub 账号，贡献图不归属，仓库对外不可归属到作者；noreply 兼顾归属与不暴露真实邮箱 | git filter-repo 改写全部历史作者（动作大需单独评估，暂缓）；改全局 config（越界）
+- 2026-09-24 | 提交作者切换为 TT-Tao178 &lt;GitHub noreply 邮箱&gt;（仓库级 config，全局配置不动） | 此前的占位身份未关联 GitHub 账号，贡献图不归属，仓库对外不可归属到作者；noreply 兼顾归属与不暴露真实邮箱 | git filter-repo 改写全部历史作者（动作大需单独评估，暂缓）；改全局 config（越界）

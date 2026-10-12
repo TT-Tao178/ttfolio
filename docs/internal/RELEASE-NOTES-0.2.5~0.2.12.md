@@ -1,6 +1,6 @@
 # RELEASE-NOTES · v0.2.5~v0.2.12（浏览器建页拖资产用）
 
-> 用途：uploads.github.com 被加速器拦，Release 页与资产需浏览器手动操作——
+> 用途：uploads.github.com 受网络限制，Release 页与资产需浏览器手动操作——
 > 本稿提供 8 个版本的标题与正文，直接复制粘贴。
 > 操作顺序（每个版本约 1 分钟）：GitHub → Releases → Draft a new release →
 > 顶部「Tag」下拉选对应 tag（tag 已推送，会出现在 Choose a tag 列表）→
