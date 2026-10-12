@@ -154,6 +154,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     }
   }, [mode]);
 
+  // Electron 桌面版：主题变化上报主进程切 nativeTheme，让原生窗口标题栏跟随深浅
+  // （第 34 轮）。桥由 preload 注入；浏览器/Web 模式没有它，可选调用即 no-op。
+  useEffect(() => {
+    const native = (window as unknown as { ttfolioNative?: { setTheme: (m: string) => void } }).ttfolioNative;
+    native?.setTheme(mode);
+  }, [mode]);
+
   const [dark, setDark] = useState<boolean>(() => (mode === 'system' ? systemDark() : mode === 'dark'));
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

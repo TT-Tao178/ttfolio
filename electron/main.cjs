@@ -10,7 +10,7 @@
  *    用 Electron 原生 dialog.showOpenDialog 弹出（替代 PowerShell + WinForms 的误报高危组合）。
  *  - 数据目录仍是 %APPDATA%\ttFolio（安装/卸载、升级、Web 模式三态共用同一份数据）。
  */
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme } = require('electron');
 const http = require('node:http');
 const net = require('node:net');
 const crypto = require('node:crypto');
@@ -28,6 +28,15 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let win = null;
+
+// 主题跟随（第 34 轮）：渲染层在主题设置变化/首帧时经 preload 桥上报，主进程切
+// nativeTheme.themeSource——Windows 原生标题栏颜色随 shouldUseDarkColors 走，
+// 深色主题下标题栏不再恒白。oled 属深色系按 dark 处理；未知值回 system（跟随操作系统），
+// 防渲染层异常值把标题栏钉死。浏览器/Web 模式无此桥，纯网页不受影响。
+ipcMain.on('tt:theme-changed', (_event, mode) => {
+  const map = { light: 'light', dark: 'dark', oled: 'dark' };
+  nativeTheme.themeSource = map[mode] ?? 'system';
+});
 
 function getFreePort() {
   return new Promise((resolve, reject) => {
@@ -170,12 +179,7 @@ function loadWindowState(fallback) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const raw = require('node:fs').readFileSync(windowStateFile(), 'utf8');
     const s = JSON.parse(raw);
-    if (
-      typeof s !== 'object' ||
-      s === null ||
-      typeof s.width !== 'number' ||
-      typeof s.height !== 'number'
-    ) {
+    if (typeof s !== 'object' || s === null || typeof s.width !== 'number' || typeof s.height !== 'number') {
       return { ...fallback };
     }
     const width = Math.max(WINDOW_MIN.width, Math.floor(s.width));
@@ -204,7 +208,12 @@ function withRememberedBounds(state) {
     height: state.height,
     autoHideMenuBar: true,
     title: 'TT项目管理工作台',
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
   };
   if (state.x !== undefined && state.y !== undefined) {
     opts.x = state.x;
