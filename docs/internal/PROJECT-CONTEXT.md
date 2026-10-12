@@ -13,13 +13,13 @@
 
 **本地项目工作台**：把硬盘上散落的项目文件夹登记成"项目卡片"，在一处浏览、打开、看源码、管 Git、看架构图、找文档。**磁盘是真相，数据库只是索引**——除用户显式操作外，被登记目录零改动。
 
-- 代码仓库：`D:\Workspace-1\code\ttfolio\`（npm workspaces：packages/shared、server、web）
-- 规格文档（权威，冲突时以约束文档为准）：`D:\Workspace-1\设计文档\ttFolio设计文档\` 下的 4 个文件（设计文档 88 条 FR / 开发约束 C-01~C-62 / 开发规范 / AntD 界面原型）
+- 代码仓库：`D:\<工作区>\code\ttfolio\`（npm workspaces：packages/shared、server、web）
+- 规格文档（权威，冲突时以约束文档为准）：`D:\<工作区>\设计文档\ttFolio设计文档\` 下的 4 个文件（设计文档 88 条 FR / 开发约束 C-01~C-62 / 开发规范 / AntD 界面原型）
 - 仓库内文档：`README.md`（怎么跑）、`DELIVERY-REPORT.md`（v1.0.0 交付全貌）、`docs/adr/`（3 篇关键决策）、`DECISIONS.md`（历史决策台账）、`KNOWN-GAPS.md`（7 条打折项，**别当 bug 修**）、`PROGRESS.md`（FR 台账）
 
 ## 二、动手前先读（按此顺序）
 
-1. `D:\Workspace-1\code\ttfolio\README.md` —— 架构、命令、数据目录
+1. `D:\<工作区>\code\ttfolio\README.md` —— 架构、命令、数据目录
 2. `DELIVERY-REPORT.md` —— 全部设计要点与红线自查的真实验证方式
 3. `docs/adr/0001..0003` —— PathGuard / 保存冲突 / AntD token 三大决策的背景与后果
 4. `DECISIONS.md` + `KNOWN-GAPS.md` —— 什么是有意为之、什么是已知缺口

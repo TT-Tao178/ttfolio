@@ -42,7 +42,7 @@
    DELIVERY-REPORT / PROJECT-CONTEXT 共 7 份。私有仓没问题；一旦开源，它们要么移入 `docs/internal/`，
    要么从历史中清除（见下条）。
 9. **敏感信息在 tracked 文件里**（私有可接受，开源前必须清理）：
-   - 真实路径 `D:\Workspace-1/2`、用户名 `21936`：HANDOVER / PROGRESS / DELIVERY-REPORT / PROJECT-CONTEXT / playwright.config.ts（e2e 数据目录默认值）
+   - 真实路径 `D:\<工作区>/2`、用户名 `<用户名>`：HANDOVER / PROGRESS / DELIVERY-REPORT / PROJECT-CONTEXT / playwright.config.ts（e2e 数据目录默认值）
    - 你的真实项目名（爱莉希雅png、B站热门分析、杂-一些可爱的表情等）：HANDOVER / PROGRESS 的台账记录
    - 1 条提交信息含真实路径（73fc738 正文）
    - 处置建议（分叉点 3）：playwright.config.ts 的默认值改为相对路径（必做、无风险）；

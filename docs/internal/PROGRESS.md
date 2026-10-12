@@ -19,7 +19,7 @@
 
 ### ② 架构图软件内直接查看（056092a + 38c62f8 + 73fc738 + 6c09161 + 6d16389）
 
-- **真实根因**：取证用户真实架构图目录（D:\Workspace-1\架构图\ttFolio）——产物共
+- **真实根因**：取证用户真实架构图目录（D:\<工作区>\架构图\ttFolio）——产物共
   25 个文件四类（3 主图 HTML + 3 visual-check HTML + 12 PNG + 7 md/json + json 源），
   而旧扫描只收 .html，图片/文本全被挡在列表外——「只是显示一些文件」由此而来。
 - **改动**：扫描新增 imageFiles（png/jpg/jpeg/gif/webp/svg/bmp）与 textFiles
@@ -771,7 +771,7 @@
   ③ FR-11.6「打开日志」（**本轮已补**）④ 原型剩余中低优先级观感差异 ⑤ KNOWN-GAPS 7 项
 - 环境陷阱：编辑工具 ReplaceFile 落盘对读方非原子 → Vite 可能缓存**半截模块**（表现为"代码改了不生效"）
   → **重启 dev server**（判断脚本见 `HANDOVER.md` 第 6 节）
-- 重启服务：`cd D:\Workspace-1\code\ttfolio; npm run dev`（开发入口 http://localhost:5173）
+- 重启服务：`cd D:\<工作区>\code\ttfolio; npm run dev`（开发入口 http://localhost:5173）
 
 ## 当前阶段：第十二轮修复已交付，等待用户手测（本轮不跑 e2e，由用户手测）
 

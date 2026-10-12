@@ -9,8 +9,8 @@
 > **文档位置（第 27 轮起）**：内部交接文档在 （PROGRESS/DECISIONS/KNOWN-GAPS/PLAN 等）；根目录只留开源门面文件（README/README.en/CHANGELOG/LICENSE）。
 
 - 产品：**ttFolio · tt项目仓库（a local project workbench）**——本地优先的项目工作台（不是 Jira 式 PM）。
-- 代码：`D:\Workspace-1\code\ttfolio`（npm workspaces：`packages/shared|server|web`）
-- 文档：`D:\Workspace-1\设计文档\ttFolio设计文档\`（设计文档/约束/规范/实现提示词/GLM 开工提示词/AntD 原型/ASCII 原型/对比页/契约模板）
+- 代码：`D:\<工作区>\code\ttfolio`（npm workspaces：`packages/shared|server|web`）
+- 文档：`D:\<工作区>\设计文档\ttFolio设计文档\`（设计文档/约束/规范/实现提示词/GLM 开工提示词/AntD 原型/ASCII 原型/对比页/契约模板）
 
 ## 1. 用户明确要求的工作方式（务必遵守）
 
@@ -24,7 +24,7 @@
 ## 2. 服务启动（本轮收口时已全部停止）
 
 ```powershell
-cd D:\Workspace-1\code\ttfolio
+cd D:\<工作区>\code\ttfolio
 npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读端口 7817
 ```
 - 开发入口：http://localhost:5173 ／ 生产构建入口：http://127.0.0.1:7717
