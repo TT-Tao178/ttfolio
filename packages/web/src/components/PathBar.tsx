@@ -66,6 +66,7 @@ export function PathBar(): React.JSX.Element {
     items: [
       { key: 'light', label: '浅色（默认）' },
       { key: 'dark', label: '深色' },
+      { key: 'oled', label: '电红色发光' },
       { key: 'system', label: '跟随系统' },
     ],
     selectable: true,

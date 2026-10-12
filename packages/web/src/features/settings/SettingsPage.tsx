@@ -177,6 +177,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                   options={[
                     { label: '浅色（默认）', value: 'light' },
                     { label: '深色', value: 'dark' },
+                    { label: '电红色发光', value: 'oled' },
                     { label: '跟随系统', value: 'system' },
                   ]}
                 />

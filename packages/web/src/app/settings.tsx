@@ -19,9 +19,16 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { theme as antdTheme, ConfigProvider, App as AntdApp } from 'antd';
+import { ConfigProvider, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { antdThemeConfig, applyThemeVars, componentSizeOf, SEMANTIC, type ThemeMode } from '@/theme/tokens';
+import {
+  antdThemeConfig,
+  applyThemeVars,
+  componentSizeOf,
+  SEMANTIC,
+  type ResolvedTheme,
+  type ThemeMode,
+} from '@/theme/tokens';
 import { api, ApiClientError } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -95,10 +102,17 @@ type SetSetting = (key: SettingKey, value: unknown) => void;
 interface SettingsCtx {
   settings: SettingsShape;
   dark: boolean;
+  /** 解析后的实际主题（system 已按系统深浅落成 light/dark；oled 独立态） */
+  resolved: ResolvedTheme;
   setSetting: SetSetting;
 }
 
-const Ctx = createContext<SettingsCtx>({ settings: DEFAULT_SETTINGS, dark: false, setSetting: () => {} });
+const Ctx = createContext<SettingsCtx>({
+  settings: DEFAULT_SETTINGS,
+  dark: false,
+  resolved: 'light',
+  setSetting: () => {},
+});
 
 export const useSettings = (): SettingsCtx => useContext(Ctx);
 
@@ -119,7 +133,7 @@ function ToastBridge({ children }: { children: React.ReactNode }): React.JSX.Ele
 function cachedTheme(): ThemeMode | null {
   try {
     const c = localStorage.getItem('ttfolio-theme');
-    return c === 'dark' || c === 'light' || c === 'system' ? c : null;
+    return c === 'dark' || c === 'light' || c === 'oled' || c === 'system' ? c : null;
   } catch {
     return null;
   }
@@ -155,16 +169,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   }, [mode]);
 
   // Electron 桌面版：主题变化上报主进程切 nativeTheme，让原生窗口标题栏跟随深浅
-  // （第 34 轮）。桥由 preload 注入；浏览器/Web 模式没有它，可选调用即 no-op。
+  // （第 34 轮）。oled 属深色系按 dark 上报；桥由 preload 注入，浏览器/Web 模式没有
+  // 它，可选调用即 no-op。
   useEffect(() => {
     const native = (window as unknown as { ttfolioNative?: { setTheme: (m: string) => void } }).ttfolioNative;
-    native?.setTheme(mode);
+    native?.setTheme(mode === 'oled' ? 'dark' : mode);
   }, [mode]);
 
-  const [dark, setDark] = useState<boolean>(() => (mode === 'system' ? systemDark() : mode === 'dark'));
+  // 三态解析：system 由系统深浅解析为 light/dark；oled 独立成态（有自己的变量表与发光规则）。
+  // dark 布尔保留在上下文里（= resolved !== 'light'）供既有消费方兼容。
+  const [resolved, setResolved] = useState<ResolvedTheme>(() =>
+    mode === 'system' ? (systemDark() ? 'dark' : 'light') : mode,
+  );
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const compute = (): void => setDark(mode === 'system' ? mq.matches : mode === 'dark');
+    const compute = (): void => setResolved(mode === 'system' ? (mq.matches ? 'dark' : 'light') : mode);
     compute();
     mq.addEventListener('change', compute);
     return () => mq.removeEventListener('change', compute);
@@ -172,8 +191,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
 
   // useLayoutEffect：早于绘制写入变量，避免先亮后暗闪一下
   useLayoutEffect(() => {
-    applyThemeVars(dark);
-  }, [dark]);
+    applyThemeVars(resolved);
+  }, [resolved]);
 
   /** 无 toast 的核心实现（toast 需要 AntdApp 上下文，见 SettingsBridge）。 */
   const coreSetSetting = useCallback<SetSetting>(
@@ -205,8 +224,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   );
 
   const value = useMemo<SettingsCtx>(
-    () => ({ settings, dark, setSetting: coreSetSetting }),
-    [settings, dark, coreSetSetting],
+    () => ({ settings, dark: resolved !== 'light', resolved, setSetting: coreSetSetting }),
+    [settings, resolved, coreSetSetting],
   );
 
   return (
@@ -214,10 +233,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
       locale={zhCN}
       button={{ autoInsertSpace: false }}
       componentSize={componentSizeOf(settings.density)}
-      theme={{
-        algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        ...antdThemeConfig(dark),
-      }}
+      theme={antdThemeConfig(resolved)}
     >
       {/* height:100% 是必需的：AntD App 会额外渲染一层 div.ant-app，若不给高度，
           其高度退化为内容高度，导致应用壳的 height:100% 无法撑满视口（整体只剩内容高度、
