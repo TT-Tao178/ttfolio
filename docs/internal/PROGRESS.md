@@ -1,5 +1,79 @@
 # PROGRESS
 
+## 第三十四轮：四项体验改进 + 电红色发光主题（0.3.0，已出包待用户手测）
+
+> 用户一次性点名四项需求，先对齐计划后按小步提交实施；版本号按用户指定
+> 升至 0.3.0（主题里程碑），打破「每出包 +0.0.1」惯例（CHANGELOG 已注记）。
+
+### ① 检查更新删失实 Token 提示（52474c6）
+
+- 仓库已转公开，设置→关于里「仓库私有，检查更新需要能读取 Token；转公开后
+  可留空」已失实，整行删除；文件头注释同步改公开口径。Token 配置入口保留
+  （提升 API 限额用）。
+
+### ② 窗口标题栏跟随主题（bcd7755）
+
+- **取证反转**：用户报障「深色主题下状态栏还是白的」——组件层 StatusBar 全走
+  CSS 令牌本就正常变色，白色的是 Electron 原生窗口标题栏（主进程从未配置过
+  titleBar，Windows 下默认恒白不随页面变）。
+- 新增 electron/preload.cjs（sandbox 兼容的 contextBridge 单方法桥），渲染层
+  主题变化时上报，主进程按白名单映射切 nativeTheme.themeSource（light→light、
+  dark/oled→dark、未知值回 system）；electron-builder files 为 electron/**/*
+  自动随包，无需改打包清单。
+- 边界说明（已向用户交底）：标题栏呈系统深色（近黑），不是 OLED 纯 #000——
+  精确纯黑需 titleBarOverlay 重构窗口拖拽区，风险大本轮不做。
+
+### ③ 侧栏项目「最后打开」相对时间（770f565）
+
+- 取证：projects.last_opened_at 字段与 last_opened 排序早已有（侧栏默认按它排，
+  即用户说的「点开自动移顶」），数据链路现成，纯前端展示。
+- format.ts 新增 openAgo（<1分钟→1分钟内 / N分钟前 / N小时前 / N天前，
+  30 天以上落日期，从未打开不占位；悬浮 title 给精确时刻——保留用户原本想要
+  的时间戳信息），now 参数注入便于测试，新增 7 条分桶边界用例（92→99）。
+- 刷新双保险：打开项目由 SSE 失效 projects 查询即时刷新（既有）+ 30s 心跳
+  覆盖「挂着不动」变档。项目项 label 改 flex 两栏（名称自适应收窄、时间
+  不换行），data-project-id 右键委托位置不变，右键菜单零影响。
+- 刻意与既有 relTime（「刚刚 / N 分钟前」带空格口径）并存互不影响，详情栏/
+  卡片/表格等消费点零改动。
+
+### ④ 电红色发光主题（082efed）
+
+- tokens.ts：ThemeMode 扩为 light/dark/oled/system，新增 ResolvedTheme 三态与
+  VARS_OLED（布局底 #000000、容器 #0b0b0d、主色 #ff3b47、功能色借 GitHub Dark
+  黑底色系）；themeVarsCss 输出三段变量 + 发光规则（主按钮/开关/勾选红色
+  box-shadow 光晕、hover 增强）；applyThemeVars / antdThemeConfig 签名从 dark
+  布尔改三态（唯一调用方 settings.tsx 同步改），oled 沿用 darkAlgorithm 派生
+  组件色。
+- settings.tsx：dark 布尔状态改 resolved 三态（上下文保留 dark 布尔供兼容），
+  cachedTheme 接受 oled，标题栏上报 oled→dark；设置页 Segmented 与路径栏主题
+  菜单各加「电红色发光」项。
+- 服务端零改动（theme 值本就不做枚举校验）；「跟随系统」仍在浅/深间解析、
+  不涉及 oled；CSS 变量机制未动，SEMANTIC 15 个引用文件零改动。
+- 参考应用的本地安装目录只有 exe（Tauri 前端内嵌不可提取），色板按用户文字
+  描述「OLED 黑色主题 + 电光红色发光效果」自定，观感微调属纯色值改动。
+
+### 版本收口与出包（58b8a08 + dist:win 另行验证）
+
+- CHANGELOG 新条目（含版本号例外说明）、README 徽章滚动 0.3.0。
+- **dist:win 实战两坑连现，均按既定预案通过**：
+  1. electron-builder 下载阶段 TLS 证书校验失败（网络受限环境中间人，HANDOVER
+     第 6 节老坑）→ NODE_USE_SYSTEM_CA=1 + npmmirror 双镜像重跑，electron zip
+     拉取成功（audit / build / build:server / electron-rebuild 链头四步此前已过）；
+  2. packaging 阶段 EBUSY 锁 dist-electron 旧 app.asar（杀软，0.1.5/0.1.9 同款）
+     → 输出全新 dist-electron-tmp1 + VERIFY_DIST 指向新目录自检 7 项全绿 +
+     安装包移回；dist-electron 共 25 个 exe。dist-electron-tmp1 的 win-unpacked
+     asar 仍被杀软锁定暂未删净（无可见锁源进程，不强杀，后续手动删即可）。
+- 出包后 npm rebuild better-sqlite3 翻回 Node ABI，门禁复跑三绿。
+
+### 待用户手测（装 ttFolio-Setup-0.3.0.exe）
+
+1. 深色/OLED 主题下窗口标题栏是否变深色（浏览器模式无原生标题栏，只能装版验）
+2. 三主题切换与 OLED 发光观感（不满意属纯色值微调，直接反馈）
+3. 侧栏项目右侧相对时间：打开项目立即变「1分钟内」，放置后变「N分钟前」，
+   悬浮见精确时刻
+4. 设置→关于不再出现 Token 私有仓库提示
+5. 回归：窗口尺寸记忆 / 集合 / 各右键菜单（preload 新增理论上零影响，冒烟已过）
+
 ## 第二十六轮：面包屑逐级定位 + 架构图内嵌查看 + 文件树右键菜单（0.1.9，已修，待用户手测）
 
 > 三项需求先出规划文档（PLAN-第26轮-交互三件套.md，未随本轮提交）经用户批准后实施；

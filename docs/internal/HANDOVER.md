@@ -33,25 +33,22 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-- 最新提交：0.2.13 发布（第三十三轮工程补强 14 个提交 + 8 tag，2ceeeed + 台账；
-  dist:win 连续第四次一次过且 audit:prod 前置首次实战，ttFolio-Setup-0.2.13.exe
-  已入 dist-electron 共 24 个）；其上是 0.2.12 发布（手动检查更新 5 个提交）；
-  其上是 0.2.11 发布（第三十一轮评审 remediation 20 个提交）；再上是
-  0.2.10 发布（侧栏集合折叠列表）；再上是 0.2.9 发布（侧栏项目右键菜单）；再上
-  是 0.2.8 发布
-  （卡片右键菜单 + 集合归属 + 集合视图过滤）；再上是 0.2.7 收口 a31e886、
-  0.2.7 树缩略图 / 0.2.7 版本 / 0.2.6 图片缩放
-  查看器 / 0.2.5 顶栏品牌区去除 / 0.2.4 开源规范化（元数据/双语 README/安装包名
-  ttFolio-Setup）；桌面版功能逐轮台账见 PROGRESS（精确哈希看 `git log --oneline`）
-- 桌面版版本 **0.2.13**；`dist-electron/` 下共二十四个安装包（0.1.0~0.2.3 中文名 +
-  ttFolio-Setup-0.2.4~0.2.13 新名），
+- 最新提交：0.3.0 发布（第三十四轮四项体验改进 6 个提交：删失实 Token 提示 /
+  标题栏跟随主题 / 侧栏相对打开时间 / 电红色发光主题 + 版本收口，台账见
+  PROGRESS；dist:win 两坑连现均按预案通过）；其上是 0.2.13 发布（第三十三轮
+  工程补强 14 个提交 + 8 tag）；再往前为 0.2.4~0.2.12 各轮（功能台账见
+  PROGRESS，精确哈希看 `git log --oneline`）
+- 桌面版版本 **0.3.0**；`dist-electron/` 下共二十五个安装包（0.1.0~0.2.3 中文名 +
+  ttFolio-Setup-0.2.4~0.3.0 新名），
   **旧包一律不删**；出包必走 `npm run dist:win` 全链路（verify-dist-electron
   自检 7 项全绿才算数，绕过 dist:win 曾被自检真实拦截过两次；出包前必须
   停 dev 并清 ttfolio 相关 node 进程（按命令行过滤）——进程锁 .node 文件会让
-  electron-rebuild 失败；杀软 EBUSY 锁
+  electron-rebuild 失败；两个高频坑的预案：①下载阶段 TLS 证书校验失败（网络
+  受限环境中间人）→ `NODE_USE_SYSTEM_CA=1` + npmmirror 双镜像重跑
+  electron-builder；②杀软 EBUSY 锁
   旧 asar 时按 0.1.5/0.1.9 经验：electron-builder 输出全新临时目录
   `-c.directories.output=dist-electron-tmpN` + `VERIFY_DIST=dist-electron-tmpN/win-unpacked`
-  自检 + 安装包移回）
+  自检 + 安装包移回）；出包后必须 `npm rebuild better-sqlite3` 翻回 Node ABI
 - 第二十六轮交互三件套：面包屑可点段有视觉信号、目录段点击→树逐层定位
   （store.treeLocate）；架构图页签为常驻分栏（HTML/图片/文本三类文件直接预览，
   文本走同源接口 /api/archives/:id/file，三重只读约束）；文件树右键菜单
@@ -102,32 +99,31 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   四角透明（真源 `electron/build/icon.svg`，重生成 `node scripts/make-icon.mjs`）；
   git 提交身份已全局统一为 TT-Tao178 <GitHub noreply>，历史已 filter-repo
   改写归一（2026-09-25）
-- 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（私有），直接 git push；
+- 远程已配好：`https://github.com/TT-Tao178/ttfolio.git`（已公开），直接 git push；
   GitHub 已开源规范化（topics/description/双语 README/Release v0.2.4），但
   **全部 15 个 Release 均未挂安装包资产**——uploads.github.com 受网络限制
   拦截（直连/HTTP 代理/socks/借道 github 入口 IP 四通道全试不通，第四通道能
   建连但 POST 被 301 重定向到主站），用户选择浏览器手动拖（dist-electron 下
   文件名与 Release 版本号一一对应）；v0.2.4 Release 页面：
   https://github.com/TT-Tao178/ttfolio/releases/tag/v0.2.4
-- **待用户验证/待查（第 33 轮收口时）**：
-  1. ~~右键菜单在安装版是否弹出~~ ✅ 用户装 0.2.7 实测**能弹**（0.2.3 起的修复在
-     安装版生效，闭案）
+- **待用户验证/待查（第 34 轮收口时）**：
+  1. ~~右键菜单在安装版是否弹出~~ ✅ 用户装 0.2.7 实测**能弹**（闭案）
   2. 安装版 Electron 实例登记接口返回 ok 却不落库
-  2b. **待用户拍板两件**：删 v0.1.0-p0 / v0.3.0-p2 / v1.0.0 三个脏 tag（远端不可逆）；
-     根目录 HANDOVER-legacy.md 归档进 docs/internal 还是删除（elec-verify 测试库 0 行，
-     原因未定位）——仅影响测试数据目录，用户真实库未复现，待查
-  4. dev.mjs 已根治 runtime.json 旧端口竞态（起 server 前清旧文件）
-  5. 第 28~32 轮全部改动——装 ttFolio-Setup-0.2.13.exe 手测（0.2.13 已含全部；
-     新增：窗口状态记忆 / 崩溃落盘（开发者工具 throw 后看打开日志）/ 集合回归 /
-     file→Git→后退导航回归（92 条测试覆盖））
-  6. **检查更新全链路**——先按 docs/internal/RELEASE-NOTES-0.2.5~0.2.12.md 建页
-     拖资产，之后 0.2.13 点检查应显示已最新 v0.2.13
-  6. **检查更新全链路**（0.2.12 新增）——设置→关于：配一个能读本仓库的 GitHub
-     Token → 检查更新（当前 0.2.12 即最新，应提示已最新；下次出包后应报新版本）；
-     Token 未配/无效应有对应提示；「打开下载页」应开系统浏览器
+  2b. **待用户拍板**：删规划性脏 tag（实查 git tag 共 **4 个**：v0.1.0-p0 /
+     v0.2.0-p1 / v0.3.0-p2 / v1.0.0——原清单只列 3 个，v0.2.0-p1 是第 34 轮
+     实查新发现，远端不可逆，去留待定）；根目录 HANDOVER-legacy.md 归档进
+     docs/internal 还是删除（elec-verify 测试库 0 行，原因未定位）
+  3. **装 ttFolio-Setup-0.3.0.exe 手测**（已含 28~33 轮全部改动 + 第 34 轮四项：
+     深色/OLED 标题栏变色、三主题切换与发光观感、侧栏项目相对时间、检查更新
+     不再出 Token 提示；完整清单见 PROGRESS 第三十四轮）
+  4. **检查更新全链路**——先按 docs/internal/RELEASE-NOTES-0.2.5~0.2.12.md 建页
+     拖资产，建完 v0.3.0 Release 后点检查应显示已最新 v0.3.0；仓库已公开、
+     无 Token 可查（Token 仅用于提升 API 限额）
+  5. dist-electron-tmp1/win-unpacked 杀软锁残留未删净（第 34 轮出包绕坑产物，
+     无可见锁源进程，不强杀，稍后手动删即可）
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
-  `npm test` **62 条** ✅
-- 数据库 user_version=**3**（0003：projects 加 git_last_commit_subject，只增不改）
+  `npm test` **99 条** ✅
+- 数据库 user_version=**4**（0001~0004；第 34 轮零迁移，只增不改）
 - 第二十一/二十二轮（0.1.1~0.1.5）台账已在 `PROGRESS.md` 顶部补记；总览布局
   0.1.3→0.1.5 的演进线看该文「第二十二轮」小节
 - e2e：**按用户要求未跑**，交给用户手测
