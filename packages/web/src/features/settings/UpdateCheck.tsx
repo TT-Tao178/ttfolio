@@ -1,8 +1,8 @@
 /**
  * 关于卡内的「检查更新」（评审 C10 轻方案前端）：手动检查 GitHub Releases
  * （元数据走 api.github.com，不经被加速器拦截的下载域）+ Token 配置 + 打开下载页。
- * 仓库当前为私有：检查需要能读取本仓库的 GitHub Token（只存本机 settings 表，
- * 接口不回显本体）；仓库转公开后无 Token 也能查。
+ * 仓库已公开，无 Token 也能检查；Token 仅用于提升 API 限额，只存本机 settings 表，
+ * 接口不回显本体。
  */
 import { Alert, App as AntdApp, Button, Input, Space, Tag, Typography } from 'antd';
 import {
@@ -144,9 +144,6 @@ export function UpdateCheck(): React.JSX.Element {
           ) : (
             <Tag color="warning">未配置</Tag>
           )}
-          <span style={{ opacity: 0.6 }}>
-            仓库私有，检查更新需要能读取 {status?.repo ?? '本仓库'} 的 Token；转公开后可留空
-          </span>
         </div>
         <Space.Compact style={{ width: '100%', maxWidth: 460 }}>
           <Input.Password
