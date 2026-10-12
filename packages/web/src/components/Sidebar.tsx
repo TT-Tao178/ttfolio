@@ -21,6 +21,7 @@ import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { SEMANTIC } from '@/theme/tokens';
+import { openAgo } from '@/lib/format';
 
 type MenuKey = string;
 
@@ -97,6 +98,15 @@ export function Sidebar(): React.JSX.Element {
     },
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });
+
+  // 项目项右侧的「最后打开」相对时间会随时间流逝变档（1分钟内 → N分钟前 → …），
+  // 打开项目后由 SSE 失效 projects 查询即时刷新；这里再 30s 心跳覆盖"挂着不动"的场景，
+  // 粒度到分钟级分桶，30s 足够且开销可忽略。
+  const [, setTimeTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTimeTick((x) => x + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const onCtx = (e: MouseEvent): void => {
@@ -329,26 +339,39 @@ export function Sidebar(): React.JSX.Element {
   const projectItems = (projects ?? []).slice(0, 30).map((p) => ({
     key: `proj:${p.id}:files`,
     // data-project-id 供 document 级右键委托定位项目（第 29 轮）
-    // 用户要求：起了别名时别名与原始名都要看到 → 两行展示（上=别名，下=原名）；无别名只显示原名
+    // 用户要求：起了别名时别名与原始名都要看到 → 两行展示（上=别名，下=原名）；无别名只显示原名。
+    // 第 34 轮：右侧补「最后打开」相对时间（左名称自适应收窄、时间不换行；悬浮 title 给精确时刻）
     label: (
       <span
         data-project-id={p.id}
-        style={{ display: 'inline-block', maxWidth: 190, lineHeight: 1.3, verticalAlign: 'middle' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 190 }}
       >
-        {p.alias !== null ? (
-          <>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          {p.alias !== null ? (
+            <>
+              <span className="tt-ellipsis" style={{ display: 'block' }}>
+                {p.alias}
+              </span>
+              <span className="tt-ellipsis tt-mono" style={{ display: 'block', fontSize: 11, opacity: 0.6 }}>
+                {p.diskName}
+              </span>
+            </>
+          ) : (
             <span className="tt-ellipsis" style={{ display: 'block' }}>
-              {p.alias}
-            </span>
-            <span className="tt-ellipsis tt-mono" style={{ display: 'block', fontSize: 11, opacity: 0.6 }}>
               {p.diskName}
             </span>
-          </>
-        ) : (
-          <span className="tt-ellipsis" style={{ display: 'block' }}>
-            {p.diskName}
-          </span>
-        )}
+          )}
+        </span>
+        <span
+          style={{ flexShrink: 0, fontSize: 11, opacity: 0.55, whiteSpace: 'nowrap' }}
+          title={
+            p.lastOpenedAt === null
+              ? '从未打开'
+              : `最后打开：${new Date(p.lastOpenedAt).toLocaleString('zh-CN')}`
+          }
+        >
+          {openAgo(p.lastOpenedAt)}
+        </span>
       </span>
     ),
   }));
