@@ -45,6 +45,12 @@ export function Sidebar(): React.JSX.Element {
     queryKey: ['collections'],
     queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
   });
+  // 标签入口（第 36 轮 A2 补齐 KNOWN-GAPS #8）：带项目计数，点击开对应标签的卡片墙
+  const { data: tags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () =>
+      api.get<Array<{ id: string; name: string; color: string | null; projectCount: number }>>('/api/tags'),
+  });
 
   const openWorkbench = (filter?: Record<string, string>): void => {
     void queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -306,11 +312,20 @@ export function Sidebar(): React.JSX.Element {
         ],
       });
     }
+    // 标签 = 平面条目（第 36 轮 A2）：点击开该标签的卡片墙（subTab=tag:<id>），
+    // 计数与集合条目同口径；无项目数 0 的标签仍显示，便于发现空标签
+    for (const t of tags ?? []) {
+      items.push({ key: `tag:${t.id}`, label: `${t.name}（${t.projectCount}）` });
+    }
     if (activeTab !== undefined) {
       if (activeTab.kind === 'overview') {
-        // 总览屏（subTab=null）→ 工作台总览；卡片墙视图 → view:*；集合卡片墙 → 高亮对应集合子菜单标题
+        // 总览屏（subTab=null）→ 工作台总览；卡片墙视图 → view:*/col:*/tag:* → 高亮对应条目
         if (activeTab.subTab === null) selected = 'view:all';
-        else if (activeTab.subTab.startsWith('view:') || activeTab.subTab.startsWith('col:'))
+        else if (
+          activeTab.subTab.startsWith('view:') ||
+          activeTab.subTab.startsWith('col:') ||
+          activeTab.subTab.startsWith('tag:')
+        )
           selected = activeTab.subTab;
       } else if (activeTab.kind === 'project' && activeTab.projectId !== null) {
         selected = `proj:${activeTab.projectId}:files`;
@@ -428,6 +443,16 @@ export function Sidebar(): React.JSX.Element {
         return;
       }
       useAppStore.getState().setPalette(true);
+      return;
+    }
+    if (key.startsWith('tag:')) {
+      // 标签条目点击 = 打开该标签的卡片墙视图，标签名作标签页标题
+      const t = (tags ?? []).find((x) => x.id === key.slice(4));
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      openTab(
+        { kind: 'overview', projectId: null, targetPath: null, subTab: key, scroll: 0 },
+        t?.name ?? '标签',
+      );
       return;
     }
     if (key.startsWith('col:')) {

@@ -29,6 +29,11 @@ describe('parseSubTab', () => {
     expect(parseSubTab('col:01ABC')).toEqual({ status: 'active', collection: '01ABC' });
   });
 
+  it('tag:<id> → 标签过滤参数（第 36 轮 A2 补齐 KNOWN-GAPS #8，与 col: 同构）', () => {
+    expect(parseSubTab('tag:01XYZ')).toEqual({ status: 'active', tag: '01XYZ' });
+    expect(parseSubTab('tag:')).toEqual({ status: 'active', tag: '' });
+  });
+
   it('JSON 分支透传筛选参数', () => {
     expect(parseSubTab('{"status":"archived","q":"demo"}')).toEqual({ status: 'archived', q: 'demo' });
   });

@@ -47,6 +47,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
       type: q.type as ListFilters['type'],
       collectionId: q.collection,
+      tagId: q.tag,
       dirty:
         q.dirty === '1' || q.dirty === 'true'
           ? true
@@ -437,9 +438,14 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
   // ---- 标签 ----
   app.get('/api/tags', async () => {
     const db = ctx.db();
+    // 附带项目计数（第 36 轮 A2）：侧栏标签入口要显示「名称（n）」，与集合条目口径一致
     return ok(
       db
-        .prepare<[], { id: string; name: string; color: string | null }>('SELECT * FROM tags ORDER BY name')
+        .prepare<[], { id: string; name: string; color: string | null; projectCount: number }>(
+          `SELECT t.id, t.name, t.color, COUNT(pt.project_id) AS projectCount
+           FROM tags t LEFT JOIN project_tags pt ON pt.tag_id = t.id
+           GROUP BY t.id ORDER BY t.name`,
+        )
         .all(),
     );
   });

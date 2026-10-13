@@ -28,6 +28,7 @@ export function parseSubTab(subTab: string | null): Record<string, string> {
     }
   }
   if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };
+  if (subTab.startsWith('tag:')) return { status: 'active', tag: subTab.slice(4) };
   if (subTab.startsWith('{')) {
     try {
       return JSON.parse(subTab) as Record<string, string>;

@@ -15,6 +15,7 @@ export interface ListFilters {
   status?: ProjectStatus | 'all';
   type?: ProjectType | 'all';
   collectionId?: string;
+  tagId?: string;
   dirty?: boolean;
   hasDocs?: boolean;
   hasArch?: boolean;
@@ -179,6 +180,10 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
   if (filters.collectionId !== undefined) {
     where.push('id IN (SELECT project_id FROM collection_members WHERE collection_id = ?)');
     params.push(filters.collectionId);
+  }
+  if (filters.tagId !== undefined) {
+    where.push('id IN (SELECT project_id FROM project_tags WHERE tag_id = ?)');
+    params.push(filters.tagId);
   }
   const orderBy = (() => {
     switch (filters.sort) {
