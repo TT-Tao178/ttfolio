@@ -30,7 +30,12 @@ const steps = [
 
 for (const [label, cmd, args] of steps) {
   process.stdout.write(`\n[dist:win] === ${label} ===\n`);
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  // Windows 下 npm/npx 是 .cmd，须经 shell 执行；shell:true 与 args 数组并用会触发
+  // DEP0190（参数不转义仅拼接）——固定参数无空格无特殊字符，win 下直接拼串，其余平台数组直传
+  const r =
+    process.platform === 'win32'
+      ? spawnSync([cmd, ...args].join(' '), { stdio: 'inherit', shell: true })
+      : spawnSync(cmd, args, { stdio: 'inherit' });
   if (r.status !== 0) {
     process.stderr.write(`[dist:win] ${label} FAILED (exit ${r.status})\n`);
     process.exit(r.status ?? 1);
