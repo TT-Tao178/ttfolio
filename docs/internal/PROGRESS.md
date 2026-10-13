@@ -1,5 +1,53 @@
 # PROGRESS
 
+## 第三十六轮：0.3.1 发布——例行检查 A 计划七项（已出包，12 提交已推）
+
+> 来源：例行维护报告圈定 A 计划（低风险高收益组），版本号 0.3.1（+0.0.1）。
+> 门禁全程三绿（lint 已含 format:check），测试 99 → 101 条。
+
+### A3 出包链路固化（21ab975 + 81aad18）——本轮最大工程收益
+
+- 新建 scripts/dist-win.mjs 包装：NODE_USE_SYSTEM_CA=1 + npmmirror 双镜像
+  固化进链路（外部显式设置不覆盖），六步与旧 dist:win 完全一致，失败真实
+  退出码终止。**0.3.1 出包首次实跑即一次过——TLS 失败、EBUSY、手动补 env
+  三件套全部消失**（对比 0.3.0：两坑连现 + 手动重跑）。
+- 收尾修 DEP0190（shell:true 与 args 数组并用）：win 拼串/其余平台数组直传。
+
+### A1 七天静默重分析（5ec518d，KNOWN-GAPS #3 闭合）
+
+- projectsRepo 新增 needsReanalyze 纯函数（超 7 天；null 不触发——大项目
+  全量分析必须显式），open 接口命中即 fire-and-forget 后台重分析。
+  集成测试 +1（三分支 + 恰 7 天边界 + 非法串）。
+
+### A2 标签过滤视图（bbe7c81，KNOWN-GAPS #8 闭合）
+
+- 服务端 ListFilters.tagId（子查询与 collectionId 同款）+ GET /api/projects
+  收 query.tag + GET /api/tags 附带 projectCount（向后兼容只增字段）；
+  前端 parseSubTab 加 tag: 前缀（与 col: 同构，测试 +2）、Workbench 零改动
+  （filters 透传）、侧栏 projects 域「标签」分组（名称+计数，点击开卡片墙、
+  高亮联动）。侧栏右键刻意不加（最小面）。
+
+### A4 拆包 / A5 版本断言 / A7 tailwind / A6 补丁（81d01a0 / d61ef60 / 32976e2 / 6056912）
+
+- 拆包：manualChunks 按 antd 系 / codemirror 系 / react 核心五包（精确路径，
+  泛匹配 react 子串会错分 @tanstack 产生 circular chunk——首版即踩即改）/
+  vendor 分五块，2326KB → 最大 953KB，告警消失；生产入口真实冒烟零
+  pageerror。
+- verify 自检 7→8 项：冒烟 health 的 data.version 与根 package.json 比对，
+  0.3.1 出包实跑 ✓（0.3.0 常量漏改事故的固化防线）。
+- 移除零使用 tailwind（无 config、零工具类），dev 漏洞 27→23；
+  npm update 8 包补丁；npm audit fix 此前 29→27。
+
+### 收口与出包
+
+- 版本五处同步 0.3.1（校验脚本过）；KNOWN-GAPS #3/#8 标闭合入库；
+  tag v0.3.1（f89a302）+ Release 页经 API 建好，latest=v0.3.1 已验证；
+  出包后 rebuild better-sqlite3 翻回 Node ABI、门禁复跑三绿（101 条）。
+- 安装包 ttFolio-Setup-0.3.1.exe 入 dist-electron（26 个）；资产待用户手拖
+  （对照清单已含该行——需更新）。
+- 待用户手测（0.3.1）：侧栏标签过滤联动、打开过期项目触发静默重分析、
+  拆包后各页签加载正常、窗口标题栏/主题回归。
+
 ## 例行维护（2026-10-13，三提交 603b0dd/bb6fb8f/efdbc2f 已推）
 
 - **修复**：①prettier 四文件漂移回绿（UpdateCheck 行尾 + Workbench/App/system 历史重排）；
