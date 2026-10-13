@@ -297,6 +297,22 @@ export function markOpened(db: Database.Database, id: string): void {
   );
 }
 
+/**
+ * 打开时是否需要静默重分析（FR-3.1 SHOULD，第 36 轮 A1 补齐 KNOWN-GAPS #3）：
+ * analyzed_at 超过 7 天即需要。从未分析（null）不算——大项目的全量分析必须
+ * 由用户显式触发，不随打开隐式发生。now/maxAgeMs 供测试注入。
+ */
+export function needsReanalyze(
+  row: { analyzed_at: string | null },
+  now: number = Date.now(),
+  maxAgeMs: number = 7 * 24 * 60 * 60 * 1000,
+): boolean {
+  if (row.analyzed_at === null) return false;
+  const t = Date.parse(row.analyzed_at);
+  if (!Number.isFinite(t)) return false;
+  return now - t > maxAgeMs;
+}
+
 export function softDeleteProject(db: Database.Database, id: string): void {
   const now3 = new Date().toISOString();
   run(db, 'UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?', [now3, now3, id]);

@@ -25,6 +25,7 @@ import {
   patchProject,
   softDeleteProject,
   markOpened,
+  needsReanalyze,
   listCollections,
   type ListFilters,
 } from '../db/repo/projectsRepo.js';
@@ -230,6 +231,11 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const db = ctx.db();
     markOpened(db, id);
     ctx.sse.publish('project.updated', { projectId: id });
+    // 7 天静默重分析（FR-3.1 SHOULD，第 36 轮 A1 补齐 KNOWN-GAPS #3）：打开时
+    // analyzed_at 超期则后台触发——fire-and-forget 不阻塞打开响应，与登记/
+    // 重定位路径的异步分析同模式，任务系统自带排队与取消。
+    const row = getProjectRow(db, id);
+    if (row !== undefined && needsReanalyze(row)) void analyzeProjects(ctx, [id]);
     return ok({ opened: true });
   });
 

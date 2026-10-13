@@ -14,6 +14,7 @@ import {
   softDeleteProject,
   listProjects,
   checkPathOk,
+  needsReanalyze,
 } from './db/repo/projectsRepo.js';
 import { getSession, putSession } from './db/repo/sessionRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
@@ -86,6 +87,19 @@ describe('迁移与登记', () => {
   it('同一路径重复登记被唯一约束拦截', () => {
     register();
     expect(() => register()).toThrow();
+  });
+});
+
+describe('打开时静默重分析判定（KNOWN-GAPS #3，第 36 轮 A1）', () => {
+  it('analyzed_at 三分支：从未分析/新鲜/超 7 天', () => {
+    const NOW = Date.parse('2026-10-13T12:00:00Z');
+    const DAY = 24 * 60 * 60 * 1000;
+    expect(needsReanalyze({ analyzed_at: null }, NOW)).toBe(false);
+    expect(needsReanalyze({ analyzed_at: new Date(NOW - 6 * DAY).toISOString() }, NOW)).toBe(false);
+    expect(needsReanalyze({ analyzed_at: new Date(NOW - 7 * DAY - 1000).toISOString() }, NOW)).toBe(true);
+    // 恰好 7 天整不算超期；非法时间串不触发
+    expect(needsReanalyze({ analyzed_at: new Date(NOW - 7 * DAY).toISOString() }, NOW)).toBe(false);
+    expect(needsReanalyze({ analyzed_at: 'garbage' }, NOW)).toBe(false);
   });
 });
 
