@@ -87,14 +87,24 @@ function Shell(): React.JSX.Element {
       const last = lastByMsg.get(key) ?? 0;
       if (now - last < 10000) return;
       lastByMsg.set(key, now);
-      void api.post('/api/log/client-error', { message: message.slice(0, 2000), stack: stack?.slice(0, 8000), source }).catch(() => {});
+      void api
+        .post('/api/log/client-error', {
+          message: message.slice(0, 2000),
+          stack: stack?.slice(0, 8000),
+          source,
+        })
+        .catch(() => {});
     };
     const onError = (e: ErrorEvent): void => {
       report('error', e.message ?? String(e.error ?? 'unknown'), e.error?.stack);
     };
     const onRejection = (e: PromiseRejectionEvent): void => {
       const r = e.reason;
-      report('unhandledrejection', r instanceof Error ? r.message : String(r ?? 'unknown rejection'), r instanceof Error ? r.stack : undefined);
+      report(
+        'unhandledrejection',
+        r instanceof Error ? r.message : String(r ?? 'unknown rejection'),
+        r instanceof Error ? r.stack : undefined,
+      );
     };
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);

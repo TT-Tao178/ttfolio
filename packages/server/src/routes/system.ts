@@ -253,8 +253,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     };
     const latestVersion = typeof data.tag_name === 'string' ? data.tag_name.replace(/^v/i, '') : '';
     const hasUpdate = latestVersion !== '' && semverNewer(latestVersion, ctx.version);
-    const leading =
-      !hasUpdate && latestVersion !== '' && semverNewer(ctx.version, latestVersion);
+    const leading = !hasUpdate && latestVersion !== '' && semverNewer(ctx.version, latestVersion);
     return ok({
       currentVersion: ctx.version,
       latestVersion: latestVersion === '' ? null : latestVersion,

@@ -268,18 +268,16 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                 icon={<InboxOutlined />}
                 data-testid="archived-view-btn"
                 onClick={() =>
-                  useAppStore
-                    .getState()
-                    .openTab(
-                      {
-                        kind: 'overview',
-                        projectId: null,
-                        targetPath: null,
-                        subTab: 'view:my-archived',
-                        scroll: 0,
-                      },
-                      '已归档',
-                    )
+                  useAppStore.getState().openTab(
+                    {
+                      kind: 'overview',
+                      projectId: null,
+                      targetPath: null,
+                      subTab: 'view:my-archived',
+                      scroll: 0,
+                    },
+                    '已归档',
+                  )
                 }
               />
             </Tooltip>
