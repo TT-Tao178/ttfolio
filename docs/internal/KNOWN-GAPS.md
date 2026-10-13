@@ -19,10 +19,10 @@
      并实装 F2/Delete 快捷键（此前快捷键帮助文案有承诺无实现）。
    - 本项从缺口清单闭合；右键菜单交互收敛见第 31 轮台账。
 
-3. **打开时 7 天静默重分析**（FR-3.1 的 SHOULD 项）
-   - 缺：未做"打开项目时 analyzed_at 超 7 天自动重分析"。
-   - 替代行为：卡片显示分析时间，项目页有显眼"重新分析"按钮；批量重分析在工具栏。
-   - 补法：project/open 接口内判断 analyzed_at 触发 analyzeProjects（一行）。
+3. **打开时 7 天静默重分析**（FR-3.1 的 SHOULD 项）——✅ **已补齐（0.3.1）**
+   - projectsRepo 新增 needsReanalyze 纯函数（analyzed_at 超 7 天；从未分析
+     null 不触发——大项目全量分析必须显式），open 接口命中时 fire-and-forget
+     后台重分析。本项从缺口清单闭合（第 36 轮 A1，测试 100 条锚点）。
 
 4. **会话恢复的滚动位置**（FR-1.3 部分）
    - 缺：标签/页签/文件目标已恢复，滚动像素级位置未持久化（scrollJson 通道已留）。
@@ -44,9 +44,10 @@
    - 替代行为：添加项目弹窗的拖拽提示文案已于 0.2.11 修正为明示不可用，并引导
      三种可靠入口（粘贴路径 / 系统对话框 / 父目录批量登记）。
 
-8. **按标签过滤的项目视图**（0.2.11 新增缺口：标签编辑器已上线，过滤视图未做）
-   - 缺：/api/projects 的 ListFilters 无 tag 参数，侧栏/卡片墙无法按标签过滤。
-   - 补法：ListFilters 加 tagId + WHERE EXISTS 子查询，侧栏标签区渲染入口。
+8. **按标签过滤的项目视图**（0.2.11 新增缺口）——✅ **已补齐（0.3.1）**
+   - ListFilters 加 tagId（子查询与 collectionId 同款）、GET /api/projects 收
+     query.tag、GET /api/tags 附带 projectCount；侧栏「标签」分组点击开卡片墙
+     （subTab=tag:<id>，parseSubTab 与 col: 同构）。本项闭合（第 36 轮 A2）。
 
 9. **集合手动排序**（0.2.11 新增缺口：sort_order 列存在但恒 0、无 PATCH 通道）
    - 缺：collectionCreateSchema/PATCH 均不含 sort_order，前端无排序 UI；
