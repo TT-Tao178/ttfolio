@@ -14,7 +14,7 @@
     "build": "npm run build --workspace @ttfolio/shared && npm run build --workspace @ttfolio/server && npm run build --workspace @ttfolio/web",
     "start": "tsx packages/server/src/index.ts",
     "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p packages/server/tsconfig.json --noEmit && tsc -p packages/web/tsconfig.json --noEmit",
-    "lint": "eslint packages/shared/src packages/server/src packages/web/src --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint packages/shared/src packages/server/src packages/web/src --ext .ts,.tsx --max-warnings 0 && npm run format:check",
     "test": "vitest run",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"electron/**/*.cjs\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"electron/**/*.cjs\"",
