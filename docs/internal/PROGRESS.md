@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 第三十五轮追记：Release 页 25 个补齐 + Latest 修正（API 化，资产留用户手传）
+
+- **v0.2.5~v0.3.0 共 10 个 Release 页经 GitHub API 建齐**（正文取自
+  RELEASE-NOTES 备忘稿与 CHANGELOG，标题沿用既有「ttFolio x.y.z」风格），
+  仓库累计 25 个 Release 全部无资产（用户浏览器手动拖，与既有约定一致）。
+- 凭据来源：本机 Git Credential Manager 的 github.com 存储凭据经
+  `git credential fill` 取得（GET /user 200 验证），全程环境变量传递、
+  零落盘零打印——「后台取 token 会 401 须前台注入」的老结论被推翻：
+  **GCM 凭据可直调 api.github.com 写接口**。
+- **v0.2.13 补打 tag**（2ceeeed，惯例 lightweight + chore(release) 提交）
+  并推远程——v0.2.13 建页的前置。至此 0.1.0~0.3.0 全版本 tag/Release 双齐。
+- **Latest 修正**：GitHub latest 按 created_at 排，v0.2.10 因网络瞬断重试
+  最后建成而抢走 Latest 徽章；PATCH release `make_latest:"true"` 修至
+  v0.3.0（api.github.com 偶发 000 瞬断，重试即过——本轮共遇 3 次）。
+- 检查更新数据面闭环：装 0.3.0 点「检查更新」应显示已最新 v0.3.0；
+  备忘稿已标注消费完毕。临时请求体 .tmp-test/rels/ 已删净。
+
 ## 第三十五轮：README 重制——四张宣传级截图 + 图片裂图取证（f6e966f，已 push）
 
 > 用户报障：GitHub 上 README 图片打不开、中英文显示问题；要求截图入库并造

@@ -118,9 +118,10 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
      不再出 Token 提示；完整清单见 PROGRESS 第三十四轮。注意：本机 0.3.0 包
      因版本常量漏改已同号重打替换——设置→关于应显示 v0.3.0；v0.3.0 tag 已打
      在 9002fed 并推远程，建 Release 页直接用）
-  4. **检查更新全链路**——先按 docs/internal/RELEASE-NOTES-0.2.5~0.2.12.md 建页
-     拖资产，建完 v0.3.0 Release 后点检查应显示已最新 v0.3.0；仓库已公开、
-     无 Token 可查（Token 仅用于提升 API 限额）
+  4. **检查更新全链路**——25 个 Release 页已全部建齐（v0.1.0~v0.3.0，
+     2026-10-13 经 API，正文取自 RELEASE-NOTES 备忘稿与 CHANGELOG），
+     latest 已指 v0.3.0；装 0.3.0 点检查应显示已最新；安装包资产仍待
+     用户浏览器手动拖（文件名与 tag 一一对应）
   5. dist-electron-tmp1/win-unpacked 杀软锁残留未删净（第 34 轮出包绕坑产物，
      无可见锁源进程，不强杀，稍后手动删即可；tmp2 重打包后已删净）
 - 门禁：`npm run typecheck` ✅ / `npm run lint`（`--max-warnings 0`）✅ /
