@@ -1,5 +1,24 @@
 # PROGRESS
 
+## 例行维护（2026-10-13，三提交 603b0dd/bb6fb8f/efdbc2f 已推）
+
+- **修复**：①prettier 四文件漂移回绿（UpdateCheck 行尾 + Workbench/App/system 历史重排）；
+  ②磁盘清出 374MB 构建垃圾（dist-electron-tmp1 杀软锁残骸 + win-unpacked.tmp）；
+  ③.tmp-test 29M→2.1M：清 105+37 张历史探针截图（含早期真实项目名）与
+  REPORT-*/elec-verify/asar-smoke-data/e2e-data 测试数据残留、filter-repo 时期
+  msg-*.md 工作稿与历史日志（探针脚本与 filter-repo 前备份 bundle 保留）。
+- **门禁升级（用户拍板）**：lint script 串接 format:check——此后 `npm run lint` =
+  ESLint 0 警告 + 全仓 prettier，格式漂移不再静默累积。
+- **依赖**：npm audit fix 修 2 个 high（dev 链 29→27）；余 27 个全部需要大版本
+  升级——**vitest 5（清 tinypool critical 的路径）peer 要求 vite ≥6**，与现有
+  vite 5.4.21 构建链冲突，按小步原则不强升，留待「vite 6 + vitest 5 + 插件链」
+  独立升级轮；electron 44.7 / eslint 10 / antd 6 / better-sqlite3 13 等大版本
+  同理（electron 与 better-sqlite3 跟下一次出包轮）。prod 链持续 0 漏洞。
+- **版本一致性校验脚本化**：五处版本号（package.json / index.ts 常量 / 双语
+  README 徽章 / CHANGELOG 头条）node 一行比对——本轮实跑全 0.3.0 一致 ✓。
+- 复检绿：门禁三绿（99 条，lint 已含格式）、main==origin/main、tag 双侧一致、
+  端口无残留、ABI=Node、latest=v0.3.0。
+
 ## 第三十五轮追记：Release 页 25 个补齐 + Latest 修正（API 化，资产留用户手传）
 
 - **v0.2.5~v0.3.0 共 10 个 Release 页经 GitHub API 建齐**（正文取自
