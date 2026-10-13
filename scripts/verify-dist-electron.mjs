@@ -3,7 +3,7 @@
  *  打包事故复发——2026-09-23 安装版启动即报 Cannot find module 'better-sqlite3'）。
  *  用法：node scripts/verify-dist-electron.mjs
  */
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
@@ -79,12 +79,15 @@ if (existsSync(electronExe)) {
     smokeErr += c;
   });
   let healthy = false;
+  let healthVersion = null;
   let html = '';
   for (let i = 0; i < 90; i++) {
     await new Promise((r) => setTimeout(r, 500));
     try {
       const res = await fetch('http://127.0.0.1:7949/api/health');
       if (res.ok) {
+        const hj = (await res.json().catch(() => null))?.data;
+        healthVersion = typeof hj?.version === 'string' ? hj.version : null;
         const page = await fetch('http://127.0.0.1:7949/');
         html = await page.text();
         if (html.includes('<title>') && !html.includes('前端尚未构建')) {
@@ -104,6 +107,13 @@ if (existsSync(electronExe)) {
   await new Promise((r) => setTimeout(r, 800));
   if (healthy) ok('真实启动冒烟通过：health 200 + 前端页面正常返回（非「尚未构建」占位）');
   else fail(`真实启动冒烟失败：${smokeErr.trim().slice(0, 300) || html.slice(0, 120)}`);
+  // 4) 版本断言（第 36 轮 A5）：包内服务端自报版本必须与根 package.json 一致——
+  //    0.3.0 曾因 index.ts 的 version 常量漏改，装包显示旧版且检查更新误报（真实事故）。
+  if (healthy) {
+    const expected = JSON.parse(readFileSync('package.json', 'utf8')).version;
+    if (healthVersion === expected) ok(`包内版本 ${healthVersion} 与 package.json 一致`);
+    else fail(`包内版本 ${healthVersion ?? '未知'} ≠ package.json ${expected}（version 常量漏改？）`);
+  }
 } else {
   // 静默跳过：CI 或改名后仍能跑前两项
   console.log('… 未找到 win-unpacked 主程序，跳过启动冒烟');
