@@ -4,7 +4,7 @@
 
 **本地的项目工作台** · a local project workbench
 
-[简体中文](README.md) | English
+简体中文 | [English](README.en.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](../../releases)
