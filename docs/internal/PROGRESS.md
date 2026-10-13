@@ -1,5 +1,42 @@
 # PROGRESS
 
+## 第三十五轮：README 重制——四张宣传级截图 + 图片裂图取证（f6e966f，已 push）
+
+> 用户报障：GitHub 上 README 图片打不开、中英文显示问题；要求截图入库并造
+> 多语言演示数据重拍宣传图。全程隔离实例（TTFOLIO_DATA_DIR=D:/demo/
+> ttfolio-shot-data）+ 8 个演示项目，收尾已删净（dev 按端口清、D:\demo 移除）。
+
+### 裂图取证（结论：仓库侧无问题，访问端网络域级阻断）
+
+- 三张旧图 blob 在 origin/main 完好、README 引用为仓库相对路径、本地文件
+  PNG 头正常——仓库侧零缺失。
+- 实测对照：github.com / api.github.com 可达，raw.githubusercontent.com 与
+  camo.githubusercontent.com 连接失败（curl exit 35/000）——**README 图片经
+  camo 域代理渲染，加速器分流规则未覆盖 raw/camo 两域即必然裂图**，仓库侧
+  无法绕过（GitHub sanitizer 剥 data: URI）。解法在用户侧：分流规则补
+  `raw.githubusercontent.com` + `camo.githubusercontent.com`。
+- 顺修两处真问题：README.en.md 版本徽章漏更（0.2.13，与 index.ts 常量同款
+  「第二处」教训）；Git 页「身份」栏读全局 git config 会露本机身份——演示
+  仓库一律 `git config user.name/email`（local 覆盖）。
+
+### 宣传截图流水线（探针留 .tmp-test/probe/：demo-fixture.sh / demo-seed.mjs / shot-readme-v3.mjs）
+
+- **夹具**：D:\demo 下 8 项目 7 语言（aurora-dashboard TS·React、pulse-admin
+  Vue·JS、stratus-api Java·Spring、cascade-ml Python·FastAPI、granite-gateway
+  Go、forge-cli Rust、quartz-store C、echo-notify TS·Fastify），git 历史日期
+  错开（--allow-empty 补时间线）、aurora/forge 留脏工作区。
+- **造数**：POST /api/projects {paths} 批量注册 → analyze 轮询 → 3 集合 →
+  6 标签 → 2 固定 → 别名/备注（**备注列名是 notes 不是 note，PATCH 错字段
+  会被静默忽略**）→ open 后 better-sqlite3 直改隔离库错开 last_opened_at
+  （25分钟~20天+从未打开，侧栏相对时间分桶全上镜）。
+- **拍摄**：鉴权头是 `x-ttfolio-token`（不是 Bearer）；会话活动标签持久化
+  （重开页面恢复到上次项目页，须先点回总览）；电红主题生效断言
+  （data-tt-oled=1 且 --tt-layout-bg=#000000）后再拍——第 34 轮主题代码
+  实测无 bug（v2 首拍半失效是恢复 light 的收尾 PATCH 时序问题）。
+- **成图四张**：浅色总览（KPI/七色语言条/集合/相对时间）+ 电红三连（文件
+  编辑树+CodeMirror+备注、Git 状态+历史、命令面板 FTS 内容命中高亮）。
+  两份 README 配图注叙事 + 特性列表补「主题」条目；门禁三绿。
+
 ## 第三十四轮：四项体验改进 + 电红色发光主题（0.3.0，已出包待用户手测）
 
 > 用户一次性点名四项需求，先对齐计划后按小步提交实施；版本号按用户指定
