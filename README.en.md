@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](../../releases)
-[![Version](https://img.shields.io/badge/version-0.2.13-1677ff.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-1677ff.svg)](CHANGELOG.md)
 
 </div>
 
@@ -24,13 +24,24 @@ ttFolio brings the project folders on your disk into a single workspace: browse 
 - **Search** — Ctrl+K command palette; project / file / content search (SQLite FTS5, CJK friendly, incremental index)
 - **Collections · tags · views** — group projects, collapsible sidebars, tags & notes, card/table views, one-click relocate for missing directories
 - **Dashboard** — KPIs, projects needing attention, aggregated language breakdown, cross-project recent commits
+- **Themes** — light / dark / electric-red (OLED black + red glow) / follow system; native title bar follows
 - **Desktop** — Electron + NSIS installer, in-process server, native dialogs, built-in update check
 
 ## Screenshots
 
+Dashboard (light, default): KPIs, aggregated language breakdown, collections and last-opened times:
+
 ![Dashboard](docs/images/overview.png)
 
+File browsing & editing (electric-red theme): lazy-loading tree, CodeMirror 6, tags & notes:
+
 ![Project files](docs/images/project-files.png)
+
+Git: working-tree status and commit history (no push/pull, no credentials stored):
+
+![Git history](docs/images/git-history.png)
+
+Command palette (Ctrl+K): project / file / content search with highlighted matches:
 
 ![Command palette](docs/images/command-palette.png)
 
