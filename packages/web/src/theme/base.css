@@ -71,3 +71,14 @@ body,
    背景色取 currentColor 低透明——深浅主题自动适配；负 margin 抵消 padding 避免布局位移） */
 .tt-crumb-link { color: inherit; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
 .tt-crumb-link:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+
+/* 侧栏项目项「别名 + 原名」两行展示（第 37 轮修用户报障：加别名后间距异常）：
+   antd inline Menu 条目固定 40px 高 / 40px 行高 + overflow hidden，两行内容会垂直
+   溢出被裁、右侧相对时间被挤出。对带 tt-proj-2line 标记的条目放开高度、收紧行距。 */
+.ant-menu-inline .ant-menu-item:has(.tt-proj-2line) {
+  height: auto;
+  line-height: 1.35;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.tt-proj-2line .tt-proj-diskname { margin-top: 1px; }

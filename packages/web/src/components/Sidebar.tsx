@@ -359,6 +359,7 @@ export function Sidebar(): React.JSX.Element {
     label: (
       <span
         data-project-id={p.id}
+        className={p.alias !== null ? 'tt-proj-2line' : undefined}
         style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 190 }}
       >
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -367,7 +368,10 @@ export function Sidebar(): React.JSX.Element {
               <span className="tt-ellipsis" style={{ display: 'block' }}>
                 {p.alias}
               </span>
-              <span className="tt-ellipsis tt-mono" style={{ display: 'block', fontSize: 11, opacity: 0.6 }}>
+              <span
+                className="tt-ellipsis tt-mono tt-proj-diskname"
+                style={{ display: 'block', fontSize: 11, opacity: 0.6 }}
+              >
                 {p.diskName}
               </span>
             </>
