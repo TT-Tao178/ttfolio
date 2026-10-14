@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 第 38 轮：0.3.3 发布——侧栏别名两行显示修复（1576073，已出包）
+
+- **用户报障「加别名后间距不正常」**：0.1.4 起别名项两行展示，第 34 轮改
+  flex 后仍被 antd inline Menu 条目固定 40px 高 / 行高 + overflow hidden 裁剪
+  ——别名与原名各显示半截、间距忽大忽小、相对时间不可见。隔离实例
+  复现确认（长别名「星辰前端工作台 Pro Max」两行全裁）。
+- **修复**：别名项 label 加 tt-proj-2line 标记类，base.css 对带标记条目放开
+  高度（auto + 行高 1.35 + padding 5px）——单行项与其余菜单条目零变化；
+  四域侧栏共用 projectItems 一并修复。前后截图对比存 .tmp-test/alias-fix/。
+- **0.3.3 出包**：首次撞「用户 dev 开着 → tsx watch 锁 .node → rebuild 失败」
+  （按规范停 dev 后过）；再撞杀软 EBUSY 锁旧 asar（第三次，按预案 tmp3
+  打包 + VERIFY_DIST 自检 8 项全绿 + 移回，28 个安装包）。rebuild 翻回
+  Node ABI、门禁复跑三绿（101 条）；tag v0.3.3（245b8ea）+ Release 页建好
+  latest=v0.3.3 已验；对照清单已补行。
+- **注意**：出包时停了用户开着的 dev（.node 锁）——用户需自行
+  `npm run dev` 重启。
+
 ## 第 37 轮：0.3.2 发布——赛博朋克 + 极简手绘两主题 & 主题图标更换（已出包）
 
 - **赛博朋克**（cyberpunk）：夜城蓝黑底 #0a0a12 + 霓虹青 #00f0ff 主色 + 品红
