@@ -37,7 +37,7 @@ export const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/l
 
 /** settings 表的键（type_safe 常量） */
 export const SETTING_KEYS = {
-  theme: 'theme', // light | dark | oled（电红色发光） | system
+  theme: 'theme', // light | dark | oled（电红色发光） | cyberpunk（赛博朋克） | sketch（极简手绘） | system
   density: 'density', // small | middle | large
   watchEnabled: 'watch_enabled',
   watchStabilityMs: 'watch_stability_ms',

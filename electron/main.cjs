@@ -34,7 +34,7 @@ let win = null;
 // 深色主题下标题栏不再恒白。oled 属深色系按 dark 处理；未知值回 system（跟随操作系统），
 // 防渲染层异常值把标题栏钉死。浏览器/Web 模式无此桥，纯网页不受影响。
 ipcMain.on('tt:theme-changed', (_event, mode) => {
-  const map = { light: 'light', dark: 'dark', oled: 'dark' };
+  const map = { light: 'light', dark: 'dark', oled: 'dark', cyberpunk: 'dark', sketch: 'light' };
   nativeTheme.themeSource = map[mode] ?? 'system';
 });
 

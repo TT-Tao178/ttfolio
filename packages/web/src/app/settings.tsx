@@ -133,7 +133,14 @@ function ToastBridge({ children }: { children: React.ReactNode }): React.JSX.Ele
 function cachedTheme(): ThemeMode | null {
   try {
     const c = localStorage.getItem('ttfolio-theme');
-    return c === 'dark' || c === 'light' || c === 'oled' || c === 'system' ? c : null;
+    return c === 'dark' ||
+      c === 'light' ||
+      c === 'oled' ||
+      c === 'cyberpunk' ||
+      c === 'sketch' ||
+      c === 'system'
+      ? c
+      : null;
   } catch {
     return null;
   }
@@ -173,7 +180,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   // 它，可选调用即 no-op。
   useEffect(() => {
     const native = (window as unknown as { ttfolioNative?: { setTheme: (m: string) => void } }).ttfolioNative;
-    native?.setTheme(mode === 'oled' ? 'dark' : mode);
+    // 深色系主题（oled/cyberpunk）让标题栏走深色，sketch 走浅色，其余原样上报
+    native?.setTheme(mode === 'oled' || mode === 'cyberpunk' ? 'dark' : mode === 'sketch' ? 'light' : mode);
   }, [mode]);
 
   // 三态解析：system 由系统深浅解析为 light/dark；oled 独立成态（有自己的变量表与发光规则）。

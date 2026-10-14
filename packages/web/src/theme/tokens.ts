@@ -2,10 +2,10 @@
 import { theme as antdTheme, type ThemeConfig } from 'antd';
 
 /** 用户可选主题（settings.theme 持久值）；system 跟随操作系统在浅/深间解析。 */
-export type ThemeMode = 'light' | 'dark' | 'oled' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch' | 'system';
 
-/** 解析后的实际主题：oled（电红色发光）按深色系渲染，但有独立变量表与发光规则。 */
-export type ResolvedTheme = 'light' | 'dark' | 'oled';
+/** 解析后的实际主题：oled/cyberpunk 按深色系渲染（独立变量表+特效），sketch 为纸感浅色。 */
+export type ResolvedTheme = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch';
 
 export const GITHUB_LANG_COLORS: Record<string, string> = {
   TypeScript: '#3178c6',
@@ -157,13 +157,61 @@ const VARS_OLED: Record<string, string> = {
   'tt-text-3': 'rgba(255,255,255,.42)',
 };
 
+/**
+ * 赛博朋克主题（第 36 轮，用户点名）：夜城蓝黑底 + 霓虹青主色 + 品红警示，
+ * 控件带青色霓虹光晕。与电红主题（纯黑+红光）刻意区分色系与明度层次。
+ */
+const VARS_CYBERPUNK: Record<string, string> = {
+  'tt-primary': '#00f0ff',
+  'tt-primary-bg': '#0d2126',
+  'tt-primary-border': '#155e6b',
+  'tt-success': '#00d26a',
+  'tt-warning': '#ffe14d',
+  'tt-error': '#ff2a6d',
+  'tt-layout-bg': '#0a0a12',
+  'tt-container-bg': '#12121e',
+  'tt-split': '#23233a',
+  'tt-border': '#34345a',
+  'tt-text': 'rgba(235,242,255,.9)',
+  'tt-text-2': 'rgba(215,226,255,.62)',
+  'tt-text-3': 'rgba(195,208,240,.42)',
+};
+
+/**
+ * 极简手绘主题（第 36 轮，用户点名）：米纸白底 + 炭铅笔主色 + 灰调功能色，
+ * 形状层叠手绘不等圆角与纸面硬阴影（见 themeVarsCss 的 sketch 规则段），
+ * 整体是"铅笔在纸上"的浅色观感。
+ */
+const VARS_SKETCH: Record<string, string> = {
+  'tt-primary': '#44403a',
+  'tt-primary-bg': '#f0ebe0',
+  'tt-primary-border': '#d0c7b4',
+  'tt-success': '#5a7d4a',
+  'tt-warning': '#b08d3f',
+  'tt-error': '#b0563f',
+  'tt-layout-bg': '#faf7f2',
+  'tt-container-bg': '#fffdf9',
+  'tt-split': '#e8e2d6',
+  'tt-border': '#c9c0ae',
+  'tt-text': 'rgba(45,42,37,.92)',
+  'tt-text-2': 'rgba(45,42,37,.62)',
+  'tt-text-3': 'rgba(45,42,37,.42)',
+};
+
 export const THEME_STYLE_ID = 'tt-theme-vars';
 
 /** 电光红发光的统一光晕（OLED 黑底上红色 box-shadow 即"发光"观感）。 */
 const OLED_GLOW = 'rgba(255,59,71,.4)';
+/** 赛博朋克的霓虹青光晕。 */
+const CYBER_GLOW = 'rgba(0,240,255,.38)';
 
-/** 生成变量表样式文本：浅色进 :root，深色进 html[data-tt-dark="1"]，
- *  电红色发光在深色基础上覆写（data-tt-oled 必伴随 data-tt-dark="1"）并附发光规则。 */
+/** 手绘不等圆角：四角半径刻意不对称，模拟铅笔手绘框的抖动感（经典 CSS 技巧）。 */
+const SKETCH_RADIUS_BTN = '255px 15px 225px 15px / 15px 225px 15px 255px';
+const SKETCH_RADIUS_CARD = '15px 255px 15px 225px / 225px 15px 255px 15px';
+
+/** 生成变量表样式文本：浅色进 :root，深色进 html[data-tt-dark="1"]；
+ *  oled/cyberpunk 在深色基础上覆写（必伴随 data-tt-dark="1"）并附霓虹发光规则；
+ *  sketch 为浅色覆写（data-tt-dark="0"）并附手绘线条形状规则。 */
 export function themeVarsCss(): string {
   const toCss = (vars: Record<string, string>): string =>
     Object.entries(vars)
@@ -172,13 +220,31 @@ export function themeVarsCss(): string {
   const light = toCss(VARS_LIGHT);
   const dark = toCss(VARS_DARK);
   const oled = toCss(VARS_OLED);
-  const glow = [
+  const cyber = toCss(VARS_CYBERPUNK);
+  const sketch = toCss(VARS_SKETCH);
+  const neon = [
     `html[data-tt-oled="1"] .ant-btn-primary{box-shadow:0 0 10px ${OLED_GLOW}}`,
     `html[data-tt-oled="1"] .ant-btn-primary:not(:disabled):hover{box-shadow:0 0 14px rgba(255,59,71,.6)}`,
     `html[data-tt-oled="1"] .ant-switch-checked{box-shadow:0 0 8px ${OLED_GLOW}}`,
     `html[data-tt-oled="1"] .ant-checkbox-checked .ant-checkbox-inner,html[data-tt-oled="1"] .ant-radio-checked .ant-radio-inner{border-color:#ff3b47;box-shadow:0 0 6px ${OLED_GLOW}}`,
+    `html[data-tt-cyber="1"] .ant-btn-primary{box-shadow:0 0 10px ${CYBER_GLOW}}`,
+    `html[data-tt-cyber="1"] .ant-btn-primary:not(:disabled):hover{box-shadow:0 0 14px rgba(0,240,255,.6)}`,
+    `html[data-tt-cyber="1"] .ant-switch-checked{box-shadow:0 0 8px ${CYBER_GLOW}}`,
+    `html[data-tt-cyber="1"] .ant-checkbox-checked .ant-checkbox-inner,html[data-tt-cyber="1"] .ant-radio-checked .ant-radio-inner{border-color:#00f0ff;box-shadow:0 0 6px ${CYBER_GLOW}}`,
+    `html[data-tt-cyber="1"] .ant-menu-item-selected{box-shadow:inset 2px 0 0 #ff2a6d}`,
   ].join('');
-  return `:root{${light}}html[data-tt-dark="1"]{${dark}}html[data-tt-oled="1"]{${oled}}${glow}`;
+  const handDrawn = [
+    `html[data-tt-sketch="1"] .ant-btn{border-radius:${SKETCH_RADIUS_BTN};border-width:1.5px}`,
+    `html[data-tt-sketch="1"] .ant-btn-primary{border-color:#3a362f}`,
+    `html[data-tt-sketch="1"] .ant-card{border-radius:${SKETCH_RADIUS_CARD};border:1.5px solid #c9c0ae;box-shadow:2px 3px 0 rgba(61,58,52,.12)}`,
+    `html[data-tt-sketch="1"] .ant-modal .ant-modal-content{border-radius:${SKETCH_RADIUS_CARD};border:1.5px solid #c9c0ae;box-shadow:3px 4px 0 rgba(61,58,52,.14)}`,
+    `html[data-tt-sketch="1"] .ant-tag{border-radius:${SKETCH_RADIUS_BTN};border-width:1px}`,
+  ].join('');
+  return (
+    `:root{${light}}html[data-tt-dark="1"]{${dark}}` +
+    `html[data-tt-oled="1"]{${oled}}html[data-tt-cyber="1"]{${cyber}}` +
+    `html[data-tt-sketch="1"]{${sketch}}${neon}${handDrawn}`
+  );
 }
 
 /** 把变量表写入文档（幂等；只创建一次 <style>，之后仅切换 html 上的 data-tt-*）。 */
@@ -191,11 +257,23 @@ export function applyThemeVars(resolved: ResolvedTheme): void {
     el.textContent = themeVarsCss();
     document.head.appendChild(el);
   }
-  document.documentElement.dataset['ttDark'] = resolved === 'light' ? '0' : '1';
+  const darkLike = resolved === 'dark' || resolved === 'oled' || resolved === 'cyberpunk';
+  document.documentElement.dataset['ttDark'] = darkLike ? '1' : '0';
   document.documentElement.dataset['ttOled'] = resolved === 'oled' ? '1' : '0';
+  document.documentElement.dataset['ttCyber'] = resolved === 'cyberpunk' ? '1' : '0';
+  document.documentElement.dataset['ttSketch'] = resolved === 'sketch' ? '1' : '0';
   // 让浏览器原生控件（滚动条、表单、默认底色）也跟随深浅，避免"深色页面配白滚动条"
-  document.documentElement.style.colorScheme = resolved === 'light' ? 'light' : 'dark';
-  const vars = resolved === 'light' ? VARS_LIGHT : resolved === 'oled' ? VARS_OLED : VARS_DARK;
+  document.documentElement.style.colorScheme = darkLike ? 'dark' : 'light';
+  const vars =
+    resolved === 'light'
+      ? VARS_LIGHT
+      : resolved === 'oled'
+        ? VARS_OLED
+        : resolved === 'cyberpunk'
+          ? VARS_CYBERPUNK
+          : resolved === 'sketch'
+            ? VARS_SKETCH
+            : VARS_DARK;
   const bg = vars['tt-layout-bg'] ?? '';
   document.documentElement.style.background = bg;
   document.body.style.background = bg;
@@ -226,11 +304,22 @@ export function langColor(language: string): string {
 }
 
 export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
-  // oled 沿用 darkAlgorithm（组件明暗关系一致），只是换一套真实 hex 让 AntD 推导派生色
-  const algorithm = resolved === 'light' ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm;
+  // oled/cyberpunk 沿用 darkAlgorithm（组件明暗关系一致），只是换一套真实 hex 让 AntD
+  // 推导派生色；sketch 是纸感浅色，走 defaultAlgorithm
+  const algorithm =
+    resolved === 'light' || resolved === 'sketch' ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm;
   // 这里必须给真实 hex（AntD 要用它推导 hover/active 等派生色，传 var() 会算不出派生色）；
   // 取值与上面的变量表同源，保证「AntD 组件底色」与「自绘容器底色」是同一套色。
-  const v = resolved === 'light' ? VARS_LIGHT : resolved === 'oled' ? VARS_OLED : VARS_DARK;
+  const v =
+    resolved === 'light'
+      ? VARS_LIGHT
+      : resolved === 'oled'
+        ? VARS_OLED
+        : resolved === 'cyberpunk'
+          ? VARS_CYBERPUNK
+          : resolved === 'sketch'
+            ? VARS_SKETCH
+            : VARS_DARK;
   return {
     algorithm,
     token: {

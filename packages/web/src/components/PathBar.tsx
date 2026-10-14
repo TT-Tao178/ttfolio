@@ -4,7 +4,7 @@ import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
   ReloadOutlined,
-  BgColorsOutlined,
+  SkinOutlined,
   ColumnWidthOutlined,
   BorderRightOutlined,
 } from '@ant-design/icons';
@@ -67,6 +67,8 @@ export function PathBar(): React.JSX.Element {
       { key: 'light', label: '浅色（默认）' },
       { key: 'dark', label: '深色' },
       { key: 'oled', label: '电红色发光' },
+      { key: 'cyberpunk', label: '赛博朋克' },
+      { key: 'sketch', label: '极简手绘' },
       { key: 'system', label: '跟随系统' },
     ],
     selectable: true,
@@ -139,7 +141,7 @@ export function PathBar(): React.JSX.Element {
       </Space.Compact>
       <Breadcrumb items={crumbs} style={{ flex: 1 }} data-testid="pathbar-crumbs" />
       <Dropdown menu={themeMenu}>
-        <Button size="small" type="text" icon={<BgColorsOutlined />} />
+        <Button size="small" type="text" icon={<SkinOutlined />} title="主题" />
       </Dropdown>
       <Dropdown menu={densityMenu}>
         <Button size="small" type="text" icon={<ColumnWidthOutlined />} />
