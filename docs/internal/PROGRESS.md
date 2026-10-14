@@ -1,5 +1,24 @@
 # PROGRESS
 
+## 第 37 轮：赛博朋克 + 极简手绘两主题 & 主题图标更换（ef6fffa，已推，待出包手测）
+
+- **赛博朋克**（cyberpunk）：夜城蓝黑底 #0a0a12 + 霓虹青 #00f0ff 主色 + 品红
+  #ff2a6d 警示；青色霓虹光晕（按钮/开关/勾选，hover 增强）+ 选中菜单品红内嵌
+  条；darkAlgorithm。与电红主题刻意区分色系。
+- **极简手绘**（sketch）：米纸白 #faf7f2 + 炭铅笔 #44403a 主色 + 灰调功能色；
+  手绘不等圆角（按钮/卡片/弹窗/标签，经典四角不对称技巧）+ 纸面硬阴影
+  （2-3px 偏移 box-shadow）；defaultAlgorithm。data-tt-sketch 为浅色覆写段
+  （dark=0），与霓虹段（dark=1）对称。
+- 主题系统第 34 轮机制直接扩展：ThemeMode/ResolvedTheme 六值、
+  applyThemeVars/antdThemeConfig 五分支、data-tt-cyber/tt-sketch 标记位、
+  cachedTheme 白名单、标题栏上报（cyberpunk→dark、sketch→light）与 main.cjs
+  白名单同步、两处选择器加项、constants 注释更新。SEMANTIC 消费方零改动。
+- **主题入口图标**：BgColorsOutlined → SkinOutlined（「换肤」语义 + title）。
+- 验证：门禁三绿（101 条）+ 生产构建过；隔离实例实测两主题标记位生效，
+  逐张人工过目截图（霓虹光晕/手绘纸感均达预期）。
+- 未出包（非缺陷修复；随下一轮出包带入）。手测入口：路径栏皮肤图标或设置页
+  Segmented 切「赛博朋克/极简手绘」。
+
 ## 卸载功能实测（2026-10-14，用户点名；含一次安装器行为事故与完整恢复）
 
 ### 结论：NSIS 卸载器功能完整 ✅
