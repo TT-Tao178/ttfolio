@@ -121,6 +121,11 @@ export function Dashboard(): React.JSX.Element {
   const goView = (key: string): void => {
     useAppStore.getState().updateActiveLocation({ subTab: `view:${key}` }, true);
   };
+  // KPI「项目总数」点击：平滑滚动到本屏项目区（数据就在下方，无需换视图）
+  const projectsSectionRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollToProjects = (): void => {
+    projectsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // ---- 聚合语言占比：全部项目按字节聚合，GitHub 风格色条 + 图例（top6 + 其他） ----
   const langAgg = (() => {
@@ -191,14 +196,16 @@ export function Dashboard(): React.JSX.Element {
         </div>
       )}
 
+      {/* KPI 卡片（第 39 轮）：可点的五张 hoverable + onClick 跳对应视图/锚点，
+          「平均分析耗时」无对应项目集合保持静态；跳转复用「需要关注」条的 goView */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        <Card size="small">
+        <Card size="small" hoverable onClick={scrollToProjects} data-testid="kpi-total">
           <Statistic title="项目总数" value={list.length} loading={isLoading} />
         </Card>
-        <Card size="small">
+        <Card size="small" hoverable onClick={() => goView('recent')} data-testid="kpi-opened-today">
           <Statistic title="今天动过" value={openedToday} loading={isLoading} />
         </Card>
-        <Card size="small">
+        <Card size="small" hoverable onClick={() => goView('my-dirty')} data-testid="kpi-dirty">
           <Statistic
             title="有未提交改动"
             value={dirty}
@@ -206,10 +213,10 @@ export function Dashboard(): React.JSX.Element {
             valueStyle={dirty > 0 ? { color: SEMANTIC.warning } : undefined}
           />
         </Card>
-        <Card size="small">
+        <Card size="small" hoverable onClick={() => goView('my-nodocs')} data-testid="kpi-nodocs">
           <Statistic title="缺设计文档" value={noDocs} loading={isLoading} />
         </Card>
-        <Card size="small">
+        <Card size="small" hoverable onClick={() => goView('my-noarch')} data-testid="kpi-noarch">
           <Statistic title="缺架构图" value={noArch} loading={isLoading} />
         </Card>
         <Card size="small">
@@ -281,7 +288,7 @@ export function Dashboard(): React.JSX.Element {
       )}
 
       {/* 项目区：flex:1 吃掉剩余高度，分页器恒贴本区底部 */}
-      <div style={{ marginTop: 16 }}>
+      <div ref={projectsSectionRef} style={{ marginTop: 16, scrollMarginTop: 8 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
           <Typography.Title level={5} style={{ margin: 0 }}>
             项目
