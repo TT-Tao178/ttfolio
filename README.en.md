@@ -22,9 +22,10 @@ ttFolio brings the project folders on your disk into a single workspace: browse 
 - **Git** — status, diff, staging, commit, history & details, branch switching; no push/pull, no credentials stored
 - **Docs & architecture** — Markdown discovery and rendering, external doc mounts, HTML / image / text preview for architecture dirs (read-only port + iframe sandbox)
 - **Search** — Ctrl+K command palette; project / file / content search (SQLite FTS5, CJK friendly, incremental index)
-- **Collections · tags · views** — group projects, collapsible sidebars, tags & notes, card/table views, one-click relocate for missing directories
+- **Collections · tags · views** — group projects, collapsible sidebars, tags & notes, tag-filtered views, card/table views, one-click relocate for missing directories
 - **Dashboard** — KPIs, projects needing attention, aggregated language breakdown, cross-project recent commits
-- **Themes** — light / dark / electric-red (OLED black + red glow) / follow system; native title bar follows
+- **Themes** — light / dark / electric-red (OLED black + red glow) / cyberpunk (neon cyan glow) /
+  minimal-sketch (paper feel) / follow system; native title bar follows
 - **Desktop** — Electron + NSIS installer, in-process server, native dialogs, built-in update check
 
 ## Screenshots
