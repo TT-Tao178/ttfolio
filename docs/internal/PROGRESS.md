@@ -1,5 +1,22 @@
 # PROGRESS
 
+## 第 40 轮：文档中心 Word/PDF/Excel 只读预览（d41834b，已推，待出包手测）
+
+- 三格式接入：pdfjs-dist（PDF canvas）、docx-preview（Word 版式）、SheetJS
+  （xlsx/xls/csv 表格化），与 Markdown 阅读同为纯本地解析。服务端新增
+  /api/docs/raw 二进制通道（content 同款路径守卫 + 扩展白名单 + 50MB 上限
+  ——字节保真是前提，文本接口的编码检测会破坏 OOXML 容器）；文档发现扫描
+  收录预览格式；前端 OfficePreview 三分流，编辑模式对该类格式禁用。
+- **顺修两处既有缺陷**：①文档列表 ×3——docsDirs 大小写变体（docs/Docs/
+  DOCS）在 Windows 同目录被重复扫描，冗余循环移除；②静态服务 MIME 表缺
+  .mjs → 模块 Worker 严格校验类型致 pdf.js worker 静默挂起（app.ts 补
+  text/javascript）。
+- 拆包：三库动态 import + manualChunks 独立 preview 组（992KB 仅打开预览时
+  加载），vendor 首屏回落 441KB；pdf.worker 独立 chunk。
+- 新依赖 3 个（pdfjs-dist 6 / docx-preview 0.4 / xlsx 0.18），prod 审计
+  0 漏洞维持。端到端实测：发现 3 条去重、raw 字节保真 + 白名单 400、
+  PDF canvas 1 页、docx DOM、xlsx 3 行、编辑灰置。
+
 ## 仓库门面同步（2026-10-14，81dd1ef 已推；About 经 API——挂账待办清账）
 
 - **About description/topics 经 API 同步完成**（GCM 凭据 PATCH /repos +
