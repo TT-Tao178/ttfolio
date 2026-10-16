@@ -1,6 +1,27 @@
 # PROGRESS
 
-## 第 40 轮：文档中心 Word/PDF/Excel 只读预览（d41834b，已推，待出包手测）
+## 第 41 轮：0.3.4 发布——KPI 跳转 + 文档预览随版本出包（待 push 恢复）
+
+- 版本收口四处（package.json / server 常量 / CHANGELOG / 动态徽章免维护）；
+  门禁三绿（101 条）。
+- **出包门禁首次真实拦截：xlsx 0.18.5 两个 high（原型污染/ReDoS）且 npm 侧
+  无修复版**（SheetJS 已迁自家 CDN）——audit:prod fail-fast 生效。正确修复：
+  依赖改 SheetJS 官方 CDN 直链 tarball（0.20.3，API 兼容零改动），audit 三连
+  0 漏洞（8e9eef3）。**教训**：npm「No fix available」≠ 无解，官方 CDN/仓库
+  直链是标准出路。
+- 出包：链头五步过；electron-builder 再撞杀软 EBUSY 锁旧 asar（tmp4 预案
+  过，自检 8 项全绿含版本断言 0.3.4）；rebuild 翻回 Node ABI、门禁复跑三绿。
+  安装包 ttFolio-Setup-0.3.4.exe 入 dist-electron。
+- **⚠️ 重大状态变化（如实入档）**：本轮 mv 完成后发现 dist-electron 仅剩
+  0.3.2/0.3.3/0.3.4 三个安装包——0.1.0~0.3.1 共 25 个旧包在 10-15 之后、
+  本轮出包之前已消失（保留最近 3 个的清理模式，非本轮操作所致，成因待查；
+  旧包无异地副本——GitHub Release 资产一直未拖）。建议：①查回收站/杀软
+  隔离区/其他会话的清理脚本；②资产上传策略改为每发一版立即拖（GitHub 作
+  异地副本）。上传资产对照清单已按现存 3 包重写。
+- github.com push 域加速器抖动（api 域正常）：main 与 v0.3.4 tag 挂后台
+  退避重试中；Release 页待 tag 推达后经 API 创建。
+
+## 第 40 轮：文档中心 Word/PDF/Excel 只读预览（d41834b，已推，待出包手测）：文档中心 Word/PDF/Excel 只读预览（d41834b，已推，待出包手测）
 
 - 三格式接入：pdfjs-dist（PDF canvas）、docx-preview（Word 版式）、SheetJS
   （xlsx/xls/csv 表格化），与 Markdown 阅读同为纯本地解析。服务端新增
