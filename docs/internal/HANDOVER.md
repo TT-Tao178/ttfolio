@@ -33,6 +33,10 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
+> ⚠ 本节状态截至第 34 轮（0.3.0）；第 35~41 轮见 `PROGRESS.md` 顶部——
+> 0.3.4 已发布（tag / Release 页 / latest 三达，推送已完成）。最新提交以
+> `git log` 实查为准。
+
 - 最新提交：第 35 轮 README 重制（f6e966f：四张宣传级截图入库 docs/images，
   8 个多语言演示项目隔离实例拍摄，裂图取证=访问端 raw/camo 域阻断、仓库侧
   无问题；顺修 README.en.md 徽章漏更）；其上是 0.3.0 发布（第三十四轮四项
@@ -108,11 +112,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
   https://github.com/TT-Tao178/ttfolio/releases/tag/v0.2.4
 - **待用户验证/待查（第 34 轮收口时）**：
   1. ~~右键菜单在安装版是否弹出~~ ✅ 用户装 0.2.7 实测**能弹**（闭案）
-  2. 安装版 Electron 实例登记接口返回 ok 却不落库
-  2b. **待用户拍板**：删规划性脏 tag（实查 git tag 共 **4 个**：v0.1.0-p0 /
-     v0.2.0-p1 / v0.3.0-p2 / v1.0.0——原清单只列 3 个，v0.2.0-p1 是第 34 轮
-     实查新发现，远端不可逆，去留待定）；根目录 HANDOVER-legacy.md 归档进
-     docs/internal 还是删除（elec-verify 测试库 0 行，原因未定位）
+  2. 安装版 Electron 实例登记接口返回 ok 却不落库（elec-verify 测试库 0 行，原因未定位）
+  2b. ~~删规划性脏 tag / HANDOVER-legacy.md 处置~~ ✅ 2026-10-17 已处置：
+     四个规划性脏 tag（v0.1.0-p0 / v0.2.0-p1 / v0.3.0-p2 / v1.0.0）本地+远端
+     已删（删前经 API 复核无 Release 页挂载；删后远端恰 29 个正式 tag）；
+     仓库根 HANDOVER-legacy.md 已删除（第 12 轮自包含提示词，内容已被
+     PROGRESS 第 12 轮小节与现行 HANDOVER 覆盖）
   3. **装 ttFolio-Setup-0.3.0.exe 手测**（已含 28~33 轮全部改动 + 第 34 轮四项：
      深色/OLED 标题栏变色、三主题切换与发光观感、侧栏项目相对时间、检查更新
      不再出 Token 提示；完整清单见 PROGRESS 第三十四轮。注意：本机 0.3.0 包
