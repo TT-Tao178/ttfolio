@@ -1,5 +1,23 @@
 # PROGRESS
 
+## 仓库门面同步（2026-10-14，81dd1ef 已推；About 经 API——挂账待办清账）
+
+- **About description/topics 经 API 同步完成**（GCM 凭据 PATCH /repos +
+  PUT /topics，回读验证过）——「需网页端手动改」的待办正式清账。description
+  与 README 口径一致（local project workbench/本地的项目工作台）；topics
+  去 local-first 与误导性 code-editor，换 electron/windows/workbench/
+  project-management/git/react/typescript/code-browser/sqlite 九个中性词。
+- README 双语特性列表补 0.3.2 两主题与 0.3.1 标签过滤；package.json
+  description 同步去 local-first（81dd1ef）。
+- **社交预览图**（GitHub 无 API，仅网页可传）：已用 ttfolio-video 素材的
+  电红主题总览合成标准尺寸成品
+  `D:/Workspace-1/code/ttfolio-video/out/social-preview-1280x640.png`
+  （1280×640/205KB，OLED 黑底画布融合），待用户网页上传：
+  仓库 Settings → General → Social preview → Edit → 上传该文件。
+- 发现 ttfolio-video 介绍视频工程（另一会话产物）：16 张素材含五套主题
+  截图与标签过滤界面，成片 out/ttfolio-介绍.mp4（54MB 1080p 字幕烧录）+
+  SRT + 旁白文稿；README 视频链接可选项未做（等资产上传时一并决定）。
+
 ## 第 39 轮：总览 KPI 卡片可点击跳转（173c827，已推，待出包手测）
 
 - 用户点名 KPI 卡片可点。复用「需要关注」条既有 goView 机制与现成视图：
