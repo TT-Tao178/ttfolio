@@ -177,6 +177,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       const ext = path.extname(full).toLowerCase();
       const types: Record<string, string> = {
         '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
         '.css': 'text/css',
         '.svg': 'image/svg+xml',
         '.png': 'image/png',

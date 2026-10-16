@@ -317,15 +317,15 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         const lower = e.name.toLowerCase();
         const isMd = lower.endsWith('.md') || lower.endsWith('.markdown');
         const isReadme = lower.indexOf('readme') === 0;
-        if (isMd || isReadme) mdFiles.set(rel, { label: rel });
+        // 预览文档（第 40 轮）：Word/PDF/Excel 进文档列表，前端按扩展名分流到只读预览
+        const isPreviewable = PREVIEWABLE_EXTS.some((ext) => lower.endsWith(ext));
+        if (isMd || isReadme || isPreviewable) mdFiles.set(rel, { label: rel });
       }
     };
     collectMd(row.dir_path, '', 0);
-    // 根下 docs 目录逐层
-    for (const d of docsDirs) {
-      const abs = path.join(row.dir_path, d);
-      if (fsx.exists(abs) && (fsx.statSafe(abs)?.isDir ?? false)) collectMd(abs, d, 1);
-    }
+    // （根下 docs 目录无需再扫：collectMd 在 depth 0 已对 docsDirs 递归；
+    //  原先这里再按 docsDirs 大小写变体重扫一遍，Windows 下同一目录会产生
+    //  docs/Docs/DOCS 三种前缀的重复条目——第 40 轮实测发现并移除）
     // 引用计数（同一文档目录被多个项目挂载 → 标注"被 N 个项目引用"）
     const allMounts = listAllMounts(db);
     for (const [rel] of mdFiles) {
@@ -369,7 +369,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
       for (const e of entries) {
         if (!e.isFile) continue;
         const lower = e.name.toLowerCase();
-        if (lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt')) {
+        const isDocText = lower.endsWith('.md') || lower.endsWith('.markdown') || lower.endsWith('.txt');
+        const isPreviewable = PREVIEWABLE_EXTS.some((ext) => lower.endsWith(ext));
+        if (isDocText || isPreviewable) {
           results.push({
             path: path.join(m.path, e.name),
             mountId: m.id,
@@ -395,6 +397,10 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // ---- 文档内容读写（与文件同一套冲突规则，FR-6.5） ----
+  // 预览文档扩展白名单（第 40 轮）：走 /api/docs/raw 二进制通道的格式
+  const PREVIEWABLE_EXTS = ['.docx', '.pdf', '.xlsx', '.xls', '.csv'];
+  const RAW_MAX_BYTES = 50 * 1024 * 1024;
+
   app.get('/api/docs/content', async (req) => {
     const q = req.query as { projectId?: string; path?: string; mountId?: string };
     if (q.projectId === undefined || q.path === undefined) return fail('BAD_REQUEST', '缺少参数');
@@ -416,6 +422,38 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
         size: content.size,
         hash: content.hash,
       });
+    } catch (err) {
+      return fail(...toApiErrorTuple(err));
+    }
+  });
+
+  // 预览文档二进制通道（第 40 轮）：Word/PDF/Excel 前端渲染需要字节保真，
+  // 文本接口的编码检测会破坏 zip 容器。白名单 + 50MB 上限 + 与 content 同款守卫。
+  app.get('/api/docs/raw', async (req, reply) => {
+    const q = req.query as { projectId?: string; path?: string; mountId?: string };
+    if (q.projectId === undefined || q.path === undefined) return fail('BAD_REQUEST', '缺少参数');
+    const lower = q.path.toLowerCase();
+    if (!PREVIEWABLE_EXTS.some((ext) => lower.endsWith(ext))) {
+      return fail('BAD_REQUEST', '该格式不支持预览');
+    }
+    try {
+      const abs =
+        q.mountId !== undefined
+          ? resolveMountPath(ctx, q.mountId, q.path)
+          : (await resolveInProject(ctx.db(), q.projectId, q.path, { mustExist: true })).real;
+      const st = fsx.statSafe(abs);
+      if (st === null) return fail('NOT_FOUND', '文档不存在', 404);
+      if (st.isDir) return fail('BAD_REQUEST', '目标是目录');
+      if (st.size > RAW_MAX_BYTES) {
+        return fail('TOO_LARGE', `文件超过预览大小上限（${Math.round(RAW_MAX_BYTES / 1048576)}MB）`, 413);
+      }
+      const buf = fsx.readFileSync(abs);
+      reply.header('content-type', 'application/octet-stream');
+      reply.header(
+        'content-disposition',
+        `inline; filename*=UTF-8''${encodeURIComponent(path.basename(abs))}`,
+      );
+      return reply.send(buf);
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }

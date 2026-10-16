@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import MarkdownPreview from './MarkdownPreview';
+import { OfficePreview } from './OfficePreview';
 import { relTime } from '@/lib/format';
 import { PaneSplit } from '@/components/PaneSplit';
 import { SEMANTIC } from '@/theme/tokens';
@@ -38,6 +39,9 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
       ),
   });
 
+  // 预览文档（第 40 轮：Word/PDF/Excel）不走文本接口——二进制文件经编码检测会损坏，
+  // 由 OfficePreview 走 /api/docs/raw 二进制通道；编辑模式对其禁用（只读）。
+  const isPreviewable = selected !== null && /\.(docx|pdf|xlsx|xls|csv)$/i.test(selected.path);
   const content = useQuery({
     queryKey: ['doc-content', projectId, selected?.path, selected?.mountId],
     queryFn: () =>
@@ -45,7 +49,7 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
         '/api/docs/content',
         { projectId, path: selected?.path ?? '', mountId: selected?.mountId ?? '' },
       ),
-    enabled: selected !== null && mode === 'read',
+    enabled: selected !== null && mode === 'read' && !isPreviewable,
   });
 
   const outline = useMemo(() => {
@@ -175,11 +179,12 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
                   <Segmented
                     options={[
                       { label: '阅读', value: 'read' },
-                      { label: '编辑', value: 'edit' },
+                      { label: '编辑', value: 'edit', disabled: isPreviewable },
                     ]}
-                    value={mode}
+                    value={isPreviewable ? 'read' : mode}
                     onChange={(v) => setMode(v as 'read' | 'edit')}
                   />
+                  {isPreviewable && <span style={{ fontSize: 12, opacity: 0.55 }}>只读预览格式</span>}
                   {mode === 'edit' && (
                     <DocEditor
                       projectId={projectId}
@@ -214,6 +219,19 @@ export function DocsTab({ projectId }: { projectId: string }): React.JSX.Element
                 )}
                 {content.isLoading ? (
                   <Spin style={{ margin: '48px auto', display: 'block' }} />
+                ) : mode === 'read' && isPreviewable ? (
+                  <div
+                    style={{
+                      flex: 1,
+                      overflow: 'auto',
+                      background: SEMANTIC.layoutBg,
+                      borderRadius: 8,
+                      padding: 16,
+                    }}
+                    data-testid="office-preview"
+                  >
+                    <OfficePreview projectId={projectId} path={selected.path} mountId={selected.mountId} />
+                  </div>
                 ) : mode === 'read' ? (
                   <div
                     ref={previewRef}

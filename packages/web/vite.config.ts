@@ -83,6 +83,14 @@ export default defineConfig(() => {
             if (id.includes('antd') || id.includes('@ant-design') || id.includes('rc-')) return 'antd';
             if (id.includes('codemirror') || id.includes('@uiw/react-codemirror') || id.includes('@lezer'))
               return 'codemirror';
+            // 文档预览三库（第 40 轮）：仅 DocsTab 打开 Word/PDF/Excel 时才动态加载，
+            // 单独成组避免被兜进 vendor 随首屏加载（pdf.worker 已自动独立 chunk）
+            if (
+              id.includes('pdfjs-dist') ||
+              id.includes('docx-preview') ||
+              /[\\/]node_modules[\\/]xlsx[\\/]/.test(id)
+            )
+              return 'preview';
             return 'vendor';
           },
         },

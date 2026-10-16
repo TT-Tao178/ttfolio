@@ -46,6 +46,34 @@ function base(): string {
   return '';
 }
 
+/**
+ * 文档二进制预览取回（第 40 轮）：Word/PDF/Excel 前端渲染需要字节保真，
+ * 且 query token 仅对 SSE 放行 —— 与导出下载同款做法：带鉴权头手动 fetch。
+ * 仅限 /api/docs/raw 白名单格式（docx/pdf/xlsx/xls/csv），50MB 上限由服务端把关。
+ */
+export async function fetchDocsRaw(
+  projectId: string,
+  path: string,
+  mountId: string | null,
+): Promise<ArrayBuffer> {
+  const url = new URL(base() + '/api/docs/raw', window.location.origin);
+  url.searchParams.set('projectId', projectId);
+  url.searchParams.set('path', path);
+  if (mountId !== null) url.searchParams.set('mountId', mountId);
+  const res = await fetch(url.toString(), { headers: { 'x-ttfolio-token': token() } });
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as ApiResponse<never> | null;
+    const err = payload !== null && payload.ok === false ? payload.error : undefined;
+    throw new ApiClientError(
+      err?.code ?? `HTTP_${res.status}`,
+      err?.message ?? `HTTP ${res.status}`,
+      undefined,
+      res.status,
+    );
+  }
+  return res.arrayBuffer();
+}
+
 async function request<T>(
   method: string,
   path: string,

@@ -30,12 +30,30 @@ body,
 }
 
 /* Markdown 阅读区（对齐 AntD Typography 视觉，不写死色值） */
-.tt-md h1, .tt-md h2, .tt-md h3 { margin: 0.8em 0 0.4em; font-weight: 600; }
-.tt-md h1 { font-size: 1.5em; }
-.tt-md h2 { font-size: 1.3em; }
-.tt-md h3 { font-size: 1.15em; }
-.tt-md p { margin: 0.5em 0; line-height: 1.75; }
-.tt-md ul, .tt-md ol { padding-left: 1.5em; margin: 0.5em 0; }
+.tt-md h1,
+.tt-md h2,
+.tt-md h3 {
+  margin: 0.8em 0 0.4em;
+  font-weight: 600;
+}
+.tt-md h1 {
+  font-size: 1.5em;
+}
+.tt-md h2 {
+  font-size: 1.3em;
+}
+.tt-md h3 {
+  font-size: 1.15em;
+}
+.tt-md p {
+  margin: 0.5em 0;
+  line-height: 1.75;
+}
+.tt-md ul,
+.tt-md ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
 .tt-md code {
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.9em;
@@ -49,7 +67,10 @@ body,
   overflow: auto;
   background: rgba(128, 128, 128, 0.08);
 }
-.tt-md pre code { background: transparent; padding: 0; }
+.tt-md pre code {
+  background: transparent;
+  padding: 0;
+}
 .tt-md blockquote {
   margin: 0.5em 0;
   padding: 0.2em 1em;
@@ -57,20 +78,45 @@ body,
   color: inherit;
   opacity: 0.75;
 }
-.tt-md table { border-collapse: collapse; margin: 0.6em 0; }
-.tt-md th, .tt-md td { border: 1px solid rgba(128, 128, 128, 0.35); padding: 6px 12px; }
-.tt-md img { max-width: 100%; }
-.tt-md a { color: #1677ff; }
+.tt-md table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+}
+.tt-md th,
+.tt-md td {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  padding: 6px 12px;
+}
+.tt-md img {
+  max-width: 100%;
+}
+.tt-md a {
+  color: #1677ff;
+}
 
 /* diff 视图 */
-.tt-diff-add { background: rgba(82, 196, 26, 0.12); }
-.tt-diff-del { background: rgba(255, 77, 79, 0.1); }
-.tt-diff-hunk { opacity: 0.55; }
+.tt-diff-add {
+  background: rgba(82, 196, 26, 0.12);
+}
+.tt-diff-del {
+  background: rgba(255, 77, 79, 0.1);
+}
+.tt-diff-hunk {
+  opacity: 0.55;
+}
 
 /* 面包屑可点击段（第 27 轮按用户反馈：默认文字色、无下划线，hover 用浅背景块提示可点；
    背景色取 currentColor 低透明——深浅主题自动适配；负 margin 抵消 padding 避免布局位移） */
-.tt-crumb-link { color: inherit; cursor: pointer; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
-.tt-crumb-link:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.tt-crumb-link {
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+}
+.tt-crumb-link:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
 
 /* 侧栏项目项「别名 + 原名」两行展示（第 37 轮修用户报障：加别名后间距异常）：
    antd inline Menu 条目固定 40px 高 / 40px 行高 + overflow hidden，两行内容会垂直
@@ -81,4 +127,28 @@ body,
   padding-top: 5px;
   padding-bottom: 5px;
 }
-.tt-proj-2line .tt-proj-diskname { margin-top: 1px; }
+.tt-proj-2line .tt-proj-diskname {
+  margin-top: 1px;
+}
+
+/* Office 预览（第 40 轮）：SheetJS 表格与 docx-preview 容器的基础样式。
+   颜色用灰度透明值而非令牌——表格处于白底文档容器内，深浅主题均由容器承底。 */
+.tt-sheet {
+  overflow: auto;
+}
+.tt-sheet table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.tt-sheet td {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.tt-sheet tr:first-child td {
+  background: rgba(128, 128, 128, 0.08);
+  font-weight: 600;
+}
+.tt-docx-box .tt-docx {
+  background: #ffffff;
+}
