@@ -59,7 +59,7 @@
     "docx-preview": "^0.4.1",
     "file-uri-to-path": "^2.0.0",
     "pdfjs-dist": "^6.4.299",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "author": "TT-Tao178",
   "license": "MIT",
