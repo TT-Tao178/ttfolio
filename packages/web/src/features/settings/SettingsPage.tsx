@@ -562,7 +562,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
             >
               <div style={{ fontWeight: 600, marginBottom: 4 }}>支持作者</div>
               <p style={{ fontSize: 12, opacity: 0.75, margin: '0 0 12px' }}>
-                如果 ttFolio 对你有帮助，欢迎请作者喝杯水，赞助完全自愿，不影响任何功能，也不构成任何服务承诺或售后义务。
+                如果 ttFolio
+                对你有帮助，欢迎请作者喝杯水，赞助完全自愿，不影响任何功能，也不构成任何服务承诺或售后义务。
               </p>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 <figure style={{ margin: 0, textAlign: 'center' }}>
