@@ -51,11 +51,20 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // 体检 P2：用户可控的 git 引用/作者参数以 - 开头会被 git 当作选项解析
+  //（如 diff 的 --output=<path> 可把输出写到白名单外）。shell:false 挡住了命令拼接，
+  // 但选项注入只能靠这里拒绝。
+  function assertGitArg(v: string, label: string): void {
+    // 不用 startsWith（lint C-02 全局禁用该模式）；0x2d = '-'
+    if (v.charCodeAt(0) === 0x2d) throw new AppError('INVALID_NAME', `${label} 不能以 "-" 开头`);
+  }
+
   app.get('/api/git/:projectId/diff', async (req) => {
     const { projectId } = req.params as { projectId: string };
     const q = req.query as { path?: string; staged?: string; ref?: string };
     if (q.path === undefined) return fail('BAD_REQUEST', '缺少 path');
     try {
+      if (q.ref !== undefined) assertGitArg(q.ref, 'ref');
       const dir = projectDir(projectId);
       const d = await diff(dir, q.path, q.staged === '1', q.ref);
       return ok(d);
@@ -155,6 +164,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     const { projectId } = req.params as { projectId: string };
     const q = req.query as { limit?: string; skip?: string; path?: string; author?: string };
     try {
+      if (q.author !== undefined) assertGitArg(q.author, 'author');
       const dir = projectDir(projectId);
       const entries = await log(dir, {
         limit: Math.min(Number(q.limit ?? '50'), 200),
@@ -171,6 +181,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
   app.get('/api/git/:projectId/commit/:hash', async (req) => {
     const { projectId, hash } = req.params as { projectId: string; hash: string };
     try {
+      assertGitArg(hash, 'hash');
       const dir = projectDir(projectId);
       const d = await commitDetail(dir, hash);
       const patch = await diffForCommit(dir, hash);
@@ -195,6 +206,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { branch?: string; confirmDirty?: boolean };
     if (b.branch === undefined) return fail('BAD_REQUEST', '缺少 branch');
     try {
+      assertGitArg(b.branch, '分支名');
       const dir = projectDir(projectId);
       const st = await status(dir);
       const dirty = st.staged.length + st.unstaged.length > 0;
@@ -224,6 +236,7 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { branch?: string };
     if (b.branch === undefined || b.branch.trim() === '') return fail('BAD_REQUEST', '缺少 branch');
     try {
+      assertGitArg(b.branch.trim(), '分支名');
       const dir = projectDir(projectId);
       await createBranch(dir, b.branch.trim());
       invalidateGitMarks(projectId);

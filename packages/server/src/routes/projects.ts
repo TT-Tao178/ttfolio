@@ -270,9 +270,14 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const row = getProjectRow(db, id);
     if (row === undefined) return fail('NOT_FOUND', '项目不存在', 404);
     const p = parsed.data.dirPath.trim().replace(/^"|"$/g, '');
-    const st = fsx.statSafe(path.resolve(p));
-    if (st === null || !st.isDir) return fail('NOT_FOUND', '新目录不存在', 404);
-    const abs = await fsxPromised(path.resolve(p));
+    // 体检 P2：重定位此前只 statSafe 不做危险段/realpath 校验，会把项目指到 UNC 或
+    // 保留名目录且 path_ok=1——「能登记、打不开」的不对称由此复活。与登记同规。
+    let abs: string;
+    try {
+      abs = await validateRegistrableRoot(p);
+    } catch (err) {
+      return fail(...toApiErrorTuple(err));
+    }
     const key = pathKey(abs);
     const dup = getProjectByPathKey(db, key);
     if (dup !== undefined && dup.id !== id) return fail('DUPLICATE_PROJECT', '新目录已登记为其他项目', 409);

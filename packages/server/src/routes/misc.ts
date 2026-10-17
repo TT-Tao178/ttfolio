@@ -47,6 +47,11 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/trash/restore', async (req) => {
     const b = (req.body ?? {}) as { id?: string; targetDir?: string };
     if (b.id === undefined) return fail('BAD_REQUEST', '缺少 id');
+    // 体检 P2：指定目录必须为绝对路径（恢复到指定目录是显式 L2 用户操作，审计在案；
+    // 拒绝相对路径是为了防服务端 cwd 拼接出歧义位置）
+    if (b.targetDir !== undefined && !path.isAbsolute(b.targetDir.trim())) {
+      return fail('BAD_REQUEST', '恢复目标目录必须是绝对路径');
+    }
     try {
       const r = ctx.trash.restore(ctx.db(), b.id, b.targetDir);
       if (r.status === 'taken') {

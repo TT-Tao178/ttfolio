@@ -5,6 +5,7 @@ import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import * as fsx from '../core/fsx.js';
 import { AppError } from '../core/errors.js';
+import { isInsideOrEqual } from '../core/pathGuard.js';
 import {
   docRootCreateSchema,
   docsContentPutSchema,
@@ -167,8 +168,14 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/doc-roots/:id/bind', async (req) => {
     const b = (req.body ?? {}) as { path?: string; projectId?: string };
     if (b.path === undefined || b.projectId === undefined) return fail('BAD_REQUEST', '缺少参数');
+    // 体检 P2：绑定目录必须落在对应文档根之内（原先任意路径可直接绑为挂载）
+    const root = listDocRoots(ctx.db()).find((r) => r.id === (req.params as { id: string }).id);
+    if (root === undefined) return fail('NOT_FOUND', '文档根不存在', 404);
     const st = fsx.statSafe(b.path);
     if (st === null) return fail('NOT_FOUND', '目录不存在', 404);
+    if (!isInsideOrEqual(root.path, path.resolve(b.path))) {
+      return fail('PATH_OUT_OF_SCOPE', '绑定目录必须在文档根之内');
+    }
     const mount = createMount(ctx.db(), {
       projectId: b.projectId,
       kind: 'dir',

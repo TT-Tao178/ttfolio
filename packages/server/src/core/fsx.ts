@@ -145,10 +145,16 @@ export function hashFile(absPath: string): string {
 export function looksBinary(buf: Buffer): boolean {
   const n = Math.min(buf.length, 8192);
   if (n === 0) return false;
-  const suspicious = 0;
+  // 体检 P2：原实现 suspicious 恒为 0（死逻辑），只剩 NUL 检查。
+  // 现补控制字符启发式：C0 控制字符（保留 \t\n\f\r 等常规空白）与 DEL 在文本里
+  // 几乎不出现，密集出现即二进制。注意不能把高字节（128-255）计入——GBK 中文
+  // 文本高字节占比天然超 30%，会被整批误判。
+  let suspicious = 0;
   for (let i = 0; i < n; i++) {
     const b = buf[i];
+    if (b === undefined) break;
     if (b === 0) return true;
+    if (b < 9 || (b > 13 && b < 32) || b === 127) suspicious++;
   }
   return suspicious / n > 0.3;
 }

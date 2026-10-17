@@ -329,8 +329,10 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
             item.real.toLowerCase() !== dest.toLowerCase() &&
             path.dirname(item.real).toLowerCase() !== targetDir.real.toLowerCase()
           ) {
-            // 目录移动到自身子目录：拒绝
-            if (dest.toLowerCase().indexOf(item.real.toLowerCase()) === 0) {
+            // 目录移动到自身子目录：拒绝（体检 P2：裸前缀比较会误拦兄弟目录——
+            // D:\w\a 移入 D:\w\ab 时 dest=D:\w\ab\a 恰以 D:\w\a 开头；
+            // 用守卫库的 isInsideOrEqual（path.relative 语义，C-02）才是真包含）
+            if (isInsideOrEqual(item.real, dest)) {
               return fail('INVALID_NAME', '不能把目录移动到它自己的子目录内');
             }
           }
