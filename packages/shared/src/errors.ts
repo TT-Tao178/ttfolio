@@ -15,6 +15,8 @@ export const ERROR_CODES = [
   'NOT_A_REPO',
   'GIT_IN_PROGRESS',
   'GIT_DIRTY',
+  /** 无已暂存内容时提交（原先 git 退出码 1 落入 IO_ERROR 500，语义不清） */
+  'NO_STAGED',
   'PERMISSION_DENIED',
   'IO_ERROR',
   'TRASH_PATH_TAKEN',

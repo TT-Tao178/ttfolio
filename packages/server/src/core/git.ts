@@ -284,6 +284,18 @@ export async function discard(dir: string, paths: string[]): Promise<void> {
 
 export async function commit(dir: string, message: string): Promise<{ short: string }> {
   await assertGitAvailable();
+  // 预检暂存区：git diff --cached --quiet 无差异时退出码 0（git() 不抛错）＝无暂存内容，
+  // 直接给语义化 400，而不是让 git commit 退出码 1 落入 IO_ERROR 500
+  let hasStaged: boolean;
+  try {
+    await git(dir, ['diff', '--cached', '--quiet']);
+    hasStaged = false;
+  } catch {
+    hasStaged = true;
+  }
+  if (!hasStaged) {
+    throw new AppError('NO_STAGED', '没有已暂存的改动——先在变更列表勾选要提交的文件');
+  }
   await git(dir, ['commit', '-F', '-'], { input: message, timeoutMs: 60000 });
   const out = (await git(dir, ['rev-parse', '--short', 'HEAD'])).trim();
   return { short: out };

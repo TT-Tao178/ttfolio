@@ -23,7 +23,7 @@ import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from '
 import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
 import { analyzeProject } from './core/analyzer/index.js';
-import { diff } from './core/git.js';
+import { diff, commit } from './core/git.js';
 import { SseHub } from './core/sse.js';
 import { AppError } from './core/errors.js';
 
@@ -105,6 +105,18 @@ describe('Git 单文件 diff（0.3.5 体检回归锚点）', () => {
     expect(unstagedDiff.patch).toContain('+line2');
     // 增删统计来自 --numstat（0.3.5 前该调用参数错位必抛 IO_ERROR）
     expect(stagedDiff.truncated).toBe(false);
+  });
+
+  it('无已暂存内容时提交抛 NO_STAGED（不再落入 IO_ERROR 500）', async () => {
+    // 当前暂存区在上一用例后已提交？未提交——diff-probe.txt 仍处已暂存状态，先清场
+    git(projDir, ['commit', '-q', '-m', 'flush staged']);
+    fs.writeFileSync(path.join(projDir, 'untracked-only.txt'), 'x\n');
+    try {
+      await commit(projDir, 'should fail');
+      throw new Error('应当抛出 NO_STAGED');
+    } catch (e) {
+      expect((e as AppError).code).toBe('NO_STAGED');
+    }
   });
 });
 
