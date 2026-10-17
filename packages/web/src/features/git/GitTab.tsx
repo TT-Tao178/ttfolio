@@ -1,6 +1,6 @@
 /** Git 页签（FR-5.1..5.9）：变更分组、diff、暂存/放弃、提交、历史、分支、降级。 */
 import { Alert, App, Button, Empty, Input, List, Select, Space, Spin, Tag, Tooltip, Tree } from 'antd';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { GitBranch, GitLogEntry, GitStatus } from '@ttfolio/shared';
@@ -60,8 +60,13 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
           okButtonProps: { danger: true },
           cancelText: '取消',
           onOk: () => {
+            // 体检 P1：mutation 触发重渲染后 onError 读的是新渲染闭包——
+            // 必须经 ref 取值，渲染期局部变量在回调里恒为初始值（曾致空分支名重试必败）
             void api
-              .post(`/api/git/${projectId}/checkout`, { branch: pendingBranch, confirmDirty: true })
+              .post(`/api/git/${projectId}/checkout`, {
+                branch: pendingBranchRef.current,
+                confirmDirty: true,
+              })
               .then(() => {
                 invalidate();
                 void message.success('已切换');
@@ -73,9 +78,7 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
       void message.error(e instanceof ApiClientError ? e.message : '操作失败');
     },
   });
-  const pendingBranchRef = { current: '' };
-  let pendingBranch = '';
-  void pendingBranchRef;
+  const pendingBranchRef = useRef('');
 
   if (isLoading) return <Spin style={{ display: 'block', margin: '64px auto' }} />;
   if (error !== undefined && error !== null) {
@@ -158,7 +161,7 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 placeholder={status.branch ?? '(detached)'}
                 value={status.branch ?? undefined}
                 onChange={(b) => {
-                  pendingBranch = String(b);
+                  pendingBranchRef.current = String(b);
                   gitOp.mutate({ op: 'checkout', body: { branch: b } });
                 }}
                 options={(branches ?? []).map((b) => ({
