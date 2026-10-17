@@ -33,6 +33,8 @@ interface AppState {
   dirty: Map<string, true>;
   settingsPaletteOpen: boolean;
   paletteOpen: boolean;
+  /** 命令面板打开时的搜索作用域（「在当前项目内搜索」入口置 project，体检 P2） */
+  paletteScope: 'all' | 'project';
   /** 已关闭标签栈（评审：缺「恢复已关闭」）——closeTab 压栈（上限 10），reopenLastClosed 弹出重开 */
   closedTabs: Array<{ loc: TabLocation; title: string }>;
 
@@ -50,7 +52,7 @@ interface AppState {
   setDetail: (v: boolean) => void;
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
-  setPalette: (v: boolean) => void;
+  setPalette: (v: boolean, opts?: { scope?: 'all' | 'project' }) => void;
   /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
   addProjectNonce: number;
   requestAddProject: () => void;
@@ -99,6 +101,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dirty: new Map(),
   settingsPaletteOpen: false,
   paletteOpen: false,
+  paletteScope: 'all',
   closedTabs: [],
 
   openTab: (loc, title) => {
@@ -245,7 +248,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     m.delete(key);
     set({ dirty: m });
   },
-  setPalette: (v) => set({ paletteOpen: v }),
+  setPalette: (v, opts) =>
+    set({ paletteOpen: v, ...(opts?.scope !== undefined ? { paletteScope: opts.scope } : {}) }),
   addProjectNonce: 0,
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
   pendingAutoOpenProject: null,
@@ -341,19 +345,25 @@ export function navAvailability(tab: Tab | null): { back: boolean; forward: bool
 
 export function serializeSession(tabs: Tab[], activeTabId: string | null) {
   return {
-    tabs: tabs.map((t, i) => ({
-      id: t.id,
-      sortOrder: i,
-      kind: t.kind,
-      projectId: t.projectId,
-      targetPath: t.targetPath,
-      subTab: t.subTab,
-      titleSnapshot: t.title,
-      scrollJson: JSON.stringify({ scroll: t.scroll }),
-      navHistoryJson: JSON.stringify({ history: t.history.slice(-30), index: t.historyIndex }),
-      navIndex: t.historyIndex,
-      isPinned: t.isPinned,
-    })),
+    tabs: tabs.map((t, i) => {
+      // 体检 P2：历史栈截断保留尾部 30 条时 index 必须同步平移——
+      // 原实现 index 仍按原数组下标序列化，恢复后前进/后退指向错位
+      const hist = t.history.slice(-30);
+      const shift = t.history.length - hist.length;
+      return {
+        id: t.id,
+        sortOrder: i,
+        kind: t.kind,
+        projectId: t.projectId,
+        targetPath: t.targetPath,
+        subTab: t.subTab,
+        titleSnapshot: t.title,
+        scrollJson: JSON.stringify({ scroll: t.scroll }),
+        navHistoryJson: JSON.stringify({ history: hist, index: t.historyIndex - shift }),
+        navIndex: t.historyIndex - shift,
+        isPinned: t.isPinned,
+      };
+    }),
     activeTabId,
   };
 }

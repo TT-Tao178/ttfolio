@@ -53,12 +53,18 @@ class PaneErrorBoundary extends React.Component<{ children: React.ReactNode }, {
 }
 
 function Shell(): React.JSX.Element {
-  const { tabs, activeTabId, openTab, paletteOpen, setPalette, updateActiveLocation } = useAppStore();
+  // 按字段订阅（体检 P2：全量订阅使编辑器键入等无关状态变化重渲染整个外壳树）
+  const tabs = useAppStore((s) => s.tabs);
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const openTab = useAppStore((s) => s.openTab);
+  const paletteOpen = useAppStore((s) => s.paletteOpen);
+  const setPalette = useAppStore((s) => s.setPalette);
+  const updateActiveLocation = useAppStore((s) => s.updateActiveLocation);
+  const domain = useAppStore((s) => s.domain);
   const { dark, settings } = useSettings();
   const { message } = AntdApp.useApp();
   const [sseState, setSseState] = useState<SseState>('connecting');
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
-  const domain = useAppStore((s) => s.domain);
   // 侧栏域跟随活动标签（体检 P2：顶栏齿轮开设置标签时侧栏不切设置域，分区导航不可见）。
   // file/image 双来源（文件树/架构图）不映射，保留用户手选域
   useEffect(() => {
@@ -151,7 +157,8 @@ function Shell(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (tabs.length === 0) return;
+    // 体检 P2：空会话也要持久化——原 early return 使用户关掉全部标签后
+    // 刷新/重启时已关标签全部"复活"
     const t = setTimeout(() => {
       void api.put('/api/session', serializeSession(tabs, activeTabId)).catch(() => {});
     }, 1000);

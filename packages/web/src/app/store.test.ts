@@ -216,4 +216,29 @@ describe('parseNavHistory / serializeSession 往返', () => {
     );
     expect(useAppStore.getState().activeTabId).toBe('t1');
   });
+
+  it('serializeSession：历史超过 30 条截断时 index 同步平移（体检回归锚点）', () => {
+    const s = useAppStore.getState();
+    s.openTab(loc({ targetPath: 'a.ts' }), 'proj');
+    // 连续导航造 40 条历史，当前位置在末尾（index=39）
+    for (let i = 0; i < 39; i++) {
+      s.updateActiveLocation({ targetPath: `f${i}.ts` }, true);
+    }
+    const before = useAppStore.getState().tabs[0];
+    expect(before?.history.length).toBe(40);
+    expect(before?.historyIndex).toBe(39);
+    const payload = serializeSession(useAppStore.getState().tabs, useAppStore.getState().activeTabId);
+    const nav = JSON.parse(String(payload.tabs[0]?.navHistoryJson ?? '{}')) as {
+      history: unknown[];
+      index: number;
+    };
+    // 截断保留尾部 30 条（原下标 10..39），index 平移 39-10=29
+    expect(nav.history).toHaveLength(30);
+    expect(nav.index).toBe(29);
+    // 往返后当前位置仍指向同一 targetPath（平移前指向 f38.ts）
+    reset();
+    useAppStore.getState().syncFromServer(payload.tabs as never, payload.activeTabId);
+    const t = useAppStore.getState().tabs[0];
+    expect(t?.history[t?.historyIndex ?? 0]?.targetPath).toBe('f38.ts');
+  });
 });

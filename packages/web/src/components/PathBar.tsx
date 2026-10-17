@@ -15,7 +15,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function PathBar(): React.JSX.Element {
-  const { activeTabId, navigate, tabs } = useAppStore();
+  // 按字段订阅（体检 P2：全量订阅会被无关状态变化连带重渲染）
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const navigate = useAppStore((s) => s.navigate);
+  const tabs = useAppStore((s) => s.tabs);
   const { settings, setSetting } = useSettings();
   const queryClient = useQueryClient();
   const tab = tabs.find((t) => t.id === activeTabId) ?? null;

@@ -114,8 +114,16 @@ function SortableTab({
 }
 
 export function TabBar(): React.JSX.Element {
-  const { tabs, activeTabId, activateTab, moveTab, togglePin, dirty, closedTabs, reopenLastClosed } =
-    useAppStore();
+  // 体检 P2：全量订阅使编辑器每次键入（dirty 变化）都重渲染整条标签栏及所有订阅组件；
+  // 拆为按字段选择订阅后，键入只波及真正依赖 dirty 的组件
+  const tabs = useAppStore((s) => s.tabs);
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const activateTab = useAppStore((s) => s.activateTab);
+  const moveTab = useAppStore((s) => s.moveTab);
+  const togglePin = useAppStore((s) => s.togglePin);
+  const dirty = useAppStore((s) => s.dirty);
+  const closedTabs = useAppStore((s) => s.closedTabs);
+  const reopenLastClosed = useAppStore((s) => s.reopenLastClosed);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const { message } = AntdApp.useApp();
   // 关闭逻辑抽到 useCloseTab 共享（× / Ctrl+W / 右键菜单同一套未保存确认）

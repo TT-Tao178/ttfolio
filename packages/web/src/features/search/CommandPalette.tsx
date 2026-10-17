@@ -33,10 +33,19 @@ export function CommandPalette(): React.JSX.Element {
   const inputRef = useRef<InputRef>(null);
   const queryClient = useQueryClient();
   const activeProjectId = tabs.find((t) => t.id === activeTabId)?.projectId ?? null;
+  // 体检 P2：面板打开文件/内容命中时目标是项目标签——传项目名而非文件名，
+  // 避免复用既有项目标签被改名为文件名、再点项目卡又改回（标题来回跳）
+  const titleForProject = (pid: string, fallback: string): string =>
+    tabs.find((t) => t.kind === 'project' && t.projectId === pid)?.title ??
+    projectHits.find((p) => p.projectId === pid)?.name ??
+    fallback;
 
   useEffect(() => {
-    if (paletteOpen) setTimeout(() => inputRef.current?.focus({ cursor: 'end' } as never), 50);
-    else setQ('');
+    if (paletteOpen) {
+      // 打开时消费 store 的作用域（「在当前项目内搜索」入口置 project，体检 P2）
+      setScope(useAppStore.getState().paletteScope);
+      setTimeout(() => inputRef.current?.focus({ cursor: 'end' } as never), 50);
+    } else setQ('');
   }, [paletteOpen]);
 
   const { data: search } = useQuery({
@@ -160,7 +169,7 @@ export function CommandPalette(): React.JSX.Element {
       run: () =>
         openTab(
           { kind: 'project', projectId: f.projectId, targetPath: f.relPath, subTab: 'files', scroll: 0 },
-          f.name,
+          titleForProject(f.projectId, f.name),
         ),
     })),
     ...contentHits.map((c, i) => ({
@@ -181,7 +190,7 @@ export function CommandPalette(): React.JSX.Element {
       run: () =>
         openTab(
           { kind: 'project', projectId: c.projectId, targetPath: c.relPath, subTab: 'files', scroll: 0 },
-          c.relPath.split('/').pop() ?? c.relPath,
+          titleForProject(c.projectId, c.relPath.split('/').pop() ?? c.relPath),
         ),
     })),
   ];

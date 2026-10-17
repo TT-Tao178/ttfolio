@@ -33,7 +33,10 @@ type SidebarItem = {
 };
 
 export function Sidebar(): React.JSX.Element {
-  const { domain, openTab, activeTabId } = useAppStore();
+  // 按字段订阅（体检 P2：全量订阅会被编辑器键入等无关变化连带重渲染大菜单树）
+  const domain = useAppStore((s) => s.domain);
+  const openTab = useAppStore((s) => s.openTab);
+  const activeTabId = useAppStore((s) => s.activeTabId);
   const queryClient = useQueryClient();
   const { message, modal } = AntdApp.useApp();
 
@@ -446,7 +449,8 @@ export function Sidebar(): React.JSX.Element {
         void message.info('请先打开一个项目');
         return;
       }
-      useAppStore.getState().setPalette(true);
+      // 体检 P2：把项目作用域传给命令面板（原先只开面板，scope 仍是全局）
+      useAppStore.getState().setPalette(true, { scope: 'project' });
       return;
     }
     if (key.startsWith('tag:')) {

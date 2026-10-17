@@ -46,6 +46,13 @@ export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) =
             if (projectId !== null) {
               void queryClient.invalidateQueries({ queryKey: ['tree', projectId] });
               void queryClient.invalidateQueries({ queryKey: ['git', projectId] });
+              // 体检 P2：外部修改了已打开文件时必须失效 ['file']，编辑器的
+              // 「外部修改」警告才可能触发（EditorPane 有 loadedRef 版本守卫，
+              // 重取不会覆盖未保存内容）
+              const changed = (data['paths'] as string[] | undefined) ?? [];
+              if (changed.length > 0) {
+                void queryClient.invalidateQueries({ queryKey: ['file', projectId] });
+              }
             }
             void queryClient.invalidateQueries({ queryKey: ['trash'] });
             break;

@@ -58,7 +58,11 @@ function RailButton({
 }
 
 export function DomainRail(): React.JSX.Element {
-  const { domain, setDomain, sidebarCollapsed, setSidebar } = useAppStore();
+  // 按字段订阅（体检 P2：全量订阅会被编辑器键入等无关变化连带重渲染）
+  const domain = useAppStore((s) => s.domain);
+  const setDomain = useAppStore((s) => s.setDomain);
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const setSidebar = useAppStore((s) => s.setSidebar);
   return (
     <div
       style={{

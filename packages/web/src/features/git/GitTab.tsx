@@ -265,8 +265,11 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 onChange={(e) => setCommitMsg(e.target.value)}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && commitMsg.trim() !== '') {
-                    gitOp.mutate({ op: 'commit', body: { message: commitMsg } });
-                    setCommitMsg('');
+                    // 体检 P2：成功才清空——失败（身份未配置/钩子拒绝）不丢已写信息
+                    gitOp.mutate(
+                      { op: 'commit', body: { message: commitMsg } },
+                      { onSuccess: () => setCommitMsg('') },
+                    );
                   }
                 }}
                 data-testid="commit-message"
@@ -277,8 +280,10 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 style={{ marginTop: 6 }}
                 disabled={commitMsg.trim() === '' || status.staged.length === 0}
                 onClick={() => {
-                  gitOp.mutate({ op: 'commit', body: { message: commitMsg } });
-                  setCommitMsg('');
+                  gitOp.mutate(
+                    { op: 'commit', body: { message: commitMsg } },
+                    { onSuccess: () => setCommitMsg('') },
+                  );
                 }}
                 data-testid="commit-btn"
               >

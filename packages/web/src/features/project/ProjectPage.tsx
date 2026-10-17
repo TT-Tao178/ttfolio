@@ -69,6 +69,8 @@ export function ProjectPage({
       void queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
+    // 体检 P2：别名保存失败（rev 409 冲突等）原先静默——弹窗已关、无任何提示
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败'),
   });
 
   // 项目已被移除登记（会话恢复出的旧标签、或在别处删除了登记）：
@@ -277,6 +279,9 @@ export function ProjectPage({
       <Modal
         title="改别名（仅写索引库，不动磁盘，L1）"
         open={aliasOpen}
+        // 体检 P2：非受控 Input 的 DOM 值跨开关残留——上次输入会顶替当前别名显示，
+        // 直接确定会把旧值写回；destroyOnClose 每次打开以当前别名重建
+        destroyOnClose
         onCancel={() => setAliasOpen(false)}
         onOk={() => {
           const v = (document.getElementById('alias-input') as HTMLInputElement | null)?.value ?? '';
