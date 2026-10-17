@@ -425,7 +425,8 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         const hay = q.caseSensitive === '1' ? e.name : e.name.toLowerCase();
         const hit = q.wholeWord === '1' ? hay === needle : hay.includes(needle);
         if (hit) results.push({ name: e.name, path: rel, kind: e.isDir ? 'dir' : 'file' });
-        if (e.isDir) stack.push(abs);
+        // 目录符号链接不入栈（体检 P1：junction 成环时搜索永不终止）
+        if (e.isDir && !e.isSymlink) stack.push(abs);
       }
     }
     return ok({ results });

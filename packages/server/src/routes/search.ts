@@ -173,7 +173,8 @@ function collectFileHits(
       const rel = path.relative(root, abs).split(path.sep).join('/');
       if (matcher.isHidden(rel)) continue;
       if (e.isDir) {
-        stack[stack.length] = abs;
+        // 目录符号链接不入栈（体检 P1：junction 成环时收集永不终止）
+        if (!e.isSymlink) stack[stack.length] = abs;
         continue;
       }
       if (e.name.toLowerCase().includes(needle)) {

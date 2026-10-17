@@ -84,7 +84,8 @@ function collectIndexableFiles(root: string, matcher: CompiledIgnore): string[] 
       const abs = path.join(dir, e.name);
       const rel = path.relative(root, abs).split(path.sep).join('/');
       if (e.isDir) {
-        if (!matcher.isHidden(rel)) stack[stack.length] = abs;
+        // 目录符号链接不入栈（体检 P1：junction 成环时索引永不终止）
+        if (!e.isSymlink && !matcher.isHidden(rel)) stack[stack.length] = abs;
         continue;
       }
       if (matcher.isHidden(rel)) continue;

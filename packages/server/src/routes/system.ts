@@ -29,7 +29,14 @@ import { runCommand } from '../core/exec.js';
 import { copyFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { z } from 'zod';
+import type Database from 'better-sqlite3';
 import { listProjects } from '../db/repo/projectsRepo.js';
+import { rewatchAll } from './helpers.js';
+
+/** 在册未删除项目（watcher 全量重建用）。 */
+function activeProjects(db: Database.Database): Array<{ id: string; dir_path: string }> {
+  return listProjects(db, { status: 'all' }).map((p) => ({ id: p.id, dir_path: p.dirPath }));
+}
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
@@ -96,9 +103,16 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       theme: (v) => String(v),
       density: (v) => String(v),
       watch_enabled: (v) => (v === true || v === 'true' ? '1' : '0'),
-      watch_stability_ms: (v) => String(Number(v)),
+      watch_stability_ms: (v) => {
+        // 体检附带：Number(v) 可能 NaN，NaN 落库会让 chokidar awaitWriteFinish 参数非法
+        const n = Number(v);
+        return String(Number.isFinite(n) && n >= 50 ? Math.round(n) : 300);
+      },
       auto_save: (v) => (v === true || v === 'true' ? '1' : '0'),
-      trash_retention_days: (v) => String(Number(v)),
+      trash_retention_days: (v) => {
+        const n = Number(v);
+        return String(Number.isFinite(n) && n >= 1 ? Math.round(n) : 30);
+      },
       default_arch_dir_name: (v) => String(v),
       card_sort: (v) => String(v),
       show_ignored: (v) => (v === true || v === 'true' ? '1' : '0'),
@@ -112,10 +126,14 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       const fn = allowed[k];
       if (fn !== undefined) setSetting(db, k, fn(v));
     }
-    // 监听开关变化即时生效
-    if (body['watch_enabled'] !== undefined) {
-      const enabled = body['watch_enabled'] === true || body['watch_enabled'] === 'true';
-      if (!enabled) ctx.watcher.unwatchAll();
+    // 监听开关/参数变化即时生效（体检 P1：原先关闭后重开所有项目保持无监听）
+    if (body['watch_enabled'] !== undefined || body['watch_stability_ms'] !== undefined) {
+      const enabled =
+        body['watch_enabled'] === undefined ||
+        body['watch_enabled'] === true ||
+        body['watch_enabled'] === 'true';
+      if (enabled) rewatchAll(ctx.db(), ctx.watcher, activeProjects(ctx.db()));
+      else ctx.watcher.unwatchAll();
     }
     return ok({ saved: true });
   });
@@ -325,6 +343,8 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       mode: b.mode === 'analyze_only' ? 'analyze_only' : 'hide',
       enabled: b.enabled ?? true,
     });
+    // 体检 P1：忽略规则变化即时重建监听（原先旧规则一直用到重启）
+    rewatchAll(ctx.db(), ctx.watcher, activeProjects(ctx.db()));
     return ok(rule);
   });
 
@@ -337,6 +357,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       enabled: b.enabled,
     });
     if (!found) return fail('NOT_FOUND', '规则不存在', 404);
+    rewatchAll(ctx.db(), ctx.watcher, activeProjects(ctx.db()));
     return ok({ updated: true });
   });
 
@@ -344,6 +365,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const found = deleteIgnoreRule(ctx.db(), id);
     if (!found) return fail('INVALID_NAME', '内置规则不可删除，可将其停用');
+    rewatchAll(ctx.db(), ctx.watcher, activeProjects(ctx.db()));
     return ok({ deleted: true });
   });
 

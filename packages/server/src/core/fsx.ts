@@ -291,6 +291,9 @@ export function copyRecursive(src: string, dest: string): void {
   if (st.isDirectory()) {
     mkdirSync(dest, { recursive: true });
     for (const entry of listEntries(src)) {
+      // 目录符号链接不递归（体检 P1：指向祖先的 junction 会让复制无限进行）；
+      // 文件链接照常跟随复制（文件不存在环）
+      if (entry.isDir && entry.isSymlink) continue;
       copyRecursive(path.join(src, entry.name), path.join(dest, entry.name));
     }
   } else if (st.isFile()) {
@@ -308,6 +311,7 @@ export function verifyRecursive(src: string, dest: string): void {
     return;
   }
   for (const entry of listEntries(src)) {
+    if (entry.isDir && entry.isSymlink) continue;
     verifyRecursive(path.join(src, entry.name), path.join(dest, entry.name));
   }
 }
@@ -330,6 +334,8 @@ export function measureTree(p: string): { files: number; bytes: number } {
     }
     for (const e of entries) {
       const full = path.join(dir, e.name);
+      // 目录符号链接不入栈（体检 P1：junction 成环时统计永不终止）
+      if (e.isDir && e.isSymlink) continue;
       if (e.isDir) stack.push(full);
       else if (e.isFile) {
         files++;

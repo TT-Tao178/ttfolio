@@ -42,8 +42,19 @@ export class TrashService {
       } catch (err) {
         // 跨盘：复制 + 校验 + 删源
         if (isExdev(err)) {
-          fsx.copyRecursive(p, dest);
-          fsx.verifyRecursive(p, dest);
+          try {
+            fsx.copyRecursive(p, dest);
+            fsx.verifyRecursive(p, dest);
+          } catch (copyErr) {
+            // 复制/校验失败：清行 + 清半成品，绝不动源（体检 P1：否则留下 rel_path 孤儿行）
+            deleteTrashRow(db, id);
+            try {
+              rmSync(destDir, { recursive: true, force: true });
+            } catch {
+              /* 清理失败忽略 */
+            }
+            throw copyErr;
+          }
           rmSync(p, { recursive: true, force: false });
         } else {
           deleteTrashRow(db, id);
@@ -79,9 +90,11 @@ export class TrashService {
   }
 
   /** 预览：条目内文件清单（前 50 条）。 */
-  previewEntries(id: string, limit = 50): string[] {
-    const row = getTrashRowCompat(this.trashDir, id);
-    if (row === null) return [];
+  previewEntries(db: Database.Database, id: string, limit = 50): string[] {
+    const row = getTrashRow(db, id);
+    if (row === undefined) return [];
+    // 孤儿行防护（体检 P1）：rel_path 为空的占位/损坏行绝不能让 join 得到回收站根
+    if (row.trash_rel_path === '') return [];
     const abs = path.join(this.trashDir, row.trash_rel_path);
     if (!existsSync(abs)) return [];
     const out: string[] = [];
@@ -99,9 +112,9 @@ export class TrashService {
       }
       for (const e of entries) {
         const relChild = rel === '' ? e.name : `${rel}/${e.name}`;
-        if (e.isDir) stack.concat([relChild]);
-        if (e.isDir) stack[stack.length] = relChild;
-        else out[out.length] = relChild;
+        // 目录符号链接不入栈（环边界）；concat 原是死语句（结果被丢弃），已删
+        if (e.isDir && !e.isSymlink) stack[stack.length] = relChild;
+        else if (!e.isDir) out[out.length] = relChild;
       }
     }
     return out;
@@ -115,6 +128,12 @@ export class TrashService {
   ): { status: 'ok' | 'taken'; restoredTo?: string } {
     const row = getTrashRow(db, id);
     if (row === undefined) throw new AppError('NOT_FOUND', '回收站条目不存在');
+    // 孤儿行防护（体检 P1）：rel_path 为空 = 崩溃/失败遗留的损坏条目，
+    // join 会得到回收站根——恢复将把整个回收站 rename 走。按损坏清除处理。
+    if (row.trash_rel_path === '') {
+      deleteTrashRow(db, id);
+      throw new AppError('IO_ERROR', '回收站条目已损坏（内容从未入站），已清除该条目');
+    }
     const src = path.join(this.trashDir, row.trash_rel_path);
     if (!existsSync(src)) {
       deleteTrashRow(db, id);
@@ -151,6 +170,12 @@ export class TrashService {
   purge(db: Database.Database, id: string): void {
     const row = getTrashRow(db, id);
     if (row === undefined) return;
+    // 孤儿行防护（体检 P1）：rel_path 为空 = 损坏条目，join 会得到回收站根，
+    // rmSync 递归将清空全部回收站内容——只删行、绝不碰文件系统
+    if (row.trash_rel_path === '') {
+      deleteTrashRow(db, id);
+      return;
+    }
     const abs = path.join(this.trashDir, row.trash_rel_path);
     try {
       rmSync(abs, { recursive: true, force: true });
@@ -201,11 +226,4 @@ export class TrashService {
 
 function isExdev(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'EXDEV';
-}
-
-function getTrashRowCompat(_dir: string, id: string): TrashRow | null {
-  // 由路由层传入 db 后走 getTrashRow；这里仅用于 previewEntries 的独立路径检查
-  void _dir;
-  void id;
-  return null;
 }

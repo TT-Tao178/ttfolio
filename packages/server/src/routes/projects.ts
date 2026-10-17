@@ -2,7 +2,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
 import type { AppContext } from '../context.js';
-import { ok, fail, toApiError } from './helpers.js';
+import { ok, fail, toApiError, rewatchProject } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
 import { assertSafeName, validateRegistrableRoot } from '../core/pathGuard.js';
@@ -102,6 +102,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
           });
           if (revived !== undefined) {
             added[added.length] = revived.id;
+            // 体检 P1：复活的项目立即纳入监听（原先重启前收不到任何 fs/git 事件）
+            rewatchProject(db, ctx.watcher, revived.id, absReal);
             logActivity(db, {
               kind: 'project.add',
               level: 'L1',
@@ -120,6 +122,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
           defaultArchDir: defaultArchDirName(db),
         });
         added[added.length] = row.id;
+        // 体检 P1：新登记的项目立即纳入监听（原先重启前无监听）
+        rewatchProject(db, ctx.watcher, row.id, absReal);
         logActivity(db, {
           kind: 'project.add',
           level: 'L1',
@@ -279,6 +283,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       path_ok: 1,
       path_checked_at: new Date().toISOString(),
     });
+    // 体检 P1：目录变了，旧路径监听作废——重建到新路径
+    rewatchProject(db, ctx.watcher, id, abs);
     logActivity(db, {
       kind: 'project.relocate',
       level: 'L1',
@@ -325,6 +331,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       path_ok: 1,
       path_checked_at: new Date().toISOString(),
     });
+    // 体检 P1：目录名变了，按新路径重建监听
+    rewatchProject(db, ctx.watcher, id, abs);
     logActivity(db, {
       kind: 'project.rename_disk',
       level: 'L3',

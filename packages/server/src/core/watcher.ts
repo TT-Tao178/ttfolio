@@ -30,11 +30,12 @@ export class WatcherManager {
   watch(projectId: string, root: string, matcher: CompiledIgnore, stabilityMs: number): void {
     if (this.watches.has(projectId)) return;
     const pending = new Map<string, 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir'>();
-    let timer: NodeJS.Timeout | null = null;
-    let gitTimer: NodeJS.Timeout | null = null;
+    // timer 存在共享对象 rec 上（体检 P1：原实现 timer/gitTimer 是闭包局部变量，
+    // ProjectWatch 上恒 null——unwatch 清的是空引用，残留 flush 仍会为已移除项目发事件）
+    const rec = { pending, timer: null as NodeJS.Timeout | null, gitTimer: null as NodeJS.Timeout | null };
 
     const flush = (): void => {
-      timer = null;
+      rec.timer = null;
       if (pending.size === 0) return;
       const paths: string[] = [];
       const openedModified: string[] = [];
@@ -55,9 +56,9 @@ export class WatcherManager {
         modified: openedModified.slice(0, 50).map((p) => path.relative(root, p).split(path.sep).join('/')),
       });
       // Git 信号 1s 去抖
-      if (gitTimer !== null) clearTimeout(gitTimer);
-      gitTimer = setTimeout(() => {
-        gitTimer = null;
+      if (rec.gitTimer !== null) clearTimeout(rec.gitTimer);
+      rec.gitTimer = setTimeout(() => {
+        rec.gitTimer = null;
         this.sse.publish('git.changed', { projectId });
       }, 1000);
     };
@@ -76,8 +77,8 @@ export class WatcherManager {
 
     const record = (evt: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir') => (absPath: string) => {
       pending.set(absPath, evt);
-      if (timer === null) {
-        timer = setTimeout(flush, 500);
+      if (rec.timer === null) {
+        rec.timer = setTimeout(flush, 500);
       }
     };
 
@@ -94,10 +95,7 @@ export class WatcherManager {
         });
       });
 
-    this.watches.set(projectId, { projectId, root, watcher, pending, timer: null, gitTimer: null });
-    // 保持引用，避免 TS 认为未使用
-    void timer;
-    void gitTimer;
+    this.watches.set(projectId, { projectId, root, watcher, ...rec });
   }
 
   unwatch(projectId: string): void {

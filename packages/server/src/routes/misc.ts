@@ -41,7 +41,7 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/api/trash/:id/preview', async (req) => {
     const { id } = req.params as { id: string };
-    return ok({ entries: ctx.trash.previewEntries(id) });
+    return ok({ entries: ctx.trash.previewEntries(ctx.db(), id) });
   });
 
   app.post('/api/trash/restore', async (req) => {
