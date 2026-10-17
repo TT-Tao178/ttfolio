@@ -23,6 +23,7 @@ import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from '
 import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
 import { analyzeProject } from './core/analyzer/index.js';
+import { diff } from './core/git.js';
 import { SseHub } from './core/sse.js';
 import { AppError } from './core/errors.js';
 
@@ -88,6 +89,22 @@ describe('迁移与登记', () => {
   it('同一路径重复登记被唯一约束拦截', () => {
     register();
     expect(() => register()).toThrow();
+  });
+});
+
+describe('Git 单文件 diff（0.3.5 体检回归锚点）', () => {
+  it('未暂存与已暂存 diff 均返回 patch 与增删行数', async () => {
+    fs.writeFileSync(path.join(projDir, 'diff-probe.txt'), 'line1\n');
+    git(projDir, ['add', 'diff-probe.txt']);
+    const stagedDiff = await diff(projDir, 'diff-probe.txt', true);
+    expect(stagedDiff.additions).toBe(1);
+    expect(stagedDiff.patch).toContain('+line1');
+    fs.writeFileSync(path.join(projDir, 'diff-probe.txt'), 'line1\nline2\n');
+    const unstagedDiff = await diff(projDir, 'diff-probe.txt', false);
+    expect(unstagedDiff.additions).toBe(1);
+    expect(unstagedDiff.patch).toContain('+line2');
+    // 增删统计来自 --numstat（0.3.5 前该调用参数错位必抛 IO_ERROR）
+    expect(stagedDiff.truncated).toBe(false);
   });
 });
 

@@ -221,7 +221,7 @@ export async function diff(dir: string, relPath: string, staged: boolean, ref?: 
       : staged
         ? ['diff', '--numstat', '--no-color', '--cached']
         : ['diff', '--numstat', '--no-color'];
-  const numOut = await git(dir, ref !== undefined ? numArgs.slice(1) : numArgs.slice(1));
+  const numOut = await git(dir, numArgs);
   let binary = false;
   let additions = 0;
   let deletions = 0;
