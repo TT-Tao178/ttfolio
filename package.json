@@ -1,7 +1,7 @@
 {
   "name": "ttfolio",
   "private": true,
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "ttFolio — a local project workbench to register, browse and manage the code projects on your disk",
   "workspaces": [
     "packages/*"
