@@ -58,6 +58,25 @@ function Shell(): React.JSX.Element {
   const { message } = AntdApp.useApp();
   const [sseState, setSseState] = useState<SseState>('connecting');
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  const domain = useAppStore((s) => s.domain);
+  // 侧栏域跟随活动标签（体检 P2：顶栏齿轮开设置标签时侧栏不切设置域，分区导航不可见）。
+  // file/image 双来源（文件树/架构图）不映射，保留用户手选域
+  useEffect(() => {
+    const map: Partial<Record<string, typeof domain>> = {
+      overview: 'projects',
+      project: 'projects',
+      file: 'projects',
+      trash: 'projects',
+      git: 'git',
+      archive: 'archives',
+      doc: 'docs',
+      search: 'search',
+      settings: 'settings',
+    };
+    const target = activeTab !== null ? map[activeTab.kind] : undefined;
+    if (target !== undefined && target !== domain) useAppStore.getState().setDomain(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.kind]);
   // Ctrl+W 与标签 × 同一套关闭逻辑（评审：此前 Ctrl+W 对脏标签静默拦截无反馈）
   const closeTabConfirmed = useCloseTab();
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
