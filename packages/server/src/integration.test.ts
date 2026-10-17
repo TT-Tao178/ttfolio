@@ -13,6 +13,7 @@ import {
   patchProject,
   softDeleteProject,
   listProjects,
+  listCollections,
   checkPathOk,
   needsReanalyze,
 } from './db/repo/projectsRepo.js';
@@ -87,6 +88,32 @@ describe('迁移与登记', () => {
   it('同一路径重复登记被唯一约束拦截', () => {
     register();
     expect(() => register()).toThrow();
+  });
+});
+
+describe('集合成员（0.3.5 回归锚点）', () => {
+  it('同一项目可同时在多个集合；重复加入同集合幂等；归属字段双集合齐全', () => {
+    const now = new Date().toISOString();
+    for (const id of ['col-a', 'col-b']) {
+      db.prepare(
+        'INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, NULL, 0, ?, ?)',
+      ).run(id, `集合${id.slice(-1).toUpperCase()}`, now, now);
+    }
+    const proj = getProjectByPathKey(db, pathKey(projDir));
+    if (proj === undefined) throw new Error('demo 项目未登记');
+    // 与 POST /api/collections/:id/members 的追加路径同款 SQL（replace=false）
+    const ins = db.prepare(
+      'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+    );
+    ins.run('col-a', proj.id);
+    ins.run('col-b', proj.id);
+    ins.run('col-a', proj.id);
+    const cols = listCollections(db);
+    expect(cols.find((c) => c.id === 'col-a')?.memberCount).toBe(1);
+    expect(cols.find((c) => c.id === 'col-b')?.projectIds).toEqual([proj.id]);
+    // 用户报障「项目没办法同时在俩集合」的核心断言：项目归属字段同时含两个集合
+    const list = listProjects(db, { status: 'active' });
+    expect([...(list.find((p) => p.id === proj.id)?.collections ?? [])].sort()).toEqual(['col-a', 'col-b']);
   });
 });
 

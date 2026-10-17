@@ -18,7 +18,7 @@ import { InboxOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { ProjectSummary } from '@ttfolio/shared';
+import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { Dashboard } from './Dashboard';
@@ -68,6 +68,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 
   const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab);
+  // 集合视图标识：传给「添加项目」弹窗，登记成功后项目随即加入该集合（0.3.5 修复）
+  const collectionId = filters['collection'] ?? null;
   const {
     data: allProjects,
     isLoading,
@@ -224,7 +226,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       {subTab === null ? (
         <>
           <Dashboard />
-          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
         </>
       ) : (
         <>
@@ -335,7 +337,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               />
             )}
           </StateView>
-          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} />
+          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
           {pickerProject !== null && (
             <CollectionPickerModal
               key={pickerProject.id}
@@ -392,7 +394,16 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   );
 }
 
-function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element {
+function AddProjectModal({
+  open,
+  onClose,
+  collectionId = null,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** 集合视图传入：登记成功后项目随即加入该集合（追加语义，不影响其他成员） */
+  collectionId?: string | null;
+}): React.JSX.Element {
   const [text, setText] = useState('');
   const [parentPath, setParentPath] = useState('');
   const [children, setChildren] = useState<
@@ -402,22 +413,53 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
   const [browsing, setBrowsing] = useState(false);
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // 集合上下文仅用于展示与登记后入集：名字取 ['collections'] 缓存（与侧栏共享，未加载时降级中性文案）
+  const { data: collections } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
+    enabled: open && collectionId !== null,
+  });
+  const collectionName =
+    collectionId !== null ? (collections ?? []).find((c) => c.id === collectionId)?.name : undefined;
 
   const add = useMutation({
-    mutationFn: (body: unknown) =>
-      api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>('/api/projects', body),
+    mutationFn: async (body: unknown) => {
+      const r = await api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>(
+        '/api/projects',
+        body,
+      );
+      // 集合上下文（修复：集合视图里「添加项目」此前只进公共池不进集合）：
+      // 登记成功即加入当前集合——members 为追加语义，不影响集合已有成员
+      let joined = false;
+      if (collectionId !== null && r.added.length > 0) {
+        try {
+          await api.post(`/api/collections/${collectionId}/members`, { projectIds: r.added });
+          joined = true;
+        } catch {
+          joined = false;
+        }
+      }
+      return { ...r, joined };
+    },
     onSuccess: (r) => {
       if (r.added.length > 0) {
-        void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
-        // 登记成功后切到卡片墙：否则停在总览屏看不到刚登记的项目（"添加了但没反应"）。
-        const st = useAppStore.getState();
-        const cur = st.tabs.find((t) => t.id === st.activeTabId);
-        if (cur?.kind === 'overview') st.updateActiveLocation({ subTab: 'view:all' }, true);
-        else
-          st.openTab(
-            { kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 },
-            '工作台',
-          );
+        if (collectionId !== null) {
+          if (r.joined) void message.success(`已登记 ${r.added.length} 个项目并加入集合，正在分析…`);
+          else void message.warning('项目已登记，但加入集合失败——可稍后在项目右键「归属集合…」中补加', 5);
+        } else {
+          void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
+          // 登记成功后切到卡片墙：否则停在总览屏看不到刚登记的项目（"添加了但没反应"）。
+          // 集合视图不切走：登记结果直接体现在当前集合卡片墙（invalidate 后新卡片出现）
+          const st = useAppStore.getState();
+          const cur = st.tabs.find((t) => t.id === st.activeTabId);
+          if (cur?.kind === 'overview') st.updateActiveLocation({ subTab: 'view:all' }, true);
+          else
+            st.openTab(
+              { kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 },
+              '工作台',
+            );
+        }
+        void queryClient.invalidateQueries({ queryKey: ['collections'] });
       }
       for (const s of r.skipped) void message.warning(`跳过 ${s.path}：${s.reason}`);
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -472,7 +514,7 @@ function AddProjectModal({ open, onClose }: { open: boolean; onClose: () => void
 
   return (
     <Modal
-      title="添加项目"
+      title={collectionId !== null ? `添加项目到「${collectionName ?? '集合'}」` : '添加项目'}
       open={open}
       onCancel={onClose}
       footer={null}
