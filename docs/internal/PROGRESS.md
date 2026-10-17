@@ -1,5 +1,44 @@
 # PROGRESS
 
+## 第 42++ 轮：体检 20 条缺陷全修——P0/P1/P2 六提交 + 全量复测 48/48 与 10/10
+
+- **用户拍板「都进行修复吧」**，按五批小步提交全部落地（共 6 提交，门禁
+  104→105 条）：
+  - **批1 P0（19425d0）**：/api/restore 恢复前 close 库、成功重开+integrity
+    Check、失败 .before-restore 回滚；basename 防备份文件名逃逸（P2 守卫
+    缺口同文件顺手闭合）。EditorPane 保存成功清 ['draft'] 缓存 + hasDraft
+    改与 valueRef 比对（草稿打回链路双保险）。
+  - **批2 P1 server（ca923ca）**：回收站空 rel_path 孤儿行三处防护（purge
+    只删行/restore 报损坏/预览返回空）、EXDEV 失败清行+清半成品；preview
+    改走 getTrashRow（恒 null 占位删除，concat 死语句顺修）；六处目录遍历
+    跳过目录符号链接（junction 环→同步挂死的根断）；登记/复活/重定位/
+    改名后 rewatchProject，忽略规则增删改与监听开关/参数变化 rewatchAll
+    （helpers 新增），watcher 计时器存共享 record（unwatch 真正生效）；
+    watch_stability_ms/trash_retention_days NaN 兜底。
+  - **批3 P1 web（ba05bce）**：GitTab 切分支改真 useRef，GIT_DIRTY 确认后
+    重试不再发空分支名（半截重构死代码删除）。
+  - **批4 P2 server（18b946e）**：move 自身子目录判断改 isInsideOrEqual
+    （裸前缀误拦兄弟目录）；git ref/hash/branch/author 路由层拒绝 - 开头
+    （选项注入；charCodeAt 比较，同避 lint C-02 禁用 startsWith——**两次
+    被 lint 拦下**，规则防线有效）；doc-roots bind 校验在文档根之内；
+    relocate 改走 validateRegistrableRoot 与登记同规；looksBinary 补控制
+    字符启发式（高字节不计入防误伤 GBK 中文）。
+  - **批5 P2 web（3bad082）**：serializeSession 截断 index 平移（+回归
+    锚点，105 条）；空会话持久化（关最后标签刷新不再复活）；fs.changed
+    失效 ['file']（外部修改警告恢复工作）；setPalette 支持 scope，「在
+    当前项目内搜索」贯通；提交成功才清空信息；别名弹窗 destroyOnClose
+    +onError；面板命中传项目名不改标签名；五组件拆按字段订阅（键入
+    不再全树重渲染）。
+- **全量复测**：隔离实例 API 探针 **48/48**、UI 巡检 **10/10** 零控制台
+  错误——修复零回归。复测揪出**探针自身两坑**（已修）：①proj-a 建在
+  ttfolio 工作区内，git rev-parse 向上探测到外层仓导致跳过 init（identity
+  变成用户全局配置、stage 报 .gitignore 拒绝）——init 判定改显式查 .git；
+  ②dirty.txt 在初始提交前写入导致永远是干净 tracked 文件——移到 commit
+  后写入。
+- 遗留入册：latin-1 等非 UTF-8 非 GBK 文件的「有损回写」残余风险（looks
+  Binary 只拦控制字符密集型；完整修法需读时记录 lossy 标志并禁回写，涉及
+  接口与前端联动，留后续轮评估）。
+
 ## 第 42+ 轮：全面体检——diff 必 500 修复、API 探针 48/48、UI 巡检 10/10（体检轮）
 
 - **用户点名全面体检**（链路 + 功能找缺陷）。三路并行：①静态审查（server 侧与
