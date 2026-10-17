@@ -1,5 +1,40 @@
 # PROGRESS
 
+## 第 42 轮：0.3.5——集合视图「添加项目」入集修复 + 跨集合归属澄清（已出包）
+
+- **用户报障两现象**：①集合视图点「添加项目」，项目只进公共池、集合里没有；
+  ②「项目没办法同时在俩集合」。**取证结论：两现象一个根因**——集合视图复用
+  全局登记弹窗（AddProjectModal）但不传集合上下文，登记成功还主动切 view:all，
+  集合归属从未建立；用户反复用该入口往两个集合加，每次都只进公共池，②是①
+  的衍生观感。**API 层（复合主键 (collection_id,project_id)、members 追加语义）
+  与「归属集合…」弹窗（diff 保存）经隔离实例端到端实测均正常**——一个项目
+  同时归属多个集合本就是支持的能力。
+- **修复（f4e445a）**：AddProjectModal 增可选 collectionId（parseSubTab 的
+  collection 参数透传）；登记成功即对新增项目发 members 追加入集；弹窗标题
+  「添加项目到「集合名」」；登记后留在集合视图（不再切走，invalidate 即见
+  新卡片）；加集失败降级提示可用右键「归属集合…」补加不阻断登记。总览屏
+  与 view:all 行为零变化。工具栏按钮与空状态按钮同一 state 一并生效。
+- **回归锚点**：integration.test.ts 新增集合成员一条（多集合共存/同集合重复
+  加入幂等/归属字段齐全），测试 101→**102 条**。
+- **隔离实例探针五坑（本轮全踩齐，下次直接绕开）**：
+  ①探针实例必须**从仓库根起**（cwd 相对定位 web/dist），从 packages/server 起
+  需 TTFOLIO_WEB_DIST 且值必须 Windows 风格路径（MSYS 的 /d/... Node 解析不出）；
+  ②**端口被占自动 +1 静默回退**——残留探针进程占 7799，新实例落 7801，探针
+  打的全是死配置旧进程；清法=按监听端口 Get-NetTCPConnection 杀 OwningProcess
+  （按 CommandLine 匹配 tsx 会误杀 bash 包装层）；③**heredoc/JSON 传参吃反斜杠**——
+  Bash tool 的 command 经 JSON 解码 `\\`→`\`，写入 .mjs 后 JS 再丢一层，登记路径
+  变废串（toast 报「目录不存在」肉眼可见路径缩水）——**探针里的 Windows 路径
+  一律正斜杠**；④antd Modal 打开动画期 Playwright 判 hidden，waitFor visible
+  会超时——用 state:'attached'+waitForTimeout(600)；⑤tsx 子进程杀后仍锁
+  library.db（已知坑再验），rm 前按监听端口清进程。
+- **0.3.5 出包**：版本三处收口（package.json/server 常量/CHANGELOG，动态徽章
+  免维护）；门禁三绿后 1966d58 提交、tag v0.3.5。dist:win 链头五步过，
+  **electron-builder 再撞杀软 EBUSY 锁旧 asar（第 8 次）**——tmp1 预案过
+  （自检 8 项全绿含版本断言 0.3.5），安装包移回；tmp1 目录本体仍被杀软锁
+  残留未删净（无锁源进程，稍后手动删）；rebuild 翻回 Node ABI、门禁复跑三绿
+  （102 条）。dist-electron 现 4 包（0.3.2~0.3.5）。
+- 上传对照清单补 v0.3.5 行、「成因待查」改闭案口径。
+
 ## 第 41 轮：0.3.4 发布——KPI 跳转 + 文档预览随版本出包（已推送）
 
 - 版本收口四处（package.json / server 常量 / CHANGELOG / 动态徽章免维护）；

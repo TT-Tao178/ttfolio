@@ -33,8 +33,9 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 34 轮（0.3.0）；第 35~41 轮见 `PROGRESS.md` 顶部——
-> 0.3.4 已发布（tag / Release 页 / latest 三达，推送已完成）。最新提交以
+> ⚠ 本节状态截至第 34 轮（0.3.0）；第 35~42 轮见 `PROGRESS.md` 顶部——
+> 0.3.5 已出包（集合视图添加项目入集修复；tag v0.3.5、Release 页与资产
+> 拖传见 PROGRESS 第 42 轮与 dist-electron/上传资产对照.md）。最新提交以
 > `git log` 实查为准。
 
 - 最新提交：第 35 轮 README 重制（f6e966f：四张宣传级截图入库 docs/images，
