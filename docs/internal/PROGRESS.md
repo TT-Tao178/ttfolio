@@ -30,6 +30,28 @@
   ③观察 → **闭案（结论修正）**：命令面板 CommandPalette 已有未索引项目
   引导（「{项目名}：建立索引」Tag 点击即建索引）——体检时探针只测了
   API 层未开面板，观察有误，非缺口。
+- **静态审查（server/web 两个子代理，各 10 条，P0/P1 三条已亲自复核属实）**：
+  **server P0**：恢复备份 /api/restore 在库连接未关闭时覆盖主库文件且恢复后
+  不重开连接（Windows 上轻则 malformed 重则丢数据，routes/system.ts:421）。
+  **web P0**：EditorPane 保存成功只删服务端草稿与 ['file'] 缓存、不清
+  ['draft'] 缓存——继续编辑保存后，载入 effect 用陈旧草稿对比新磁盘内容
+  判 hasDraft=true，把编辑器内容打回保存前草稿版本（二次保存即丢增量，
+  EditorPane.tsx:101-177）。**P1 三条**：回收站 trash_rel_path='' 孤儿行
+  使 purge/restore 作用整个回收站根（core/trash.ts）；目录遍历跟随
+  junction 无环检测可同步挂死服务（core/fsx.ts+搜索/measureTree）；
+  GitTab 切分支 GIT_DIRTY 确认后用空分支名重试必败（半截重构死代码
+  pendingBranchRef）。**P1 两条**：watcher 仅启动时注册（新登记/复活/
+  relocate 项目无监听、忽略规则与开关变更不生效）；回收站预览恒空
+  （getTrashRowCompat 恒 null 占位）。**P2 若干**：fs/move 前缀匹配误拦
+  兄弟目录、git ref/hash 选项注入（--output=）、三端点绕过 PathGuard
+  （trash restore targetDir//api/restore file/doc-roots bind）、relocate
+  等绕过 validateRegistrableRoot、looksBinary 死逻辑+GBK 有损回写、
+  serializeSession 截断历史 index 未平移、关最后标签不持久化空会话、
+  SSE fs.changed 不失效 ['file']（外部修改检测失效）、「在当前项目内
+  搜索」不传 scope、store 全量订阅键入全树重渲染、commit 失败清空提交
+  信息、别名弹窗 defaultValue 残留+无 onError、命令面板开文件改项目标签名。
+  处置：清单交用户排优先级，未擅自开工；总体印象=工程素养高，病灶集中在
+  半截重构与「登记入口校验未收敛/生命周期事件不回灌长驻资源」两类。
 - **体检工程坑（本轮新入档）**：①探针实例与端口——**杀旧起新必查监听端口
   是否真释放**（TaskStop 后 tsx 子进程残留占 7799，新实例静默 +1 落 7800，
   探针全程打到旧代码实例，「修复无效」假象；清法=Get-NetTCPConnection 按
