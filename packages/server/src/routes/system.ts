@@ -14,6 +14,7 @@ import {
   deleteCommandTemplate,
 } from '../db/repo/rulesRepo.js';
 import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
+import { integrityCheck } from '../db/migrate.js';
 import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
 import {
@@ -25,7 +26,8 @@ import {
 } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
-import { join } from 'node:path';
+import { copyFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { z } from 'zod';
 import { listProjects } from '../db/repo/projectsRepo.js';
 
@@ -422,9 +424,27 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     const b = (req.body ?? {}) as { file?: string; confirm?: boolean };
     if (b.confirm !== true) return fail('CONFIRM_REQUIRED', '恢复备份会覆盖当前索引库，需要 confirm 确认');
     if (b.file === undefined) return fail('BAD_REQUEST', '缺少 file');
-    const target = join(ctx.layout.backupDir, b.file);
+    // 只接受备份目录顶层的文件名：basename 防绝对路径 / ..\ 逃出备份目录（体检 P2 守卫缺口）
+    const target = join(ctx.layout.backupDir, basename(b.file));
     if (!existsSync(target)) return fail('NOT_FOUND', '备份文件不存在', 404);
-    restoreBackup(ctx.layout.dbFile, target);
+    // 体检 P0：恢复覆盖库文件前必须关连接，否则存活句柄的页缓存/WAL 与新文件错位
+    //（轻则 malformed 重则丢数据）；失败用 restoreBackup 留下的 .before-restore 回滚
+    ctx.store.close();
+    try {
+      restoreBackup(ctx.layout.dbFile, target);
+    } catch (e) {
+      const rollback = `${ctx.layout.dbFile}.before-restore`;
+      try {
+        if (existsSync(rollback)) copyFileSync(rollback, ctx.layout.dbFile);
+      } catch {
+        /* 回滚失败只能如实上报原错误 */
+      }
+      ctx.store.open();
+      throw e;
+    }
+    ctx.store.open();
+    const integrity = integrityCheck(ctx.store.get());
+    if (!integrity.ok) throw new AppError('IO_ERROR', `恢复后完整性校验失败：${integrity.message}`);
     logActivity(ctx.db(), { kind: 'library.restore', level: 'L3', detail: { from: b.file } });
     return ok({ restored: true, note: '恢复完成，请刷新页面' });
   });

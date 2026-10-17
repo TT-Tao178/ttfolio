@@ -103,7 +103,8 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
       draft !== null &&
       draft !== undefined &&
       draft.content !== '' &&
-      draft.content !== file.content;
+      // 与编辑器当前内容比对（而非磁盘内容）：草稿缓存可能陈旧，与磁盘不同≠用户还有未保存草稿
+      draft.content !== valueRef.current;
     if (sameVersion) {
       // 磁盘内容已经在编辑器里了，这一轮只为"草稿是否要填进去"服务，不动其它状态
       if (hasDraft && draft !== null && draft !== undefined) {
@@ -163,6 +164,9 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         useAppStore.getState().clearDirty(draftKey);
         void message.success('已保存');
         await queryClient.invalidateQueries({ queryKey: ['file', projectId, path] });
+        // 体检 P0：保存成功必须同步清 ['draft'] 缓存（服务端草稿已删）——否则重取文件后
+        // 载入 effect 拿陈旧草稿与磁盘比对判 hasDraft=true，把编辑器打回保存前版本
+        queryClient.setQueryData(['draft', pathKey], null);
       } catch (e) {
         if (e instanceof ApiClientError && e.code === 'MTIME_CONFLICT') {
           const detail = e.detail as { current: DiskVersionInfo } | undefined;
