@@ -22,6 +22,8 @@ export function PathBar(): React.JSX.Element {
   const { settings, setSetting } = useSettings();
   const queryClient = useQueryClient();
   const tab = tabs.find((t) => t.id === activeTabId) ?? null;
+  // 右栏详情依赖项目上下文：仅项目标签可切换（与 App 右栏折叠条件同口径）
+  const canToggleDetail = tab !== null && tab.kind === 'project' && tab.projectId !== null;
   // 置灰而不是"按了没反应"：无历史可退时按钮必须是禁用态（原实现两个按钮永远可点但无效）
   const nav = navAvailability(tab);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -149,11 +151,14 @@ export function PathBar(): React.JSX.Element {
       <Dropdown menu={densityMenu}>
         <Button size="small" type="text" icon={<ColumnWidthOutlined />} />
       </Dropdown>
-      <Tooltip title="右栏 (Ctrl+B)">
+      {/* 体检用户反馈：非项目标签下右栏被强制折叠，点击/快捷键毫无视觉反馈像"坏了"——
+          置灰并说明原因；右栏内容依赖项目上下文，仅在项目标签可用 */}
+      <Tooltip title={canToggleDetail ? '右栏 (Ctrl+B)' : '右栏详情在打开项目后可用'}>
         <Button
           size="small"
           type="text"
           icon={<BorderRightOutlined />}
+          disabled={!canToggleDetail}
           onClick={() => useAppStore.getState().setDetail(!useAppStore.getState().detailVisible)}
         />
       </Tooltip>

@@ -188,9 +188,14 @@ function Shell(): React.JSX.Element {
       } else if (e.altKey && e.key === 'ArrowRight') {
         useAppStore.getState().navigate(1);
       } else if (mod && e.key.toLowerCase() === 'b') {
-        // 右栏开关（与原型一致：Ctrl/⌘+B）
+        // 右栏开关（与原型一致：Ctrl/⌘+B）。非项目标签下右栏强制折叠、
+        // 切换无视觉变化——给出提示而不是无声无息（体检用户反馈"点了没反应"）
         e.preventDefault();
-        setDetail(!useAppStore.getState().detailVisible);
+        if (activeTab?.kind === 'project' && activeTab.projectId !== null) {
+          setDetail(!useAppStore.getState().detailVisible);
+        } else {
+          void message.info('右栏详情在打开项目后可用');
+        }
       } else if (mod && e.key === ',') {
         e.preventDefault();
         openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
