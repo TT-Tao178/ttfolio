@@ -6,6 +6,7 @@ import {
   Card,
   Descriptions,
   Form,
+  Image,
   Input,
   InputNumber,
   List,
@@ -568,8 +569,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                 <figure style={{ margin: 0, textAlign: 'center' }}>
                   <div
                     style={{
-                      width: 168,
-                      height: 168,
+                      width: 260,
+                      height: 260,
                       padding: 10,
                       background: '#ffffff',
                       borderRadius: 10,
@@ -579,9 +580,18 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                       justifyContent: 'center',
                     }}
                   >
-                    <img
+                    {/* 体检轮用户反馈：码图太小扫不出——260 容器 + antd Image 点击查看全屏大图 */}
+                    <Image
                       src={sponsorAlipay}
                       alt="支付宝收款码"
+                      width={190}
+                      preview={{
+                        imageRender: (originalNode) => (
+                          <div style={{ background: '#fff', padding: 24, borderRadius: 12 }}>
+                            {originalNode}
+                          </div>
+                        ),
+                      }}
                       style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                     />
                   </div>
@@ -590,8 +600,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                 <figure style={{ margin: 0, textAlign: 'center' }}>
                   <div
                     style={{
-                      width: 168,
-                      height: 168,
+                      width: 260,
+                      height: 260,
                       padding: 10,
                       background: '#ffffff',
                       borderRadius: 10,
@@ -601,9 +611,17 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                       justifyContent: 'center',
                     }}
                   >
-                    <img
+                    <Image
                       src={sponsorWechat}
                       alt="微信收款码"
+                      width={190}
+                      preview={{
+                        imageRender: (originalNode) => (
+                          <div style={{ background: '#fff', padding: 24, borderRadius: 12 }}>
+                            {originalNode}
+                          </div>
+                        ),
+                      }}
                       style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                     />
                   </div>

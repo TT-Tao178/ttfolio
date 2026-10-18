@@ -523,7 +523,9 @@ function AddProjectModal({
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div>
-          <div style={{ marginBottom: 6 }}>① 粘贴路径（支持多行、带引号、\\?\ 前缀）</div>
+          <div style={{ marginBottom: 6 }}>
+            ① 添加单个项目（粘贴项目文件夹路径）——也支持一次粘贴多行批量登记，可带引号、\\?\ 前缀
+          </div>
           <Input.TextArea
             rows={4}
             value={text}
@@ -546,7 +548,9 @@ function AddProjectModal({
           </Space>
         </div>
         <div>
-          <div style={{ marginBottom: 6 }}>② 从父目录批量登记</div>
+          <div style={{ marginBottom: 6 }}>
+            ② 批量登记（选一个父目录，扫描其下的子文件夹，一次登记多个项目）
+          </div>
           <Space.Compact style={{ width: '100%' }}>
             <Input
               value={parentPath}
