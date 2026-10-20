@@ -101,6 +101,8 @@ export const collectionPatchSchema = z.object({
   name: z.string().min(1).optional(),
   note: z.string().nullish().optional(),
 });
+/** 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：按传入顺序全量重排 sort_order */
+export const collectionReorderSchema = z.object({ ids: z.array(z.string()).min(1) });
 export const collectionMembersSchema = z.object({
   projectIds: z.array(z.string()).min(0),
   replace: z.boolean().default(false),

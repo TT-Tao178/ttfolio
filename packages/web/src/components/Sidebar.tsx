@@ -3,6 +3,8 @@ import { App as AntdApp, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   AppstoreOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined,
   BranchesOutlined,
   CopyOutlined,
   DeleteOutlined,
@@ -195,6 +197,22 @@ export function Sidebar(): React.JSX.Element {
         ? [
             { key: 'openview', label: '打开集合视图', icon: <FolderOpenOutlined /> },
             { type: 'divider' as const },
+            {
+              key: 'moveup',
+              label: '上移',
+              icon: <ArrowUpOutlined />,
+              disabled: (collections ?? []).findIndex((c) => c.id === ctxCollection.id) <= 0,
+            },
+            {
+              key: 'movedown',
+              label: '下移',
+              icon: <ArrowDownOutlined />,
+              disabled:
+                (collections ?? []).findIndex((c) => c.id === ctxCollection.id) === -1 ||
+                (collections ?? []).findIndex((c) => c.id === ctxCollection.id) ===
+                  (collections ?? []).length - 1,
+            },
+            { type: 'divider' as const },
             { key: 'editcol', label: '编辑名称 / 备注…', icon: <EditOutlined /> },
             { key: 'delcol', label: '删除集合…', icon: <DeleteOutlined />, danger: true },
           ]
@@ -266,6 +284,24 @@ export function Sidebar(): React.JSX.Element {
         case 'openview':
           openCollectionView(col.id);
           break;
+        case 'moveup':
+        case 'movedown': {
+          // 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：与相邻集合交换位置，全量重排
+          const list = (collections ?? []).slice();
+          const i = list.findIndex((c) => c.id === col.id);
+          const j = key === 'moveup' ? i - 1 : i + 1;
+          if (i < 0 || j < 0 || j >= list.length) break;
+          const a = list[i];
+          const b = list[j];
+          if (a === undefined || b === undefined) break;
+          list[i] = b;
+          list[j] = a;
+          void api
+            .post('/api/collections/reorder', { ids: list.map((c) => c.id) })
+            .then(() => queryClient.invalidateQueries({ queryKey: ['collections'] }))
+            .catch(() => void message.error('排序失败'));
+          break;
+        }
         case 'editcol':
           setEditingCol({ id: col.id, name: col.name, note: col.note });
           break;

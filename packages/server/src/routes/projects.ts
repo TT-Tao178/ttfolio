@@ -13,6 +13,7 @@ import {
   renameDiskSchema,
   collectionCreateSchema,
   collectionMembersSchema,
+  collectionReorderSchema,
 } from '@ttfolio/shared';
 import {
   listProjects,
@@ -417,6 +418,23 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     ctx.db().prepare('DELETE FROM collections WHERE id = ?').run(id);
     return ok({ deleted: true });
+  });
+
+  // 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：按传入 id 顺序全量重排 sort_order（单事务原子）
+  app.post('/api/collections/reorder', async (req) => {
+    const parsed = collectionReorderSchema.safeParse(req.body);
+    if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
+    const db = ctx.db();
+    const ids = parsed.data.ids;
+    const known = new Set(listCollections(db).map((c) => c.id));
+    if (ids.some((id) => !known.has(id))) return fail('NOT_FOUND', '包含不存在的集合', 404);
+    const tx = db.transaction(() => {
+      const upd = db.prepare('UPDATE collections SET sort_order = ?, updated_at = ? WHERE id = ?');
+      const now = new Date().toISOString();
+      ids.forEach((id, i) => upd.run(i, now, id));
+    });
+    tx();
+    return ok(listCollections(db));
   });
 
   app.post('/api/collections/:id/members', async (req) => {
