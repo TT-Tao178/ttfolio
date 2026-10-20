@@ -354,7 +354,11 @@ export function Dashboard(): React.JSX.Element {
             rowKey="id"
             dataSource={commits}
             renderItem={(p) => (
-              <List.Item style={{ cursor: 'pointer', padding: '3px 0' }} onClick={() => openGit(p)}>
+              <List.Item
+                className="tt-commit-row"
+                style={{ cursor: 'pointer', padding: '3px 0' }}
+                onClick={() => openGit(p)}
+              >
                 <span style={{ display: 'inline-flex', gap: 8, width: '100%', alignItems: 'center' }}>
                   <strong style={{ flexShrink: 0, fontSize: 12 }}>{p.alias ?? p.diskName}</strong>
                   <span className="tt-ellipsis" style={{ flex: 1, fontSize: 12, opacity: 0.85 }}>

@@ -152,3 +152,16 @@ body,
 .tt-docx-box .tt-docx {
   background: #ffffff;
 }
+
+/* 「最近提交」动态流行悬停动画（第 44 轮用户需求）：背景淡入 + 轻微右移提示可点；
+   背景取 currentColor 低透明——深浅主题自动适配；负 margin 抵消 padding 避免布局位移。 */
+.tt-commit-row {
+  transition: background-color 0.18s ease, transform 0.18s ease;
+  border-radius: 6px;
+  padding-inline: 6px;
+  margin-inline: -6px;
+}
+.tt-commit-row:hover {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  transform: translateX(3px);
+}

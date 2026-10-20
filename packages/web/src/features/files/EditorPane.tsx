@@ -2,6 +2,7 @@
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
 import { Alert, Button, Modal, Space, Tag, App } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError, rawUrl } from '@/lib/api';
@@ -26,10 +27,13 @@ interface ConflictState {
 export function EditorPane({ projectId, path }: Props): React.JSX.Element {
   const dark = useSettingsDark();
   const { settings } = useSettings();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const draftKey = `${projectId}|${path}`;
   const pathKey = `${projectId}:${path}`.toLowerCase();
+  // 编辑模式（用户需求：防误改）——默认只读，点「编辑」进入可改，
+  // 修改后必须点保存 / Ctrl+S 落盘；切文件自动退出编辑态
+  const [editMode, setEditMode] = useState(false);
 
   const [value, setValue] = useState<string>('');
   const [base, setBase] = useState<{
@@ -50,6 +54,40 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 切文件自动退出编辑态：新文件必须重新点「编辑」才能改（防误改）
+  useEffect(() => {
+    setEditMode(false);
+  }, [path]);
+
+  /** 退出编辑：有未保存修改时确认——修改已由草稿防抖保留（24h），再进编辑会提示恢复。 */
+  const exitEdit = (): void => {
+    if (dirtyRef.current) {
+      modal.confirm({
+        title: '退出编辑？',
+        content:
+          '有未保存的修改。退出后编辑器回到磁盘版本，你的修改保留在草稿中（24 小时），下次进入编辑会提示恢复。',
+        okText: '退出编辑',
+        cancelText: '继续编辑',
+        onOk: () => {
+          if (file !== undefined) {
+            setValue(file.content);
+            setDirty(false);
+            setBase({
+              mtime: file.mtime,
+              size: file.size,
+              hash: file.hash,
+              encoding: file.encoding,
+              eol: file.eol,
+            });
+          }
+          setEditMode(false);
+        },
+      });
+    } else {
+      setEditMode(false);
+    }
+  };
   /**
    * 已载入的版本标识 + 是否已考虑过草稿。
    * 为什么必须记：路径条「刷新」、保存后的失效、SSE 的文件变更都会重新取同一个文件，
@@ -306,14 +344,35 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         <Tag>{file.eol}</Tag>
         <div style={{ flex: 1 }} />
         <Space>
-          <Button
-            size="small"
-            disabled={!dirty || saving}
-            onClick={() => void save(false)}
-            data-testid="save-btn"
-          >
-            保存 (Ctrl+S)
-          </Button>
+          {editMode ? (
+            <>
+              <Tag color="orange" style={{ marginRight: 0 }} data-testid="edit-mode-tag">
+                编辑中
+              </Tag>
+              <Button
+                size="small"
+                type="primary"
+                disabled={!dirty || saving}
+                onClick={() => void save(false)}
+                data-testid="save-btn"
+              >
+                保存 (Ctrl+S)
+              </Button>
+              <Button size="small" onClick={exitEdit} data-testid="exit-edit-btn">
+                取消编辑
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="small"
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => setEditMode(true)}
+              data-testid="edit-btn"
+            >
+              编辑
+            </Button>
+          )}
         </Space>
       </div>
       {externalChanged && (
@@ -346,6 +405,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           value={value}
           height="100%"
           theme={dark ? 'dark' : 'light'}
+          editable={editMode}
           extensions={[langExtension(path), cmTheme(dark), cmHighlight(dark), EditorView.lineWrapping]}
           onChange={onChange}
           basicSetup={{ foldGutter: true, autocompletion: false }}
