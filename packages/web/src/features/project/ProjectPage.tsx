@@ -8,11 +8,11 @@ import {
   FolderOpenOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { ProjectDetail } from '@ttfolio/shared';
-import { useAppStore } from '@/app/store';
+import { useAppStore, useTabScroll } from '@/app/store';
 import { fmtBytes, fmtMs, relTime } from '@/lib/format';
 import { LanguageBar } from '@/components/LanguageBar';
 import { StateView } from '@/components/StateView';
@@ -44,6 +44,9 @@ export function ProjectPage({
   const { message } = App.useApp();
   const active = subTab ?? 'files';
   const [aliasOpen, setAliasOpen] = useState(false);
+  // 项目概览页签的滚动同步（0.3.8 补 KNOWN-GAPS #4）：按 项目+页签 维度持久化与回放
+  const ovScrollRef = useRef<HTMLDivElement>(null);
+  useTabScroll(ovScrollRef, `${projectId}|${active}`);
 
   const notFound = error instanceof ApiClientError && error.code === 'NOT_FOUND';
   const retry = (): void => {
@@ -160,7 +163,7 @@ export function ProjectPage({
             onRetry={retry}
           >
             {p !== undefined && (
-              <div style={{ overflow: 'auto', height: '100%', paddingRight: 4 }}>
+              <div ref={ovScrollRef} style={{ overflow: 'auto', height: '100%', paddingRight: 4 }}>
                 {p.analyzePartial && p.analyzeError !== null && (
                   <Alert
                     type="warning"

@@ -19,7 +19,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
-import { useAppStore } from '@/app/store';
+import { useAppStore, useTabScroll } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { Dashboard } from './Dashboard';
 import { ProjectCard } from './ProjectCard';
@@ -220,8 +220,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     },
   ];
 
+  // 标签滚动同步（0.3.8 补 KNOWN-GAPS #4）：滚动写回会话、切标签/视图回放
+  const wbRef = useRef<HTMLDivElement>(null);
+  const wbActiveTabId = useAppStore((s) => s.activeTabId);
+  useTabScroll(wbRef, `${wbActiveTabId ?? ''}|${subTab ?? ''}`);
+
   return (
-    <div style={{ padding: 16, height: '100%', overflow: 'auto' }} data-testid="workbench">
+    <div ref={wbRef} style={{ padding: 16, height: '100%', overflow: 'auto' }} data-testid="workbench">
       {/* 工作台总览（subTab=null）与卡片墙是两个屏：前者回答"哪里需要我"，后者用于筛选/浏览项目 */}
       {subTab === null ? (
         <>

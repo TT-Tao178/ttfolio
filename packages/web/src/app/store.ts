@@ -1,5 +1,6 @@
 /** UI 状态（Zustand）：标签会话、域切换、脏文件注册表（FR-1.2/1.3/4.3）。 */
 import { create } from 'zustand';
+import React, { useEffect } from 'react';
 import { ulidLike } from '@/lib/ulid';
 
 export type TabKind =
@@ -62,6 +63,8 @@ interface AppState {
   /** 面包屑目录段点击的定位请求（第 26 轮）：FilesTab 监听 nonce 变化，展开树到该目录并选中 */
   treeLocate: { projectId: string; path: string; nonce: number } | null;
   setTreeLocate: (loc: { projectId: string; path: string }) => void;
+  /** 写回活动标签的内容区滚动位置（0.3.8 补 KNOWN-GAPS #4：滚动随会话持久化） */
+  setActiveTabScroll: (scroll: number) => void;
   syncFromServer: (
     tabs: Array<{
       id: string;
@@ -256,15 +259,32 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
   treeLocate: null,
   setTreeLocate: (loc) => set({ treeLocate: { ...loc, nonce: Date.now() } }),
+  setActiveTabScroll: (scroll) => {
+    const { tabs, activeTabId } = get();
+    if (activeTabId === null) return;
+    // tabs 引用变化会触发既有 1s 会话防抖 PUT，滚动随会话落库（0.3.8 补 KNOWN-GAPS #4）
+    set({ tabs: tabs.map((t) => (t.id === activeTabId && t.scroll !== scroll ? { ...t, scroll } : t)) });
+  },
 
   syncFromServer: (serverTabs, activeId) => {
     const tabs = serverTabs.map<Tab>((t) => {
+      let restoredScroll = 0;
+      if (t.scrollJson !== null && t.scrollJson !== undefined && t.scrollJson !== '') {
+        try {
+          const parsed = JSON.parse(t.scrollJson) as { scroll?: unknown };
+          if (typeof parsed.scroll === 'number' && Number.isFinite(parsed.scroll) && parsed.scroll > 0) {
+            restoredScroll = parsed.scroll;
+          }
+        } catch {
+          /* 脏数据回落 0 */
+        }
+      }
       const loc: TabLocation = {
         kind: t.kind,
         projectId: t.projectId ?? null,
         targetPath: t.targetPath ?? null,
         subTab: t.subTab ?? null,
-        scroll: 0,
+        scroll: restoredScroll,
       };
       // 历史栈必须随标签一起恢复：原实现把 history 置空、historyIndex 置 -1，
       // 于是刷新/重启后「后退/前进」永远按不动（FR-1.3 要求恢复页签与浏览历史）。
@@ -366,4 +386,36 @@ export function serializeSession(tabs: Tab[], activeTabId: string | null) {
     }),
     activeTabId,
   };
+}
+
+/**
+ * 标签内容区滚动同步（0.3.8 补 KNOWN-GAPS #4）：
+ * 滚动 300ms 防抖写回活动标签（随会话落库）；key 变化（切标签/切视图/切页签）时回放该标签的 scroll。
+ * 用法：const ref = useRef<HTMLDivElement>(null); useTabScroll(ref, `${activeTabId}|${subTab}`);
+ */
+export function useTabScroll(ref: React.RefObject<HTMLElement | null>, key: string): void {
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    el.scrollTop = useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.scroll ?? 0;
+    // key 变化即回放（切标签/切视图）；activeTabId 变化必然伴随 key 变化
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = (): void => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        useAppStore.getState().setActiveTabScroll(Math.round(el.scrollTop));
+      }, 300);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [ref]);
 }
