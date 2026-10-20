@@ -1,5 +1,26 @@
 # PROGRESS
 
+## 第 45 轮：0.3.8 发布——KNOWN-GAPS #4/#9 补全（滚动持久化 + 集合排序，用户点名）
+
+- **T-003 滚动持久化（5abc577 + 71bb511）**：store setActiveTabScroll 写回活动
+  标签 scroll（既有 1s 会话防抖自动落库）；syncFromServer 解析 scrollJson 回放；
+  新增 useTabScroll hook（滚动 300ms 防抖写回、key 变化回放），接线 Workbench
+  （总览/卡片墙）与 ProjectPage 概览页签。**复测揪出补偿失效**：回放时内容未
+  撑高 scrollTop 被钳 0，钳位滚动事件经防抖把期望位置降级成 0、补偿回放失效
+  ——onScroll 加钳位噪声过滤（内容高度不足以到达期望位置时忽略），补偿回放
+  400ms/1000ms 两次拉回（71bb511）。实测：滚 400 → 刷新恢复 400 ✓。
+- **T-013 集合排序（666c8c9）**：collectionReorderSchema + POST
+  /api/collections/reorder（按 id 顺序单事务全量重排 sort_order，含存在性
+  校验）；侧栏集合右键菜单「上移/下移」（首末禁用），交换后全量重排；
+  实测 UI 右键下移 B>A>C → B>C>A 侧栏渲染跟随 ✓。
+- **收口**：KNOWN-GAPS #4/#9 闭合标注（在册仅剩 #1/#5/#6）；任务总表生成器
+  PARTIAL 映射同步修剪并重生成（✅78 🔶3 ⛔7，有效进度 81/81）。
+- **出包两连坑均按预案过**：①electron-rebuild 失败＝验收用的 `&` 后台 tsx
+  实例残留锁 .node（run_in_background 任务被 TaskStop 杀得掉、shell `&` 的
+  杀不掉——按端口清）；②EBUSY 锁旧 asar——tmp1 预案过、自检 8 项全绿含
+  0.3.8 断言；rebuild 翻回、门禁复跑三绿。安装包入 dist-electron（7 包
+  0.3.2~0.3.8）；tag v0.3.8、Release 页 latest 已验、对照清单补行。
+
 ## 第 44+ 轮：用户需求两项——最近提交悬停动画、编辑器默认只读+编辑模式（01322ab）
 
 - **最近提交悬停动画**：Dashboard 动态流行加 tt-commit-row——hover 背景
