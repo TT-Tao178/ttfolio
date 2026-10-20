@@ -1,6 +1,6 @@
 /** UI 状态（Zustand）：标签会话、域切换、脏文件注册表（FR-1.2/1.3/4.3）。 */
 import { create } from 'zustand';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ulidLike } from '@/lib/ulid';
 
 export type TabKind =
@@ -395,10 +395,26 @@ export function serializeSession(tabs: Tab[], activeTabId: string | null) {
  */
 export function useTabScroll(ref: React.RefObject<HTMLElement | null>, key: string): void {
   const activeTabId = useAppStore((s) => s.activeTabId);
+  // 期望滚动位置：回放时设为恢复值；用户滚动（防抖后）跟随实际值。
+  // 内容常在恢复之后才异步撑高（卡片墙数据未返回时回放会被钳回 0）——
+  // 因此回放后在 400ms/1000ms 各补一次，把位置拉回期望值。
+  const expectedRef = useRef(0);
   useEffect(() => {
     const el = ref.current;
     if (el === null) return;
-    el.scrollTop = useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.scroll ?? 0;
+    const expected = useAppStore.getState().tabs.find((t) => t.id === activeTabId)?.scroll ?? 0;
+    expectedRef.current = expected;
+    el.scrollTop = expected;
+    const t1 = setTimeout(() => {
+      el.scrollTop = expectedRef.current;
+    }, 400);
+    const t2 = setTimeout(() => {
+      el.scrollTop = expectedRef.current;
+    }, 1000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
     // key 变化即回放（切标签/切视图）；activeTabId 变化必然伴随 key 变化
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -407,8 +423,13 @@ export function useTabScroll(ref: React.RefObject<HTMLElement | null>, key: stri
     if (el === null) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = (): void => {
+      // 钳位噪声过滤（体检复测发现）：回放时内容尚未撑高，scrollTop 被钳到 0 的
+      // 滚动事件若照常写回，会把期望位置降级成 0、补偿回放随之失效——内容高度
+      // 不足以到达期望位置时忽略本次滚动
+      if (expectedRef.current > 0 && el.scrollHeight < expectedRef.current + el.clientHeight) return;
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(() => {
+        expectedRef.current = Math.round(el.scrollTop);
         useAppStore.getState().setActiveTabScroll(Math.round(el.scrollTop));
       }, 300);
     };
