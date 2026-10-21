@@ -1,10 +1,11 @@
-/** 域条（3.2）：项目/Git/架构图/文档/搜索/设置。 */
+/** 域条（3.2）：项目/Git/架构图/文档/搜索/活动/设置。 */
 import { Tooltip } from 'antd';
 import {
   AppstoreOutlined,
   BranchesOutlined,
   ApartmentOutlined,
   BookOutlined,
+  FieldTimeOutlined,
   SearchOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
@@ -18,6 +19,7 @@ const DOMAINS: Array<{ key: Domain; icon: React.JSX.Element; label: string }> = 
   { key: 'archives', icon: <ApartmentOutlined />, label: '架构图' },
   { key: 'docs', icon: <BookOutlined />, label: '文档' },
   { key: 'search', icon: <SearchOutlined />, label: '搜索' },
+  { key: 'activity', icon: <FieldTimeOutlined />, label: '活动' },
   { key: 'settings', icon: <SettingOutlined />, label: '设置' },
 ];
 
@@ -89,14 +91,15 @@ export function DomainRail(): React.JSX.Element {
               setSidebar(false);
               // 设置域的内容就是设置页本身（不像项目域是标签驱动的），
               // 只切域会出现"点了设置但右边没反应"；这里补上：已有设置标签就切过去，没有就开一个。
-              if (d.key === 'settings') {
+              if (d.key === 'settings' || d.key === 'activity') {
+                const wantKind = d.key === 'settings' ? 'settings' : 'activity';
                 const st = useAppStore.getState();
-                const existing = st.tabs.find((t) => t.kind === 'settings');
+                const existing = st.tabs.find((t) => t.kind === wantKind);
                 if (existing !== undefined) st.activateTab(existing.id);
                 else
                   st.openTab(
-                    { kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 },
-                    '设置',
+                    { kind: wantKind, projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                    wantKind === 'settings' ? '设置' : '活动中心',
                   );
               }
             }

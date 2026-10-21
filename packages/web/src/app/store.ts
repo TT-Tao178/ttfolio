@@ -4,7 +4,17 @@ import React, { useEffect, useRef } from 'react';
 import { ulidLike } from '@/lib/ulid';
 
 export type TabKind =
-  'overview' | 'project' | 'file' | 'image' | 'doc' | 'archive' | 'git' | 'search' | 'settings' | 'trash';
+  | 'overview'
+  | 'project'
+  | 'file'
+  | 'image'
+  | 'doc'
+  | 'archive'
+  | 'git'
+  | 'search'
+  | 'settings'
+  | 'trash'
+  | 'activity';
 
 export interface TabLocation {
   kind: TabKind;
@@ -23,7 +33,7 @@ export interface Tab extends TabLocation {
   invalid: 'path-missing' | 'project-removed' | null;
 }
 
-export type Domain = 'projects' | 'git' | 'archives' | 'docs' | 'search' | 'settings';
+export type Domain = 'projects' | 'git' | 'archives' | 'docs' | 'search' | 'activity' | 'settings';
 
 interface AppState {
   tabs: Tab[];

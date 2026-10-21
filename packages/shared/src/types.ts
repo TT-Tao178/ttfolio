@@ -282,7 +282,17 @@ export interface SseEvent {
 
 /** 会话（标签恢复） */
 export type TabKind =
-  'overview' | 'project' | 'file' | 'image' | 'doc' | 'archive' | 'git' | 'search' | 'settings' | 'trash';
+  | 'overview'
+  | 'project'
+  | 'file'
+  | 'image'
+  | 'doc'
+  | 'archive'
+  | 'git'
+  | 'search'
+  | 'settings'
+  | 'trash'
+  | 'activity';
 
 export interface SessionTab {
   id: string;

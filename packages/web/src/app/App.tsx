@@ -17,6 +17,7 @@ import { DetailPanel } from '@/components/DetailPanel';
 import { Workbench } from '@/features/workbench/Workbench';
 import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
+import { ActivityPage } from '@/features/activity/ActivityPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import {
@@ -86,6 +87,7 @@ function Shell(): React.JSX.Element {
       archive: 'archives',
       doc: 'docs',
       search: 'search',
+      activity: 'activity',
       settings: 'settings',
     };
     const target = activeTab !== null ? map[activeTab.kind] : undefined;
@@ -328,6 +330,8 @@ function Shell(): React.JSX.Element {
                         <ProjectPage projectId={activeTab.projectId} subTab={activeTab.subTab} />
                       ) : activeTab.kind === 'trash' ? (
                         <TrashPage />
+                      ) : activeTab.kind === 'activity' ? (
+                        <ActivityPage />
                       ) : activeTab.kind === 'settings' ? (
                         <SettingsPage anchor={activeTab.subTab} />
                       ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (

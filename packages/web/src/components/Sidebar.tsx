@@ -382,6 +382,10 @@ export function Sidebar(): React.JSX.Element {
     items.push({ key: 'search-all', label: '全局搜索（Ctrl+K）' });
     items.push({ key: 'search-current', label: '在当前项目内搜索' });
     selected = '';
+  } else if (domain === 'activity') {
+    // 活动中心（FR-13.8 / T-105）：单页三页签，侧栏只一个入口
+    items.push({ key: 'activity-hub', label: '活动中心' });
+    if (activeTab?.kind === 'activity') selected = 'activity-hub';
   } else if (domain === 'settings') {
     // 设置域原先没有任何分支 → items 恒为空菜单（用户报障："左侧设置里面是空的，啥都没有"）。
     // 这里按 sections.ts 的单一来源列分组，点击后打开设置标签并滚动到对应分组。
@@ -474,6 +478,10 @@ export function Sidebar(): React.JSX.Element {
         { kind: 'search', projectId: null, targetPath: null, subTab: 'git-overview', scroll: 0 },
         'Git 总览',
       );
+      return;
+    }
+    if (key === 'activity-hub') {
+      openTab({ kind: 'activity', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '活动中心');
       return;
     }
     if (key === 'search-all') {
