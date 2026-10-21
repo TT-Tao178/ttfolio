@@ -1,12 +1,12 @@
 /** 媒体网格与缩略图辅助（FR-13.5 / T-099）：纯函数 + 哈希，供 MediaTab/Lightbox 复用。 */
 import type { MediaItem, MediaKind } from '@ttfolio/shared';
 
-/** 缩略图文件名：sha1(相对路径) hex + .png——与服务端落盘命名一致。 */
-export async function thumbNameOf(relPath: string): Promise<string> {
+/** 缩略图文件名（T-113 两级）：<sha1(相对路径)>@g.webp / @p.webp——与服务端命名一致。 */
+export async function thumbNameOf(relPath: string, tier: 'g' | 'p' = 'g'): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(relPath));
   let hex = '';
   for (const b of new Uint8Array(buf)) hex += b.toString(16).padStart(2, '0');
-  return `${hex}.png`;
+  return `${hex}@${tier}.webp`;
 }
 
 export interface MediaGroup {
@@ -44,4 +44,24 @@ export type DensityKey = keyof typeof DENSITY_PX;
 export function columnsFor(width: number, cellPx: number): number {
   if (width <= 0) return 1;
   return Math.max(1, Math.floor((width + 8) / (cellPx + 8)));
+}
+
+/** 计划缺哪些档（T-113 纯函数）：音频除外；cap 限单次补建数量。 */
+export function missingItems(
+  items: MediaItem[],
+  have: Set<string>,
+  names: Map<string, { g: string; p: string }>,
+  tier: 'g' | 'p',
+  cap = Number.POSITIVE_INFINITY,
+): MediaItem[] {
+  const out: MediaItem[] = [];
+  for (const it of items) {
+    if (it.kind === 'audio') continue;
+    const n = names.get(it.path);
+    if (n === undefined) continue;
+    if (have.has(n[tier])) continue;
+    out.push(it);
+    if (out.length >= cap) break;
+  }
+  return out;
 }

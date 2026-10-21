@@ -65,6 +65,11 @@ interface AppState {
   /** 面包屑目录段点击的定位请求（第 26 轮）：FilesTab 监听 nonce 变化，展开树到该目录并选中 */
   treeLocate: { projectId: string; path: string; nonce: number } | null;
   setTreeLocate: (loc: { projectId: string; path: string }) => void;
+  /** 缩略图后台补建进度（FR-13.5 / T-113）：状态栏展示 + 可取消 */
+  thumbBackfill: { projectId: string; done: number; total: number; cancelled: boolean } | null;
+  setThumbBackfill: (
+    v: { projectId: string; done: number; total: number; cancelled: boolean } | null,
+  ) => void;
   /** 媒体联动信号（FR-13.5）：文件树点击媒体文件 → 跳媒体页签并开灯箱 */
   mediaFocus: { projectId: string; path: string; nonce: number } | null;
   setMediaFocus: (loc: { projectId: string; path: string }) => void;
@@ -269,6 +274,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
   treeLocate: null,
   setTreeLocate: (loc) => set({ treeLocate: { ...loc, nonce: Date.now() } }),
+  thumbBackfill: null,
+  setThumbBackfill: (v) => set({ thumbBackfill: v }),
   mediaFocus: null,
   setMediaFocus: (loc) => set({ mediaFocus: { ...loc, nonce: Date.now() } }),
   setActiveTabScroll: (scroll) => {

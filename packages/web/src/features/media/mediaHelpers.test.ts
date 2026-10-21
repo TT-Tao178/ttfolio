@@ -1,6 +1,6 @@
 /** 回归锚点：媒体网格纯函数（FR-13.5 / T-099）——分组排序、密度列数、缩略图命名。 */
 import { describe, expect, it } from 'vitest';
-import { columnsFor, groupByFolder, thumbNameOf, type MediaGroup } from './mediaHelpers';
+import { columnsFor, groupByFolder, missingItems, thumbNameOf, type MediaGroup } from './mediaHelpers';
 import type { MediaItem } from '@ttfolio/shared';
 
 function item(path: string, kind: 'image' | 'video' | 'audio' = 'image'): MediaItem {
@@ -36,12 +36,34 @@ describe('columnsFor（响应式列数）', () => {
   });
 });
 
-describe('thumbNameOf（缩略图命名，与服务端 sha1 一致）', () => {
-  it('稳定且为 40 位 hex.png', async () => {
-    const a = await thumbNameOf('assets/a.jpg');
-    const b = await thumbNameOf('assets/a.jpg');
-    expect(a).toBe(b);
-    expect(a).toMatch(/^[0-9a-f]{40}\.png$/);
-    expect(await thumbNameOf('assets/b.jpg')).not.toBe(a);
+describe('thumbNameOf（两级命名，与服务端 sha1 一致）', () => {
+  it('稳定、tier 可区分、同为 40 位 hex', async () => {
+    const g = await thumbNameOf('assets/a.jpg', 'g');
+    const p = await thumbNameOf('assets/a.jpg', 'p');
+    expect(g).toBe(await thumbNameOf('assets/a.jpg'));
+    expect(g).toMatch(/^[0-9a-f]{40}@g\.webp$/);
+    expect(p).toMatch(/^[0-9a-f]{40}@p\.webp$/);
+    expect(g).not.toBe(p);
+    expect(await thumbNameOf('assets/b.jpg')).not.toBe(g);
+  });
+});
+
+describe('missingItems（T-113 缺口计划）', () => {
+  const names = new Map([
+    ['a.png', { g: 'a@g.webp', p: 'a@p.webp' }],
+    ['b.mp4', { g: 'b@g.webp', p: 'b@p.webp' }],
+    ['c.mp3', { g: 'c@g.webp', p: 'c@p.webp' }],
+  ]);
+
+  it('音频不计；已有 g 档跳过；cap 截断', () => {
+    const items = [item('a.png'), item('b.mp4', 'video'), item('c.mp3', 'audio')];
+    expect(missingItems(items, new Set(['a@g.webp']), names, 'g').map((i) => i.path)).toEqual(['b.mp4']);
+    expect(missingItems(items, new Set(), names, 'g', 1).map((i) => i.path)).toEqual(['a.png']);
+    expect(missingItems(items, new Set(['a@g.webp', 'b@g.webp']), names, 'g')).toEqual([]);
+  });
+
+  it('p 档独立判断（有 g 不等于有 p）', () => {
+    const items = [item('a.png')];
+    expect(missingItems(items, new Set(['a@g.webp']), names, 'p').map((i) => i.path)).toEqual(['a.png']);
   });
 });

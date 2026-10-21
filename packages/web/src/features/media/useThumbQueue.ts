@@ -1,142 +1,179 @@
-/** 缩略图懒生成队列（FR-13.5 / T-099）：渲染层 canvas 解码缩放 → POST 服务端
- * 落盘（数据目录 thumbs/，单写者保持）；并发受限；失败诚实回退图标。
- * 音频无缩略图（直接 failed 态，UI 回退图标——沿诚实降级惯例）。 */
-import { useEffect, useRef, useState } from 'react';
+/** 缩略图队列 v2（FR-13.5 / T-113）：
+ * ① 首屏先读存在性索引（thumb-index），命中直接出图，未命中才入队；
+ * ② 只给「可视区 + overscan」的条目排生成（滚动增量补），并发受限；
+ * ③ 失败 5 分钟 TTL 内不再重排（如实回退图标）；
+ * ④ 灯箱预览档（p）按需生成。
+ * 生成与上传在 thumbGen（Electron 原生解码优先 / Web canvas 兜底）。 */
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { thumbNameOf } from './mediaHelpers';
-import type { MediaItem, MediaKind } from '@ttfolio/shared';
+import { missingItems, thumbNameOf } from './mediaHelpers';
+import { FAILED_TTL_MS, generateThumb, type ThumbTier } from './thumbGen';
+import type { MediaItem } from '@ttfolio/shared';
 
 export interface ThumbState {
   status: 'idle' | 'loading' | 'ready' | 'failed';
-  /** 服务端落盘后的缩略图文件名（sha1.png） */
-  name?: string;
+  /** g 档文件名（网格） */
+  g?: string;
+  /** p 档文件名（灯箱预览） */
+  p?: string;
+  failedAt?: number;
 }
 
 const CONCURRENCY = 3;
-const MAX_PX = 320;
 
-/** 解码 + canvas 缩放；视频取中点附近帧；音频/失败返回 null（诚实回退）。 */
-async function generateDataUrl(url: string, kind: MediaKind): Promise<string | null> {
-  const drawTo = (source: HTMLImageElement | HTMLVideoElement, sw: number, sh: number): string | null => {
-    const canvas = document.createElement('canvas');
-    const scale = Math.min(1, MAX_PX / Math.max(sw || 1, sh || 1));
-    canvas.width = Math.max(1, Math.round((sw || 1) * scale));
-    canvas.height = Math.max(1, Math.round((sh || 1) * scale));
-    const ctx2d = canvas.getContext('2d');
-    if (ctx2d === null) return null;
-    ctx2d.drawImage(source, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
-  };
-  try {
-    if (kind === 'image') {
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('image decode failed'));
-        img.src = url;
-      });
-      return drawTo(img, img.naturalWidth, img.naturalHeight);
-    }
-    if (kind === 'video') {
-      const video = document.createElement('video');
-      video.muted = true;
-      video.preload = 'metadata';
-      video.src = url;
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('video load timeout')), 8000);
-        video.onloadeddata = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-        video.onerror = () => {
-          clearTimeout(timer);
-          reject(new Error('video decode failed'));
-        };
-      });
-      // 取中点附近一帧做封面（seek 失败不致命，用当前帧）
-      const half = Number.isFinite(video.duration) ? video.duration / 2 : 0.1;
-      await new Promise<void>((resolve) => {
-        video.onseeked = () => resolve();
-        setTimeout(() => resolve(), 1500);
-        try {
-          video.currentTime = half;
-        } catch {
-          resolve();
-        }
-      });
-      return drawTo(video, video.videoWidth, video.videoHeight);
-    }
-    return null;
-  } catch {
-    return null;
-  }
+export interface ThumbQueueApi {
+  states: Map<string, ThumbState>;
+  /** 灯箱按需请求 p 档预览。 */
+  requestPreview: (path: string) => void;
 }
 
 export function useThumbQueue(
   projectId: string,
+  dirPath: string,
   items: MediaItem[],
   enabled: boolean,
-): Map<string, ThumbState> {
+  visiblePaths: Set<string>,
+): ThumbQueueApi {
   const [states, setStates] = useState<Map<string, ThumbState>>(new Map());
-  const queueRef = useRef<MediaItem[]>([]);
+  const [names, setNames] = useState<Map<string, { g: string; p: string }>>(new Map());
+  const queueRef = useRef<Array<{ item: MediaItem; tier: ThumbTier }>>([]);
+  const queuedRef = useRef<Set<string>>(new Set());
   const runningRef = useRef(0);
+  const haveRef = useRef<Set<string>>(new Set());
   const statesRef = useRef(states);
   statesRef.current = states;
+  const namesRef = useRef(names);
+  namesRef.current = names;
+
+  const indexQuery = useQuery({
+    queryKey: ['thumb-index', projectId],
+    queryFn: () => api.get<{ names: string[] }>(`/api/media/${projectId}/thumb-index`),
+    enabled,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
-    if (!enabled) return;
-    const pending = items.filter((it) => {
-      if (it.kind === 'audio') return false; // 音频无缩略图，直接回退图标
-      const cur = statesRef.current.get(it.path);
-      return cur === undefined;
-    });
-    if (pending.length === 0) return;
+    if (indexQuery.data === undefined) return;
+    haveRef.current = new Set(indexQuery.data.names);
+    // 索引到达后，命中项立刻转 ready（首屏直接出图，不等生成）
     setStates((prev) => {
+      let changed = false;
       const next = new Map(prev);
-      for (const it of pending) next.set(it.path, { status: 'idle' });
-      return next;
+      for (const it of items) {
+        const n = namesRef.current.get(it.path);
+        if (n === undefined) continue;
+        const cur = next.get(it.path);
+        if (cur?.status === 'ready') continue;
+        const g = haveRef.current.has(n.g) ? n.g : undefined;
+        const p = haveRef.current.has(n.p) ? n.p : undefined;
+        if (g !== undefined || p !== undefined) {
+          next.set(it.path, { status: g !== undefined ? 'ready' : (cur?.status ?? 'idle'), g, p });
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
-    queueRef.current = [...queueRef.current, ...pending];
+    // names 也要进依赖：名称异步算完（可能晚于索引）时必须重新标记命中项
+  }, [indexQuery.data, items, names]);
+
+  // 名称（sha1）按条目异步计算并缓存
+  useEffect(() => {
+    if (!enabled || items.length === 0) return undefined;
+    let alive = true;
+    void (async () => {
+      const next = new Map(namesRef.current);
+      let added = false;
+      for (const it of items) {
+        if (next.has(it.path)) continue;
+        next.set(it.path, { g: await thumbNameOf(it.path, 'g'), p: await thumbNameOf(it.path, 'p') });
+        added = true;
+      }
+      if (alive && added) setNames(next);
+    })();
+    return () => {
+      alive = false;
+    };
   }, [items, enabled]);
 
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const pump = (): void => {
-      while (runningRef.current < CONCURRENCY && queueRef.current.length > 0) {
-        const item = queueRef.current.shift();
-        if (item === undefined) break;
-        runningRef.current += 1;
-        void (async () => {
-          try {
-            const dataUrl = await generateDataUrl(
-              // 动态 import 避免初始化顺序问题（rawUrl 依赖 window，已就绪）
-              (await import('@/lib/api')).rawUrl(projectId, item.path),
-              item.kind,
-            );
-            if (dataUrl === null) {
-              setStates((prev) => new Map(prev).set(item.path, { status: 'failed' }));
-              return;
-            }
-            const r = await api.post<{ thumb: string }>(`/api/media/${projectId}/thumb`, {
-              path: item.path,
-              dataUrl,
-            });
-            setStates((prev) => new Map(prev).set(item.path, { status: 'ready', name: r.thumb }));
-          } catch {
-            setStates((prev) => new Map(prev).set(item.path, { status: 'failed' }));
-          } finally {
-            runningRef.current -= 1;
-            pump();
-          }
-        })();
-      }
-    };
-    pump();
-    return undefined;
-  }, [projectId, enabled, items]);
+  const visibleKey = useMemo(() => [...visiblePaths].sort().join('|'), [visiblePaths]);
 
-  return states;
+  const pump = (): void => {
+    while (runningRef.current < CONCURRENCY && queueRef.current.length > 0) {
+      const job = queueRef.current.shift();
+      if (job === undefined) break;
+      runningRef.current += 1;
+      const key = `${job.item.path}|${job.tier}`;
+      void (async () => {
+        setStates((prev) =>
+          new Map(prev).set(job.item.path, { ...prev.get(job.item.path), status: 'loading' }),
+        );
+        const name = await generateThumb(projectId, dirPath, job.item, job.tier);
+        if (name !== null) haveRef.current.add(name);
+        setStates((prev) => {
+          const cur = prev.get(job.item.path) ?? { status: 'idle' as const };
+          return new Map(prev).set(
+            job.item.path,
+            name !== null
+              ? { ...cur, status: job.tier === 'g' ? 'ready' : cur.status, [job.tier]: name }
+              : { ...cur, status: job.tier === 'g' ? 'failed' : cur.status, failedAt: Date.now() },
+          );
+        });
+        queuedRef.current.delete(key);
+        runningRef.current -= 1;
+        pump();
+      })();
+    }
+  };
+
+  // 可视优先入队：只排当前视口（含 overscan）里还没有 g 档的条目
+  useEffect(() => {
+    if (!enabled || names.size === 0) return;
+    const missing = missingItems(items, haveRef.current, names, 'g').filter((it) =>
+      visiblePaths.has(it.path),
+    );
+    let added = false;
+    for (const it of missing) {
+      const key = `${it.path}|g`;
+      if (queuedRef.current.has(key)) continue;
+      const cur = statesRef.current.get(it.path);
+      if (cur?.status === 'failed' && Date.now() - (cur.failedAt ?? 0) < FAILED_TTL_MS) continue;
+      queueRef.current.push({ item: it, tier: 'g' });
+      queuedRef.current.add(key);
+      added = true;
+    }
+    if (added) pump();
+    // visibleKey 承载视口变化；items/names 变化同样需要重算
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey, items, names, enabled]);
+
+  const requestPreview = (relPath: string): void => {
+    const it = items.find((x) => x.path === relPath);
+    if (it === undefined || it.kind === 'audio') return;
+    const n = namesRef.current.get(it.path);
+    if (n !== undefined && haveRef.current.has(n.p)) return;
+    const key = `${relPath}|p`;
+    if (queuedRef.current.has(key)) return;
+    queuedRef.current.add(key);
+    queueRef.current.push({ item: it, tier: 'p' });
+    pump();
+  };
+
+  return { states, requestPreview };
 }
 
-/** 计算某条目的缩略图名（供预取 /thumbs 是否存在；懒生成路径不需要）。 */
-export { thumbNameOf };
+/** 后台补建用：按索引列出缺口（上限 cap），供分析完成后的静默补建。 */
+export async function planMissingThumbs(
+  projectId: string,
+  items: MediaItem[],
+  cap = 200,
+): Promise<MediaItem[]> {
+  const idx = await api.get<{ names: string[] }>(`/api/media/${projectId}/thumb-index`);
+  const have = new Set(idx.names);
+  const names = new Map<string, { g: string; p: string }>();
+  for (const it of items) {
+    if (it.kind === 'audio') continue;
+    names.set(it.path, { g: await thumbNameOf(it.path, 'g'), p: await thumbNameOf(it.path, 'p') });
+  }
+  return missingItems(items, have, names, 'g', cap);
+}

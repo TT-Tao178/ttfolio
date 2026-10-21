@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { HealthInfo, TaskInfo } from '@ttfolio/shared';
 import { fmtBytes, relTime } from '@/lib/format';
+import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
 
@@ -27,6 +28,7 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
   });
 
   const running: TaskInfo[] = tasks?.running ?? [];
+  const backfill = useAppStore((s) => s.thumbBackfill);
   const lastAnalyze = health?.lastAnalyzeAt ?? null;
 
   return (
@@ -64,6 +66,29 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
       <span data-testid="status-watch" style={{ opacity: 0.75 }}>
         文件监听 {settings.watchEnabled ? '开' : '关'}
       </span>
+      {backfill !== null && (
+        <Space size={4} data-testid="status-thumbs">
+          <span className="tt-ellipsis" style={{ maxWidth: 180 }}>
+            缩略图补建 {backfill.done}/{backfill.total}
+          </span>
+          <Progress
+            percent={Math.round((backfill.done / Math.max(backfill.total, 1)) * 100)}
+            size="small"
+            style={{ width: 100 }}
+          />
+          <Button
+            size="small"
+            type="text"
+            danger
+            icon={<CloseCircleOutlined />}
+            title="取消补建"
+            onClick={() => {
+              const cur = useAppStore.getState().thumbBackfill;
+              if (cur !== null) useAppStore.getState().setThumbBackfill({ ...cur, cancelled: true });
+            }}
+          />
+        </Space>
+      )}
       {running.length > 0 && (
         <Space size={4}>
           <span data-testid="status-task" className="tt-ellipsis" style={{ maxWidth: 200 }}>

@@ -28,6 +28,7 @@ import {
   pluginCommandContributions,
 } from '@/features/command/registry';
 import { useCommandContext } from '@/features/command/useCommandContext';
+import { useThumbBackfill } from '@/features/media/useThumbBackfill';
 import { GitOverview, GitTab } from '@/features/git/GitTab';
 import { CommitView } from '@/features/git/CommitView';
 import { api } from '@/lib/api';
@@ -93,6 +94,8 @@ function Shell(): React.JSX.Element {
   }, [activeTab?.kind]);
   // Ctrl+W 与标签 × 同一套关闭逻辑（评审：此前 Ctrl+W 对脏标签静默拦截无反馈）
   const commandCtx = useCommandContext();
+  // 缩略图后台补建（FR-13.5 / T-113）：分析完成后静默补齐缺失的网格缩略图
+  useThumbBackfill();
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);

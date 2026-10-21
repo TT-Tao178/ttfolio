@@ -12,9 +12,10 @@ import {
   CaretRightOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { rawUrl } from '@/lib/api';
+import { rawUrl, thumbUrl } from '@/lib/api';
 import { KIND_LABEL } from './mediaHelpers';
 import type { MediaItem } from '@ttfolio/shared';
+import type { ThumbState } from './useThumbQueue';
 
 export function Lightbox({
   projectId,
@@ -23,6 +24,8 @@ export function Lightbox({
   onIndexChange,
   onClose,
   loop,
+  thumbs,
+  requestPreview,
 }: {
   projectId: string;
   items: MediaItem[];
@@ -30,6 +33,8 @@ export function Lightbox({
   onIndexChange: (next: number) => void;
   onClose: () => void;
   loop: boolean;
+  thumbs: Map<string, ThumbState>;
+  requestPreview: (path: string) => void;
 }): React.JSX.Element | null {
   const item = items[index];
   const dark = false; // 灯箱固定深底，与主题无关
@@ -37,6 +42,8 @@ export function Lightbox({
   const [scale, setScale] = useState<number | null>(null); // null=适应窗口
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [playing, setPlaying] = useState(false);
+  /** 灯箱先出 p 档预览（快），按需切回原图（T-113）。 */
+  const [showOriginal, setShowOriginal] = useState(false);
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -51,11 +58,14 @@ export function Lightbox({
     [index, items.length, loop, onIndexChange],
   );
 
-  // 换条目重置视图
+  // 换条目重置视图，并按需请求 p 档预览（图片）
   useEffect(() => {
     setScale(null);
     setOffset({ x: 0, y: 0 });
-  }, [index]);
+    setShowOriginal(false);
+    const it = items[index];
+    if (it !== undefined && it.kind === 'image') requestPreview(it.path);
+  }, [index, items, requestPreview]);
 
   // 键盘：←/→ 翻页、Esc 关闭、空格播放暂停
   useEffect(() => {
@@ -81,7 +91,11 @@ export function Lightbox({
   }, [playing, item?.kind, go]);
 
   if (item === undefined) return null;
-  const url = rawUrl(projectId, item.path);
+  const previewName = item.kind === 'image' ? thumbs.get(item.path)?.p : undefined;
+  const url =
+    item.kind === 'image' && previewName !== undefined && !showOriginal
+      ? thumbUrl(projectId, previewName, item.mtime)
+      : rawUrl(projectId, item.path);
   const name = item.path.slice(item.path.lastIndexOf('/') + 1);
   const zoomBy = (factor: number): void => {
     setScale((s) => {
@@ -147,6 +161,11 @@ export function Lightbox({
             <Button size="small" ghost onClick={() => zoomBy(0.8)}>
               −
             </Button>
+            {previewName !== undefined && (
+              <Button size="small" ghost onClick={() => setShowOriginal((v) => !v)}>
+                {showOriginal ? '预览图' : '原图'}
+              </Button>
+            )}
             <Button
               size="small"
               ghost

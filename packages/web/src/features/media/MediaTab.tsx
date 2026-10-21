@@ -1,6 +1,7 @@
-/** 媒体页签（FR-13.5 / T-099）：分组网格（@tanstack/react-virtual 行虚拟化）+
- * 灯箱（缩放平移/翻页/幻灯片/连播）+ 缩略图懒生成队列（渲染层 canvas，
- * 服务端落盘，失败诚实回退图标）。文件树媒体点击经 mediaFocus 信号直达灯箱。 */
+/** 媒体页签（FR-13.5 / T-099 + T-113 v2）：分组网格（react-virtual 行虚拟化）+
+ * 灯箱（缩放平移/翻页/幻灯片/连播）+ 缩略图队列 v2（先查存在性索引直接出图，
+ * 可视区优先生成两级 WebP；Electron 原生解码优先，失败诚实回退图标）。
+ * 文件树媒体点击经 mediaFocus 信号直达灯箱。 */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -9,7 +10,7 @@ import { VideoCameraOutlined, SoundOutlined, FileImageOutlined } from '@ant-desi
 import { api, thumbUrl } from '@/lib/api';
 import { fmtBytes } from '@/lib/format';
 import { useAppStore } from '@/app/store';
-import type { MediaItem } from '@ttfolio/shared';
+import type { MediaItem, ProjectDetail } from '@ttfolio/shared';
 import { DENSITY_PX, KIND_LABEL, columnsFor, groupByFolder, type DensityKey } from './mediaHelpers';
 import { useThumbQueue } from './useThumbQueue';
 import { Lightbox } from './Lightbox';
@@ -33,6 +34,11 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
   const mediaQuery = useQuery({
     queryKey: ['media', projectId],
     queryFn: () => api.get<MediaItem[]>(`/api/projects/${projectId}/media`),
+  });
+  // 项目根路径供 Electron 原生解码（与 ProjectPage 共用 ['project'] 缓存）
+  const { data: detail } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`),
   });
   const items = useMemo(() => {
     const all = mediaQuery.data ?? [];
@@ -72,7 +78,20 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
     overscan: 6,
   });
 
-  const thumbs = useThumbQueue(projectId, items, mediaQuery.isSuccess);
+  // 可视区（含 overscan）优先入队：虚拟化只渲染这些行，滚动即增量补齐
+  const virtualRows = virtualizer.getVirtualItems();
+  const visiblePaths = useMemo(() => {
+    const set = new Set<string>();
+    for (const vi of virtualRows) {
+      const row = rows[vi.index];
+      if (row?.type === 'cells') for (const it of row.items ?? []) set.add(it.path);
+    }
+    return set;
+    // virtualRows 每次滚动都是新数组；用索引串作为稳定依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtualRows.map((v) => v.index).join(','), rows]);
+
+  const thumbs = useThumbQueue(projectId, detail?.dirPath ?? '', items, mediaQuery.isSuccess, visiblePaths);
 
   // 文件树联动：mediaFocus 信号 → 打开对应条目灯箱
   const mediaFocus = useAppStore((s) => s.mediaFocus);
@@ -191,7 +210,7 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                   }}
                 >
                   {(row.items ?? []).map((it) => {
-                    const st = thumbs.get(it.path);
+                    const st = thumbs.states.get(it.path);
                     const flatIndex = items.indexOf(it);
                     return (
                       <button
@@ -219,17 +238,18 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                             background: 'rgba(128,128,128,.08)',
                           }}
                         >
-                          {st === undefined || st.status === 'idle' || st.status === 'loading' ? (
-                            <Spin size="small" />
-                          ) : st.status === 'ready' && st.name !== undefined ? (
+                          {st?.g !== undefined ? (
                             <img
-                              src={thumbUrl(projectId, st.name)}
+                              src={thumbUrl(projectId, st.g, it.mtime)}
                               alt={it.path}
                               loading="lazy"
+                              decoding="async"
                               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
-                          ) : (
+                          ) : st?.status === 'failed' ? (
                             cellIcon(it.kind)
+                          ) : (
+                            <Spin size="small" />
                           )}
                         </div>
                         <div
@@ -260,6 +280,8 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
           onIndexChange={setLightboxIndex}
           onClose={() => setLightboxIndex(null)}
           loop
+          thumbs={thumbs.states}
+          requestPreview={thumbs.requestPreview}
         />
       )}
     </div>

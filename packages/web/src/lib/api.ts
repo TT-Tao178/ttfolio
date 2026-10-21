@@ -7,6 +7,12 @@ declare global {
     __TTFOLIO_PORT__?: string;
     __TTFOLIO_API_BASE__?: string;
     __TTFOLIO_CONTENT_BASE__?: string;
+    /** Electron preload 桥（桌面版才有）：T-113 缩略图原生解码快速路径。 */
+    ttfolioNative?: {
+      setTheme?: (mode: string) => void;
+      /** 主进程 nativeImage 解码并按最长边缩放，返回 dataURL；失败返回 null。 */
+      thumbDecode?: (absPath: string, maxPx: number) => Promise<string | null>;
+    };
   }
 }
 
@@ -113,6 +119,23 @@ export const api = {
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string, query?: Record<string, string>) => request<T>('DELETE', path, undefined, query),
+  /** 原始字节体 POST（FR-13.5 / T-113 缩略图 webp 直传；仅 image/webp 服务端认） */
+  postBinary: async <T>(path: string, body: Blob, contentType: string): Promise<T> => {
+    const res = await fetch(new URL(base() + path, window.location.origin).toString(), {
+      method: 'POST',
+      headers: { 'x-ttfolio-token': token(), 'content-type': contentType },
+      body,
+    });
+    const payload = (await res.json().catch(() => null)) as ApiResponse<T> | null;
+    if (payload !== null && payload.ok === true) return payload.data;
+    const err = payload !== null && payload.ok === false ? payload.error : undefined;
+    throw new ApiClientError(
+      err?.code ?? `HTTP_${res.status}`,
+      err?.message ?? `请求失败（HTTP ${res.status}）`,
+      err?.detail,
+      res.status,
+    );
+  },
 };
 
 /** 用户内容端口（架构图/原始文件），与应用同 host 不同端口（C-13 跨源隔离）。 */
@@ -139,8 +162,11 @@ export function avatarUrl(): string {
 }
 
 /** 数据目录缩略图（FR-13.5）：sha1(相对路径).png，由渲染层生成后经服务端落盘。 */
-export function thumbUrl(projectId: string, thumbName: string): string {
-  return `${userContentBase()}/thumbs/${projectId}/${thumbName}?token=${encodeURIComponent(token())}`;
+/** 缩略图 URL（FR-13.5 / T-113）：带源文件 mtime 作版本参数，配合服务端 immutable 缓存。 */
+export function thumbUrl(projectId: string, thumbName: string, version?: string | null): string {
+  const v =
+    version === undefined || version === null || version === '' ? '' : `&v=${encodeURIComponent(version)}`;
+  return `${userContentBase()}/thumbs/${projectId}/${thumbName}?token=${encodeURIComponent(token())}${v}`;
 }
 
 export function sseUrl(): string {
