@@ -1,5 +1,48 @@
 # PROGRESS
 
+## 第 47 轮：第二批规划任务 T-098~T-100（体验与效率，用户点名分批实施 → v0.3.10）
+
+> 第二批无批内强依赖，按 T-098 → T-099 → T-100 顺序实施；6 个功能提交 +
+> 1 个探针修复，每提交门禁三绿。批次末用隔离环境真实 HTTP 探针（23 项）
+> 验证迁移升级与新增接口，抓出 2 个契约 bug 并修复。
+
+- **T-098 代码配色三方案（4eec530 / 77812c5）**：设置键 syntax_scheme
+  （classic 默认/warm/neon；服务端 GET 投影与 PATCH 白名单统一 isSyntaxScheme
+  归一，非法值不落库）；cmHighlight(dark, scheme) 三方案 × 深浅 6 组色板、
+  七类 token；classic 深色沿用原观感、neon 浅色自动降饱和；入口两处
+  （PathBar 下拉 + 设置外观卡分段与实时预览）；**顺带补上文档代码块高亮**
+  ——MarkdownPreview 的 pre 改为只读 CodeMirror（语言 id→扩展名映射），
+  编辑器/文档/动态视图/设置预览四处同源。
+- **T-099 多媒体库（9d2bb1f / fa6d6c0 / b742335）**：迁移 0006（media_files，
+  尺寸时长预留列）；分析器单遍扫描顺带收集（mtime 在 stat 时捕获），事务
+  全量重写幂等、文件消失即移除；mediaKindOf 收敛到 shared（前后端同源）；
+  userContent /raw 补 HTTP Range（206/Content-Range/Accept-Ranges/416，
+  解析抽纯函数）+ 音视频 MIME + 新增 /thumbs；缩略图管线按批准方案走
+  **渲染层 canvas 统一生成**（图片解码/视频取中点帧→POST→服务端校验后写
+  数据目录 thumbs/，sha1 命名天然无穿越，绝不写项目目录）；MediaTab 分组
+  虚拟网格（react-virtual 首次启用）/三档密度/类型筛选、Lightbox（缩放
+  平移/翻页/键盘/3s 幻灯片/全屏/音频连播/视频 Range 播放）、文件树媒体
+  点击经 store.mediaFocus 直达灯箱。**规划核减**：未引入 nativeImage
+  （视频帧根本解不了、且违反数据目录单写者）。
+- **T-100 命令中心（fca7bc2 / ed4c4dd）**：注册表单一来源（21 条内置命令、
+  11 条可改绑、模板入表、插件贡献点预留）；纯函数模糊匹配/MRU/chord 解析
+  与捕获；面板双模式（> 前缀与 Ctrl+Shift+P；分类分组、MRU 置顶、参数化
+  命令内联项目多选）；App 全局快捷键改查表、`?` 帮助由注册表生成；
+  **FR-11.4 随之闭合**：设置新增「快捷键」分区，逐条改绑（捕获下一个组合、
+  必须有修饰键、冲突检测、恢复默认）；Ctrl+K 在面板内仍可关闭面板；
+  EditorPane 保存按绑定匹配 + 响应命令广播（仅编辑态且有改动时落盘）。
+- **探针（b742335）**：隔离数据目录起真实服务，先手工造 user_version=4 的
+  老库再启动，验证 0005/0006 升级、媒体分类、Range 206、缩略图落盘（项目
+  目录零改动）、agent manifest/会话/actor 审计、watcher 沉淀、syntax_scheme
+  往返与非法兜底、无 token 401——23/23 PASS。**探针抓出并修复**：①缩略图
+  端点返回 "projectId/name" 与前端 thumbUrl 二次拼前缀冲突；②/thumbs 的
+  projectId 白名单只允许小写 hex，而项目 id 是 ULID（大写）→ 恒 404。
+  **探针坑**：Windows 下 shell:true 启动的 tsx 是孙进程，child.kill() 杀不掉，
+  残留实例占端口导致第二次探针读到旧服务（表现为"数据全没了"假象）——改
+  taskkill /T /F 杀进程树，本轮已实测端口释放。
+- **收口**：任务总表生成器把 T-098/099/100 移入 PLANNED_DONE 并重生成
+  （规划已完成 6 / 待做 10）；KNOWN-GAPS 仍为三项（无新打折项）。
+
 ## 第 46 轮：第一批规划任务 T-095~T-097（Agent 协作三部曲，用户点名分批实施 → v0.3.9）
 
 > 2026-10-21 用户点名「实现 T-095~T-100，分两批：每批测试后打包」。第一批
