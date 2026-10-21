@@ -18,13 +18,32 @@ interface TaskRecord extends TaskInfo {
   cancelled: boolean;
 }
 
+/** 任务历史持久化钩子（FR-13.11 / T-108）：实现方自兜异常隔离之外，这里再 try/catch 包一层。 */
+export interface TaskRunPersist {
+  runStarted(id: string, kind: string, title: string, startedAt: string): void;
+  runFinished(
+    id: string,
+    status: 'done' | 'error' | 'cancelled',
+    error: string | null,
+    finishedAt: string,
+    done: number,
+    total: number,
+  ): void;
+}
+
 export class TaskManager {
   private tasks = new Map<string, TaskRecord>();
+  private persist: TaskRunPersist | null = null;
 
   constructor(
     private readonly sse: SseHub,
     private readonly logger: Logger,
   ) {}
+
+  /** 挂接任务历史落库（库打开后调用；传 null 解绑）。持久化失败绝不影响任务本身。 */
+  setRunPersistence(p: TaskRunPersist | null): void {
+    this.persist = p;
+  }
 
   start(kind: TaskInfo['kind'], title: string, total: number, runner: Runner): string {
     const taskId = ulid();
@@ -39,6 +58,11 @@ export class TaskManager {
       cancelled: false,
     };
     this.tasks.set(taskId, record);
+    try {
+      this.persist?.runStarted(taskId, record.kind, title, record.startedAt);
+    } catch {
+      /* 历史落库失败不影响任务 */
+    }
     const ctx: TaskContext = {
       taskId,
       checkCancelled: () => {
@@ -66,6 +90,18 @@ export class TaskManager {
         }
         record.finishedAt = new Date().toISOString();
         this.emitProgress(record);
+        try {
+          this.persist?.runFinished(
+            taskId,
+            record.status as 'done' | 'cancelled',
+            null,
+            record.finishedAt,
+            record.done,
+            record.total,
+          );
+        } catch {
+          /* 历史落库失败不影响任务 */
+        }
       })
       .catch((err: unknown) => {
         const code = (err as { code?: string }).code;
@@ -73,6 +109,18 @@ export class TaskManager {
         record.error = err instanceof Error ? err.message : String(err);
         record.finishedAt = new Date().toISOString();
         this.emitProgress(record);
+        try {
+          this.persist?.runFinished(
+            taskId,
+            record.status as 'error' | 'cancelled',
+            record.error,
+            record.finishedAt,
+            record.done,
+            record.total,
+          );
+        } catch {
+          /* 历史落库失败不影响任务 */
+        }
         if (record.status === 'error') {
           this.logger.warn({ mod: 'tasks', msg: `task ${record.kind} failed: ${record.error}` });
         }

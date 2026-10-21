@@ -16,8 +16,14 @@ import { checkPathOk } from './db/repo/projectsRepo.js';
 import { setDefaultActorName } from './core/actor.js';
 import { hasWindowsPathHazard } from './core/pathGuard.js';
 import { compileIgnore } from './core/ignore.js';
-import { createBackup } from './core/backup.js';
+import { createBackup, applyRetentionByDays } from './core/backup.js';
 import { getSetting, setSetting } from './db/repo/metaRepo.js';
+import {
+  insertTaskRun,
+  finishTaskRun,
+  purgeOldTaskRuns,
+  failStaleRunningTaskRuns,
+} from './db/repo/taskRunRepo.js';
 import { recordSessionFileChanges } from './db/repo/agentSessionRepo.js';
 import { enforceQuota } from './core/thumbs.js';
 import { getAll } from './db/sql.js';
@@ -100,6 +106,24 @@ async function main(): Promise<void> {
       logger.warn({ mod: 'boot', msg: `backup failed: ${err instanceof Error ? err.message : String(err)}` });
     }
   }
+  // 备份保留可配（FR-13.11 / T-108）：backup_keep_days > 0 时按天数清理过期快照
+  try {
+    const keepDays = Number(getSetting(db, 'backup_keep_days') ?? '0');
+    const removed = applyRetentionByDays(layout.backupDir, keepDays);
+    if (removed > 0) {
+      logger.info({ mod: 'boot', msg: `backup retention(${keepDays}d): removed ${removed}` });
+    }
+  } catch {
+    /* 保留清理失败不阻断启动 */
+  }
+
+  // ---- 任务历史（FR-13.11 / T-108）：启动清 30 天前历史 + 崩溃遗留 running 判死 ----
+  try {
+    purgeOldTaskRuns(db, 30);
+    failStaleRunningTaskRuns(db);
+  } catch {
+    /* 历史清理失败不阻断启动 */
+  }
 
   // ---- 端口探测 ----
   // token 持久化（DECISIONS.md D-TOKEN）：dev 下 tsx watch 每次改后端代码都会重启进程，
@@ -126,6 +150,12 @@ async function main(): Promise<void> {
   // ---- 服务装配 ----
   const sse = new SseHub();
   const tasks = new TaskManager(sse, logger);
+  // 任务历史落库（FR-13.11 / T-108）：经 store.get() 惰性取当前库句柄（库恢复重建后不悬空）
+  tasks.setRunPersistence({
+    runStarted: (id, kind, title, startedAt) => insertTaskRun(store.get(), { id, kind, title, startedAt }),
+    runFinished: (id, status, error, finishedAt, done, total) =>
+      finishTaskRun(store.get(), { id, status, error, finishedAt, done, total }),
+  });
   // 资源仓库沉淀（FR-13.3 / T-097）：flush 后把变更相对路径聚合进「记录中」的会话；
   // 仓库内部自检活动会话，无会话时零成本跳过
   const watcher = new WatcherManager(sse, logger, (projectId, relPaths) => {

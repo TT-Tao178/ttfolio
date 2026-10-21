@@ -26,6 +26,7 @@ import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
 import { TagHub } from './TagHub';
+import { HealthCard } from './HealthCard';
 import { UpdateCheck } from './UpdateCheck';
 import sponsorAlipay from '@/assets/sponsor/alipay.jpg';
 import sponsorWechat from '@/assets/sponsor/wechat.jpg';
@@ -574,6 +575,12 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                 />
               </div>
             )}
+          </Card>
+        </SectionAnchor>
+
+        <SectionAnchor id="health">
+          <Card size="small" title={sectionTitle('health')}>
+            <HealthCard />
           </Card>
         </SectionAnchor>
 

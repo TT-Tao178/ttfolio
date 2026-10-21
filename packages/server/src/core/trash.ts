@@ -159,11 +159,12 @@ export class TrashService {
     return { content: content.content, encoding: content.encoding, size: st.size };
   }
 
-  /** 恢复到原路径；目标被占用时返回 'taken'。 */
+  /** 恢复到原路径；目标被占用时返回 'taken'（overwrite=true 且未指定 targetDir 时覆盖占位文件）。 */
   restore(
     db: Database.Database,
     id: string,
     targetDir?: string,
+    overwrite = false,
   ): { status: 'ok' | 'taken'; restoredTo?: string } {
     const row = getTrashRow(db, id);
     if (row === undefined) throw new AppError('NOT_FOUND', '回收站条目不存在');
@@ -182,7 +183,13 @@ export class TrashService {
     const parent = targetDir ?? path.dirname(row.origin_path);
     const dest = path.join(parent, name);
     if (existsSync(dest)) {
-      return { status: 'taken' };
+      // 覆盖恢复（FR-13.11 / T-108）：仅在恢复原路径（未指定 targetDir）时允许，
+      // 显式用户选择 + 路由层审计；指定目录恢复不提供覆盖，防误删别处同名文件
+      if (overwrite && targetDir === undefined) {
+        rmSync(dest, { recursive: true, force: true });
+      } else {
+        return { status: 'taken' };
+      }
     }
     fsx.ensureDir(parent);
     try {

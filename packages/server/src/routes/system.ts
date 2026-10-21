@@ -13,8 +13,10 @@ import {
   updateCommandTemplate,
   deleteCommandTemplate,
 } from '../db/repo/rulesRepo.js';
-import { createBackup, listBackups, restoreBackup } from '../core/backup.js';
+import { createBackup, listBackups, restoreBackup, applyRetentionByDays } from '../core/backup.js';
 import { integrityCheck } from '../db/migrate.js';
+import { buildProjectIndex, clearProjectIndex } from '../core/search.js';
+import { listTaskRuns } from '../db/repo/taskRunRepo.js';
 import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
 import {
@@ -34,11 +36,24 @@ import { z } from 'zod';
 import type Database from 'better-sqlite3';
 import { listProjects } from '../db/repo/projectsRepo.js';
 import { rewatchAll } from './helpers.js';
+import { currentActor } from '../core/actor.js';
 
 /** 在册未删除项目（watcher 全量重建用）。 */
 function activeProjects(db: Database.Database): Array<{ id: string; dir_path: string }> {
   return listProjects(db, { status: 'all' }).map((p) => ({ id: p.id, dir_path: p.dirPath }));
 }
+
+/** 迁移清单标签（库体检展示用；与 src/migrations/ 目录一一对应）。 */
+const MIGRATION_LABELS: Array<{ file: string; label: string }> = [
+  { file: '0001', label: '初始结构' },
+  { file: '0002', label: '会话活动标签' },
+  { file: '0003', label: '提交主题列' },
+  { file: '0004', label: '集合成员索引' },
+  { file: '0005', label: '资源仓库' },
+  { file: '0006', label: '多媒体库' },
+  { file: '0007', label: '架构图查看快照' },
+  { file: '0008', label: '后台任务历史' },
+];
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
@@ -83,6 +98,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       watchStabilityMs: Number(all[SETTING_KEYS.watchStabilityMs] ?? '300'),
       autoSave: (all[SETTING_KEYS.autoSave] ?? '0') === '1',
       trashRetentionDays: Number(all[SETTING_KEYS.trashRetentionDays] ?? String(TRASH_RETENTION_DAYS)),
+      backupKeepDays: Number(all['backup_keep_days'] ?? '0'),
       defaultArchDirName: all[SETTING_KEYS.defaultArchDirName] ?? '架构图',
       cardSort: all[SETTING_KEYS.cardSort] ?? 'last_opened',
       showIgnored: (all[SETTING_KEYS.showIgnored] ?? '0') === '1',
@@ -117,6 +133,11 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       trash_retention_days: (v) => {
         const n = Number(v);
         return String(Number.isFinite(n) && n >= 1 ? Math.round(n) : 30);
+      },
+      backup_keep_days: (v) => {
+        // 0 = 沿用智能保留（最近 10 份 + 每周 1 份）；>0 = 按天清理过期快照
+        const n = Number(v);
+        return String(Number.isFinite(n) && n >= 1 ? Math.round(n) : 0);
       },
       default_arch_dir_name: (v) => String(v),
       card_sort: (v) => String(v),
@@ -440,12 +461,122 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.post('/api/backup', async () => {
     const r = createBackup(ctx.layout.dbFile, ctx.layout.backupDir);
     setSetting(ctx.db(), SETTING_KEYS.lastBackupAt, new Date().toISOString());
+    // 备份保留可配（FR-13.11 / T-108）：>0 天时顺带清理过期快照并如实返回
+    const keepDays = Number(getSetting(ctx.db(), 'backup_keep_days') ?? '0');
+    const purged = applyRetentionByDays(ctx.layout.backupDir, keepDays);
     logActivity(ctx.db(), {
       kind: 'library.backup',
       level: 'L1',
-      detail: { file: r.file, integrity: r.integrity },
+      detail: { file: r.file, integrity: r.integrity, purgedByRetention: purged },
     });
-    return ok(r);
+    return ok({ ...r, purgedByRetention: purged });
+  });
+
+  // ---- 库体检（FR-13.11 / T-108）----
+  app.get('/api/health/overview', async () => {
+    const db = ctx.db();
+    const userVersion = db.pragma('user_version', { simple: true });
+    const count = (sql: string): number => {
+      const row = db.prepare<[], { c: number }>(sql).get();
+      return row?.c ?? 0;
+    };
+    return ok({
+      dbPath: ctx.layout.dbFile,
+      dbSize: ctx.dbSize(),
+      userVersion,
+      migrations: MIGRATION_LABELS,
+      tables: {
+        projects: count('SELECT COUNT(*) AS c FROM projects WHERE deleted_at IS NULL'),
+        trash: count('SELECT COUNT(*) AS c FROM trash'),
+        collections: count('SELECT COUNT(*) AS c FROM collections'),
+        tags: count('SELECT COUNT(*) AS c FROM tags'),
+        todos: count('SELECT COUNT(*) AS c FROM todos WHERE deleted_at IS NULL'),
+        editorDrafts: count('SELECT COUNT(*) AS c FROM editor_drafts'),
+        recentFiles: count('SELECT COUNT(*) AS c FROM recent_files'),
+        media: count('SELECT COUNT(*) AS c FROM media_files'),
+        activity: count('SELECT COUNT(*) AS c FROM activity_log'),
+        taskRuns: count('SELECT COUNT(*) AS c FROM task_runs'),
+      },
+    });
+  });
+
+  // schema 全外键级联 ⇒ 真正的孤儿行被约束杜绝；体检 = 完整性 + 外键两项检测下结论
+  app.post('/api/health/integrity', async () => {
+    const db = ctx.db();
+    const integrity = db.pragma('integrity_check', { simple: true });
+    const fkViolations = db.pragma('foreign_key_check');
+    logActivity(ctx.db(), {
+      kind: 'library.health_check',
+      level: 'L1',
+      detail: { integrity, fkViolations: Array.isArray(fkViolations) ? fkViolations.length : 0 },
+      actor: currentActor().actor,
+    });
+    return ok({
+      integrity: typeof integrity === 'string' ? integrity : JSON.stringify(integrity),
+      fkViolations,
+    });
+  });
+
+  app.post('/api/health/maintenance', async (req) => {
+    const b = (req.body ?? {}) as { op?: string };
+    if (b.op !== 'vacuum' && b.op !== 'analyze') return fail('BAD_REQUEST', 'op 必须是 vacuum 或 analyze');
+    const db = ctx.db();
+    const before = ctx.dbSize();
+    db.exec(b.op.toUpperCase());
+    logActivity(ctx.db(), {
+      kind: b.op === 'vacuum' ? 'library.vacuum' : 'library.analyze',
+      level: 'L2',
+      detail: { sizeBytesBefore: before, sizeBytesAfter: ctx.dbSize() },
+      actor: currentActor().actor,
+    });
+    return ok({ done: true, sizeBytesBefore: before, sizeBytesAfter: ctx.dbSize() });
+  });
+
+  // 内容索引清单（按项目）：状态表条目数 + FTS 行数
+  app.get('/api/health/fts', async () => {
+    const db = ctx.db();
+    const rows = db
+      .prepare<[], { projectId: string; name: string; stateCount: number; ftsRows: number }>(
+        `SELECT p.id AS projectId,
+                COALESCE(NULLIF(p.alias, ''), p.disk_name) AS name,
+                (SELECT COUNT(*) FROM content_index_state s WHERE s.project_id = p.id) AS stateCount,
+                (SELECT COUNT(*) FROM content_fts f WHERE f.project_id = p.id) AS ftsRows
+         FROM projects p WHERE p.deleted_at IS NULL
+         ORDER BY name`,
+      )
+      .all();
+    return ok(rows);
+  });
+
+  // 重建 = 清空该项目索引后全量重析（复用搜索域的构建链与任务通道）
+  app.post('/api/health/fts/rebuild', async (req) => {
+    const b = (req.body ?? {}) as { projectId?: string };
+    if (b.projectId === undefined) return fail('BAD_REQUEST', '缺少 projectId');
+    const db = ctx.db();
+    const row = db
+      .prepare<[string], { id: string; disk_name: string; dir_path: string }>(
+        'SELECT id, disk_name, dir_path FROM projects WHERE id = ? AND deleted_at IS NULL',
+      )
+      .get(b.projectId);
+    if (row === undefined) return fail('NOT_FOUND', '项目不存在', 404);
+    clearProjectIndex(db, row.id);
+    const pid = row.id;
+    const taskId = ctx.tasks.start('index', `重建内容索引：${row.disk_name}`, 0, async (taskCtx) => {
+      await buildProjectIndex(db, pid, row.dir_path, taskCtx);
+    });
+    logActivity(ctx.db(), {
+      kind: 'library.fts_rebuild',
+      level: 'L2',
+      projectId: row.id,
+      actor: currentActor().actor,
+    });
+    return ok({ taskId });
+  });
+
+  app.get('/api/tasks/history', async (req) => {
+    const q = req.query as { limit?: string };
+    const limit = Math.min(Math.max(Number(q.limit ?? '50'), 1), 200);
+    return ok(listTaskRuns(ctx.db(), limit));
   });
 
   app.post('/api/restore', async (req) => {

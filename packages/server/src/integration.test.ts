@@ -29,6 +29,13 @@ import {
 import { pathKey } from './db/repo/docsRepo.js';
 import { setArchiveViewSnapshot, getArchiveViewSnapshot } from './db/repo/docsRepo.js';
 import { renameTag, mergeTag, deleteTag, listTagsWithCount } from './db/repo/tagsRepo.js';
+import {
+  insertTaskRun,
+  finishTaskRun,
+  getTaskRun,
+  purgeOldTaskRuns,
+  failStaleRunningTaskRuns,
+} from './db/repo/taskRunRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
@@ -422,7 +429,7 @@ describe('回收站副本只读读取（FR-13.9 / T-106b）', () => {
 
 describe('架构图查看快照（FR-13.9 ③ / T-106c）', () => {
   it('迁移 0007 就位；快照写读往返、坏 JSON 降级 null', () => {
-    expect(db.pragma('user_version', { simple: true })).toBe(7);
+    expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(7);
     // 快照表外键指向 archives，须先插一条真实图集行
     const dirA = path.join(root, 'snap-arch');
     fs.mkdirSync(dirA, { recursive: true });
@@ -489,6 +496,39 @@ describe('标签中枢（FR-13.10 / T-107）', () => {
     expect(db.prepare('SELECT COUNT(*) AS c FROM project_tags').get()).toEqual({ c: 0 });
     const listed = listTagsWithCount(db).find((t) => t.id === 'tag-a');
     expect(listed).toBeUndefined();
+  });
+});
+
+describe('任务历史（FR-13.11 / T-108）', () => {
+  it('task_runs 落库/完成/崩溃判死/保留清理', () => {
+    insertTaskRun(db, {
+      id: 'tr-1',
+      kind: 'index',
+      title: '建立内容索引：demo',
+      startedAt: new Date().toISOString(),
+    });
+    finishTaskRun(db, {
+      id: 'tr-1',
+      status: 'error',
+      error: '文件被占用',
+      finishedAt: new Date().toISOString(),
+      done: 3,
+      total: 10,
+    });
+    const row = getTaskRun(db, 'tr-1');
+    expect(row?.status).toBe('error');
+    expect(row?.error).toBe('文件被占用');
+    expect(row?.durationMs).not.toBeNull();
+
+    // 崩溃遗留：started_at 很旧的 running 判死为 error
+    insertTaskRun(db, { id: 'tr-2', kind: 'analyze', title: 'x', startedAt: '2020-01-01T00:00:00.000Z' });
+    failStaleRunningTaskRuns(db);
+    expect(getTaskRun(db, 'tr-2')?.status).toBe('error');
+
+    // 保留清理：30 天内的留下、超期的删除
+    purgeOldTaskRuns(db, 30);
+    expect(getTaskRun(db, 'tr-2')).toBeNull();
+    expect(getTaskRun(db, 'tr-1')).not.toBeNull();
   });
 });
 

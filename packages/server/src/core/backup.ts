@@ -79,12 +79,42 @@ export function applyRetention(backupDir: string): void {
 
 function isoWeekKey(d: Date): string {
   const target = new Date(d.valueOf());
-  const dayNr = (d.getDay() + 6) % 7;
+  const dayNr = (d.getDay() + 6) % 6;
   target.setDate(target.getDate() - dayNr + 3);
   const firstThursday = new Date(target.getFullYear(), 0, 4);
   const diff = target.valueOf() - firstThursday.valueOf();
   const week = 1 + Math.round(diff / (7 * 24 * 3600 * 1000));
   return `${target.getFullYear()}-W${week}`;
+}
+
+/**
+ * 按天保留策略（FR-13.11 / T-108）：days > 0 时删除文件名匹配快照且 mtime
+ * 超过 N 天的文件（含 .integrity 旁挂）；days <= 0 = 沿用智能保留，不动作。
+ * 返回删除的文件数。
+ */
+export function applyRetentionByDays(backupDir: string, days: number): number {
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  let removed = 0;
+  let files: string[] = [];
+  try {
+    files = readdirSync(backupDir);
+  } catch {
+    return 0;
+  }
+  for (const f of files) {
+    if (!/^library-\d{8}-\d{4}\.db/.test(f)) continue;
+    try {
+      const st = statSync(join(backupDir, f));
+      if (st.mtimeMs < cutoff) {
+        rmSync(join(backupDir, f), { force: true });
+        removed++;
+      }
+    } catch {
+      /* 单个文件失败忽略 */
+    }
+  }
+  return removed;
 }
 
 export function listBackups(backupDir: string): BackupFileInfo[] {

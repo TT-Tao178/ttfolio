@@ -1,5 +1,5 @@
 /** 回收站页（FR-4.9）：列表/预览/恢复/彻底删除/清空/保留策略清理。 */
-import { Alert, App, Button, Empty, List, Modal, Space, Tag } from 'antd';
+import { Alert, App, Button, Empty, List, Modal, Select, Space, Tag } from 'antd';
 import { DeleteOutlined, DiffOutlined, UndoOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -67,31 +67,46 @@ export function TrashPage(): React.JSX.Element {
     void queryClient.invalidateQueries({ queryKey: ['trash'] });
   };
 
+  // 按项目筛选（FR-13.11 / T-108）；合计随筛选走
+  const [scopeProject, setScopeProject] = useState<string | undefined>(undefined);
+  const filtered = (items ?? []).filter((t) => scopeProject === undefined || t.projectId === scopeProject);
+
   const restore = useMutation({
-    mutationFn: (v: { id: string; targetDir?: string }) => api.post('/api/trash/restore', v),
-    onSuccess: () => {
-      void message.success('已恢复');
+    mutationFn: (v: { id: string; targetDir?: string; overwrite?: boolean }) =>
+      api.post('/api/trash/restore', v),
+    onSuccess: (_r, v) => {
+      void message.success(v.overwrite === true ? '已恢复（覆盖原位置文件）' : '已恢复');
       invalidate();
     },
     onError: (e, v) => {
-      // 原路径被占用（服务端 409 TRASH_PATH_TAKEN）：此前只能报错死路——后端 restore
-      // 本就支持 targetDir（评审时核实），接上「选择其他目录恢复」
+      // 原路径被占用（服务端 409 TRASH_PATH_TAKEN）：提供三条路——覆盖原位置（FR-13.11 /
+      // T-108，二次确认）、指定其他目录恢复、取消
       if (e instanceof ApiClientError && e.code === 'TRASH_PATH_TAKEN') {
         modal.confirm({
           title: '原路径已被占用',
-          content: '可指定其他目录恢复（将保持条目原名）。',
-          okText: '选择目录…',
+          content: '可以覆盖原位置的现有文件后恢复（现有内容将丢失、不可恢复），或指定其他目录。',
+          okText: '覆盖原位置',
+          okButtonProps: { danger: true },
           cancelText: '取消',
-          onOk: async () => {
-            try {
-              void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
-              const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
-              const dir = r.paths[0];
-              if (dir !== undefined) restore.mutate({ id: v.id, targetDir: dir });
-              else void message.info('未选择目录');
-            } catch {
-              void message.error('打开系统对话框失败');
-            }
+          onOk: () => restore.mutate({ id: v.id, overwrite: true }),
+          onCancel: () => {
+            modal.confirm({
+              title: '恢复到其他目录',
+              content: '可指定其他目录恢复（将保持条目原名）。',
+              okText: '选择目录…',
+              cancelText: '取消',
+              onOk: async () => {
+                try {
+                  void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
+                  const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
+                  const dir = r.paths[0];
+                  if (dir !== undefined) restore.mutate({ id: v.id, targetDir: dir });
+                  else void message.info('未选择目录');
+                } catch {
+                  void message.error('打开系统对话框失败');
+                }
+              },
+            });
           },
         });
         return;
@@ -118,11 +133,22 @@ export function TrashPage(): React.JSX.Element {
 
   return (
     <div style={{ padding: 16, height: '100%', overflow: 'auto' }} data-testid="trash-page">
-      <Space style={{ marginBottom: 12 }}>
+      <Space style={{ marginBottom: 12 }} wrap>
         <strong>回收站</strong>
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          placeholder="按项目筛选"
+          style={{ minWidth: 160 }}
+          value={scopeProject}
+          onChange={setScopeProject}
+          options={(projects ?? []).map((p) => ({ value: p.id, label: p.alias ?? p.diskName }))}
+          data-testid="trash-project-filter"
+        />
         <span style={{ fontSize: 12, opacity: 0.7 }}>
-          {(items ?? []).length} 条 · {fmtBytes((items ?? []).reduce((a, t) => a + t.sizeBytes, 0))} ·
-          默认保留 30 天（到期在设置页提示清理，不自动删）
+          {filtered.length} 条 · {fmtBytes(filtered.reduce((a, t) => a + t.sizeBytes, 0))} · 默认保留 30
+          天（到期在设置页提示清理，不自动删）
         </span>
         <div style={{ flex: 1 }} />
         <Button
@@ -167,7 +193,7 @@ export function TrashPage(): React.JSX.Element {
         emptyText="回收站是空的"
       >
         <List
-          dataSource={items ?? []}
+          dataSource={filtered}
           renderItem={(t) => (
             <List.Item style={{ padding: '6px 0' }}>
               <span style={{ display: 'inline-flex', gap: 8, width: '100%', alignItems: 'center' }}>

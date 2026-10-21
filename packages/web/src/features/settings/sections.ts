@@ -24,6 +24,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'shortcuts', label: '快捷键', title: '快捷键' },
   { key: 'watch', label: '文件监听与保存', title: '文件监听与保存' },
   { key: 'data', label: '数据与备份', title: '数据与备份' },
+  { key: 'health', label: '库体检', title: '库体检' },
   { key: 'about', label: '关于', title: '关于' },
 ];
 

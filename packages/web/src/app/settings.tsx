@@ -39,6 +39,8 @@ export interface SettingsShape {
   watchStabilityMs: number;
   autoSave: boolean;
   trashRetentionDays: number;
+  /** 备份快照保留天数（FR-13.11 / T-108）；0 = 智能保留 */
+  backupKeepDays: number;
   defaultArchDirName: string;
   cardSort: string;
   showIgnored: boolean;
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   watchStabilityMs: 300,
   autoSave: false,
   trashRetentionDays: 30,
+  backupKeepDays: 0,
   defaultArchDirName: '架构图',
   cardSort: 'last_opened',
   showIgnored: false,
@@ -88,6 +91,7 @@ const SERVER_KEY: Record<string, string> = {
   watchStabilityMs: 'watch_stability_ms',
   autoSave: 'auto_save',
   trashRetentionDays: 'trash_retention_days',
+  backupKeepDays: 'backup_keep_days',
   defaultArchDirName: 'default_arch_dir_name',
   cardSort: 'card_sort',
   showIgnored: 'show_ignored',
