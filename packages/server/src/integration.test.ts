@@ -17,7 +17,7 @@ import {
   checkPathOk,
   needsReanalyze,
 } from './db/repo/projectsRepo.js';
-import { getSession, putSession } from './db/repo/sessionRepo.js';
+import { getSession, putSession, listTodos, createTodo, patchTodo } from './db/repo/sessionRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
@@ -299,6 +299,46 @@ describe('软删除与 rev 乐观锁', () => {
     softDeleteProject(db, row.id);
     expect(getProjectByPathKey(db, pathKey(projDir))).toBeUndefined();
     expect(listProjects(db, { status: 'all' }).find((p) => p.id === row.id)).toBeUndefined();
+  });
+});
+
+describe('跨项目未完成清单（FR-9.3 / T-109）', () => {
+  it('scope=all 跨项目聚合、includeDone=0 只留未完成、已移除项目剔除', () => {
+    const dirA = path.join(root, 'todo 项目甲');
+    const dirB = path.join(root, 'todo 项目乙');
+    fs.mkdirSync(dirA, { recursive: true });
+    fs.mkdirSync(dirB, { recursive: true });
+    const pa = insertProject(db, {
+      dirPath: dirA,
+      dirPathKey: pathKey(dirA),
+      diskName: 'todo 项目甲',
+      defaultArchDir: '架构图',
+    });
+    const pb = insertProject(db, {
+      dirPath: dirB,
+      dirPathKey: pathKey(dirB),
+      diskName: 'todo 项目乙',
+      defaultArchDir: '架构图',
+    });
+    createTodo(db, { projectId: pa.id, title: '甲任务', category: null, dueOn: '2026-10-01', sortOrder: 1 });
+    createTodo(db, { projectId: pb.id, title: '乙任务', category: null, dueOn: null, sortOrder: 2 });
+    const doneOne = createTodo(db, {
+      projectId: pb.id,
+      title: '乙已完成',
+      category: null,
+      dueOn: null,
+      sortOrder: 3,
+    });
+    expect(patchTodo(db, doneOne.id, { done: true })).toBe(true);
+
+    const open = listTodos(db, { scopeAll: true, includeDone: false });
+    expect(open.map((t) => t.title)).toEqual(['甲任务', '乙任务']);
+    expect(open.every((t) => !t.done)).toBe(true);
+
+    // 软删项目后其清单不再出现在跨项目视图（JOIN projects 剔除）
+    softDeleteProject(db, pb.id);
+    const after = listTodos(db, { scopeAll: true, includeDone: false });
+    expect(after.map((t) => t.title)).toEqual(['甲任务']);
   });
 });
 

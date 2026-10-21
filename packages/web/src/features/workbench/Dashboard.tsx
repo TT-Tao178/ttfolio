@@ -4,19 +4,23 @@
  * 总览收敛为「KPI 一眼看全局 + 项目卡片直达」。
  */
 import { App, Button, Card, Empty, List, Pagination, Statistic, Tag, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { CheckOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { api, ApiClientError } from '@/lib/api';
-import type { ProjectSummary } from '@ttfolio/shared';
+import type { ProjectSummary, TodoItem } from '@ttfolio/shared';
 import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { ProjectCard } from './ProjectCard';
+import { buildTodoDigest } from './todoDigest';
 import { langColor, SEMANTIC } from '@/theme/tokens';
 
 /** 总览项目卡片的每页数量：1440 宽下约 3 列，12 个 = 4 屏内可翻完 */
 const PAGE_SIZE = 12;
+
+/** 跨项目未完成清单（FR-9.3）的展示上限：只影响展示，计数仍报全量 */
+const TODO_DIGEST_LIMIT = 10;
 
 /** 本地时区的 YYYY-MM-DD（评审：用 UTC 的 toISOString 比对「今天」，东八区每天 0-8 点算成昨天） */
 function localDateKey(d: Date): string {
@@ -32,8 +36,13 @@ export function Dashboard(): React.JSX.Element {
     queryKey: ['projects', 'dashboard', settings.cardSort],
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort }),
   });
+  // 跨项目未完成清单（FR-9.3）：只取未完成，汇总卡按项目分组展示
+  const { data: openTodos } = useQuery({
+    queryKey: ['todos', 'dash-digest'],
+    queryFn: () => api.get<TodoItem[]>('/api/todos?scope=all&includeDone=0'),
+  });
 
-  const list = projects ?? [];
+  const list = React.useMemo(() => projects ?? [], [projects]);
   const dirty = list.filter((p) => p.gitIsRepo && p.gitDirty).length;
   const noDocs = list.filter((p) => !p.hasDocs).length;
   const noArch = list.filter((p) => !p.hasArch).length;
@@ -112,14 +121,37 @@ export function Dashboard(): React.JSX.Element {
 
   // ---- 「需要关注」行动条：只显示计数 > 0 的项，点击跳对应卡片墙 ----
   const unanalyzed = list.filter((p) => p.analyzedAt === null).length;
+  const todoDigest = React.useMemo(() => {
+    const names = new Map(list.map((p) => [p.id, p.alias ?? p.diskName]));
+    return buildTodoDigest(openTodos ?? [], names, TODO_DIGEST_LIMIT);
+  }, [openTodos, list]);
+  const todoDone = useMutation({
+    mutationFn: (id: string) => api.patch(`/api/todos/${id}`, { done: true }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+  });
+  const todosCardRef = React.useRef<HTMLDivElement | null>(null);
   const attention = [
     { key: 'my-dirty', label: '有未提交改动', count: dirty },
     { key: 'my-nodocs', label: '缺文档', count: noDocs },
     { key: 'my-noarch', label: '缺架构图', count: noArch },
     { key: 'my-unanalyzed', label: '未分析', count: unanalyzed },
+    { key: 'my-todos', label: '未完成清单', count: todoDigest.total },
   ].filter((a) => a.count > 0);
   const goView = (key: string): void => {
+    if (key === 'my-todos') {
+      // 未完成清单不是卡片墙视图：平滑滚动到本页汇总卡（KPI「项目总数」同款手法）
+      todosCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     useAppStore.getState().updateActiveLocation({ subTab: `view:${key}` }, true);
+  };
+  // 汇总卡里点项目名 → 打开该项目标签的概览页签（清单条目就住在那里）
+  const openTodoProject = (projectId: string, projectName: string): void => {
+    useAppStore
+      .getState()
+      .openTab({ kind: 'project', projectId, targetPath: null, subTab: 'overview', scroll: 0 }, projectName);
   };
   // KPI「项目总数」点击：平滑滚动到本屏项目区（数据就在下方，无需换视图）
   const projectsSectionRef = React.useRef<HTMLDivElement | null>(null);
@@ -345,8 +377,61 @@ export function Dashboard(): React.JSX.Element {
       </div>
 
       {/* 「最近提交」动态流：跨项目按提交时间倒序，点行跳该项目 Git 页签 */}
-      {/* 弹性垫片：内容不满一屏时吃掉剩余空间、把「最近提交」推到底部；超屏时收缩为 0 顺流。 */}
+      {/* 弹性垫片：内容不满一屏时吃掉剩余空间、把底部两卡推到底部；超屏时收缩为 0 顺流。 */}
       <div style={{ flex: '1 1 0%', minHeight: 0 }} />
+
+      {/* 跨项目未完成清单（FR-9.3）：只在有未完成条目时出现；按项目分组、组内截止排序，
+          逾期标红；勾选即完成；点项目名跳该项目概览页签。旧版三卡曾因跳转乱被移除——
+          本卡沿用「最近提交」的底部单卡惯例，入口只有「需要关注」条与本卡自身。 */}
+      {todoDigest.total > 0 && (
+        <div ref={todosCardRef} style={{ marginTop: 12, scrollMarginTop: 8 }}>
+          <Card
+            size="small"
+            title={`未完成清单（${todoDigest.total}）`}
+            style={{ marginTop: 12 }}
+            data-testid="dash-todos"
+            extra={
+              <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
+                {todoDigest.groups.length} 个项目
+                {todoDigest.hidden > 0 ? ` · 还有 ${todoDigest.hidden} 条` : ''}
+              </span>
+            }
+          >
+            {todoDigest.groups.map((g, gi) => (
+              <div key={g.projectId} style={{ marginBottom: gi === todoDigest.groups.length - 1 ? 0 : 10 }}>
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: 0, height: 'auto' }}
+                  onClick={() => openTodoProject(g.projectId, g.projectName)}
+                >
+                  {g.projectName}
+                </Button>
+                {g.items.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0 2px 12px' }}
+                  >
+                    <Button
+                      size="small"
+                      type="text"
+                      icon={<CheckOutlined />}
+                      onClick={() => todoDone.mutate(t.id)}
+                    />
+                    <span style={{ flex: 1, fontSize: 12 }}>{t.title}</span>
+                    {t.dueOn !== null && (
+                      <Tag style={{ fontSize: 10 }} color={t.dueOn < todayKey ? 'error' : undefined}>
+                        截止 {t.dueOn}
+                      </Tag>
+                    )}
+                    {t.category !== null && <Tag style={{ fontSize: 10 }}>{t.category}</Tag>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
       {commits.length > 0 && (
         <Card size="small" title="最近提交" style={{ marginTop: 12 }} data-testid="dash-commits">
           <List
