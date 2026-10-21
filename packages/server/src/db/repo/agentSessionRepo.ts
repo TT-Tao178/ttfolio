@@ -142,19 +142,31 @@ export function recordSessionFileChange(
   relPath: string,
   at: string,
 ): void {
-  const s = getOne<AgentSessionRow>(
+  recordSessionFileChanges(db, projectId, [relPath], at);
+}
+
+/** 批量版：一次会话查询 + 事务内逐条 upsert（watcher flush 每次最多几十条）。 */
+export function recordSessionFileChanges(
+  db: Database.Database,
+  projectId: string,
+  relPaths: string[],
+  at: string,
+): void {
+  if (relPaths.length === 0) return;
+  const s = getOne<{ id: string }>(
     db,
     'SELECT id FROM agent_sessions WHERE project_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
     [projectId],
   );
   if (s === undefined) return;
-  run(
-    db,
+  const upsert = db.prepare(
     `INSERT INTO agent_session_files (session_id, path, first_seen_at, last_seen_at, change_count)
      VALUES (?, ?, ?, ?, 1)
      ON CONFLICT(session_id, path) DO UPDATE SET
        last_seen_at = excluded.last_seen_at,
        change_count = change_count + 1`,
-    [s.id, relPath, at, at],
   );
+  db.transaction(() => {
+    for (const p of relPaths) upsert.run(s.id, p, at, at);
+  })();
 }

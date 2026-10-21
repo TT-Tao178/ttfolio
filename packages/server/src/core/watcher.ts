@@ -24,6 +24,8 @@ export class WatcherManager {
   constructor(
     private readonly sse: SseHub,
     private readonly logger: Logger,
+    /** flush 后置钩子（FR-13.3 资源仓库沉淀）：收项目 id 与本次变更的项目内相对路径。可选，注入避免 watcher 依赖 db。 */
+    private readonly onFlush?: (projectId: string, relPaths: string[]) => void,
   ) {}
 
   /** 为项目启动监听（幂等）。enabled=false 时忽略。 */
@@ -55,6 +57,18 @@ export class WatcherManager {
         kind,
         modified: openedModified.slice(0, 50).map((p) => path.relative(root, p).split(path.sep).join('/')),
       });
+      // 资源仓库沉淀（FR-13.3）：钩子异常绝不影响 SSE 分发主链路
+      if (this.onFlush !== undefined) {
+        try {
+          const rels = paths.map((p) => path.relative(root, p).split(path.sep).join('/'));
+          this.onFlush(projectId, rels);
+        } catch (err) {
+          this.logger.warn({
+            mod: 'watcher',
+            msg: `agent session record failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
+      }
       // Git 信号 1s 去抖
       if (rec.gitTimer !== null) clearTimeout(rec.gitTimer);
       rec.gitTimer = setTimeout(() => {

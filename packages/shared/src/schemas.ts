@@ -80,6 +80,17 @@ export const projectPatchSchema = z.object({
   isPinned: z.boolean().optional(),
   status: z.enum(['active', 'archived']).optional(),
   defaultArchDir: z.string().max(100).optional(),
+  /** 资源仓库开关（FR-13.3，默认关；关闭只隐藏页签，数据保留） */
+  agentRepoEnabled: z.boolean().optional(),
+});
+
+// ---------- Agent 会话（FR-13.3 / T-097） ----------
+export const agentSessionPatchSchema = z.object({
+  title: z.string().trim().max(200).nullish(),
+  summary: z.string().max(8000).nullish(),
+});
+export const agentSessionSummarySchema = z.object({
+  summary: z.string().trim().min(1).max(8000),
 });
 
 export const relocateSchema = z.object({ dirPath: z.string().min(1) });

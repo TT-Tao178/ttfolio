@@ -17,6 +17,7 @@ import { hasWindowsPathHazard } from './core/pathGuard.js';
 import { compileIgnore } from './core/ignore.js';
 import { createBackup } from './core/backup.js';
 import { getSetting, setSetting } from './db/repo/metaRepo.js';
+import { recordSessionFileChanges } from './db/repo/agentSessionRepo.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
@@ -110,7 +111,11 @@ async function main(): Promise<void> {
   // ---- 服务装配 ----
   const sse = new SseHub();
   const tasks = new TaskManager(sse, logger);
-  const watcher = new WatcherManager(sse, logger);
+  // 资源仓库沉淀（FR-13.3 / T-097）：flush 后把变更相对路径聚合进「记录中」的会话；
+  // 仓库内部自检活动会话，无会话时零成本跳过
+  const watcher = new WatcherManager(sse, logger, (projectId, relPaths) => {
+    recordSessionFileChanges(store.get(), projectId, relPaths, new Date().toISOString());
+  });
   const trash = new TrashService(layout.trashDir);
   const webDistCandidates = [
     // 桌面版（Electron）由主进程注入 asar 内的产物路径；dev/生产 web 模式走 cwd 相对定位

@@ -30,7 +30,7 @@ interface InjectResult {
 }
 
 async function inject(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH',
   url: string,
   opts: { body?: Record<string, unknown>; actor?: string; withToken?: boolean } = {},
 ): Promise<InjectResult> {
@@ -205,5 +205,83 @@ describe('runtime.json agent 发现段', () => {
     const agent = rt?.['agent'] as Record<string, unknown> | undefined;
     expect(agent?.['manifest']).toBe('/api/agent/manifest');
     expect(rt?.['port']).toBe(port);
+  });
+});
+
+describe('资源仓库会话路由（FR-13.3 / T-097）', () => {
+  it('start → agent 提交精华（带 actor）→ 查询列表 → stop → 文件清单', async () => {
+    const db = ctx.db();
+    const pid = (db.prepare('SELECT id FROM projects WHERE disk_name = ?').get('demo') as { id: string }).id;
+    // 开启仓库开关（经项目 PATCH）
+    const detail = await inject('GET', `/api/projects/${pid}`);
+    const rev = (detail.json().data as { rev: number }).rev;
+    const patchRes = await inject('PATCH', `/api/projects/${pid}`, {
+      body: { rev, agentRepoEnabled: true },
+    });
+    expect(patchRes.json().ok).toBe(true);
+
+    // manifest 能力表带上会话端点
+    const caps = (
+      (await inject('GET', '/api/agent/manifest')).json().data as {
+        capabilities: Record<string, string>;
+      }
+    ).capabilities;
+    expect(caps['agentSessionSummary']).toContain('/api/agent/sessions/{sessionId}/summary');
+
+    // start（带 actor）
+    const startRes = await inject('POST', `/api/agent/projects/${pid}/sessions`, {
+      body: {},
+      actor: 'claude-code',
+    });
+    expect(startRes.json().ok).toBe(true);
+    const session = startRes.json().data as { id: string; actor: string; endedAt: string | null };
+    expect(session.actor).toBe('claude-code');
+    expect(session.endedAt).toBeNull();
+
+    // 重复 start 被拒
+    const dup = await inject('POST', `/api/agent/projects/${pid}/sessions`, { body: {} });
+    expect(dup.json()).toMatchObject({ ok: false, error: { code: 'BAD_REQUEST' } });
+
+    // agent 提交精华
+    const sum = await inject('POST', `/api/agent/sessions/${session.id}/summary`, {
+      body: { summary: '完成登录重构' },
+      actor: 'claude-code',
+    });
+    expect((sum.json().data as { summary: string | null }).summary).toBe('完成登录重构');
+
+    // 列表可见 active 会话与文件清单（空）
+    const listRes = await inject('GET', `/api/agent/projects/${pid}/sessions`);
+    const listData = listRes.json().data as {
+      enabled: boolean;
+      active: { id: string } | null;
+      sessions: Array<{ id: string; fileCount: number }>;
+    };
+    expect(listData.enabled).toBe(true);
+    expect(listData.active?.id).toBe(session.id);
+    expect(listData.sessions[0]?.fileCount).toBe(0);
+    const filesRes = await inject('GET', `/api/agent/sessions/${session.id}/files`);
+    expect(filesRes.json().data).toEqual([]);
+
+    // 审计带 actor（project.add 已在上一组用例验证；此处验证 agent.session.summary）
+    const act = await inject('GET', '/api/activity?limit=5');
+    const entries = act.json().data as Array<{ kind: string }>;
+    expect(entries.some((e) => e.kind === 'agent.session.summary')).toBe(true);
+
+    // stop 后 active 清空
+    await inject('POST', `/api/agent/sessions/${session.id}/stop`, { body: {} });
+    const after = await inject('GET', `/api/agent/projects/${pid}/sessions`).then(
+      (r) => r.json().data as { active: unknown },
+    );
+    expect(after.active).toBeNull();
+  });
+
+  it('会话不存在 → 404；summary 超长 → 400', async () => {
+    expect((await inject('POST', '/api/agent/sessions/nope/stop', { body: {} })).statusCode).toBe(404);
+    const res404 = await inject('POST', '/api/agent/sessions/nope/summary', { body: { summary: 'x' } });
+    expect(res404.json()).toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
+    const res400 = await inject('POST', '/api/agent/sessions/nope/summary', {
+      body: { summary: 'x'.repeat(8001) },
+    });
+    expect(res400.json()).toMatchObject({ ok: false, error: { code: 'BAD_REQUEST' } });
   });
 });

@@ -199,6 +199,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       const name = assertSafeName(b.defaultArchDir);
       fields['default_arch_dir'] = name;
     }
+    if (b.agentRepoEnabled !== undefined) fields['agent_repo_enabled'] = b.agentRepoEnabled ? 1 : 0;
     const rev = patchProject(db, id, fields);
     ctx.sse.publish('project.updated', { projectId: id });
     return ok({ id, rev });
