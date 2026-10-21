@@ -31,7 +31,7 @@ import { enforceQuota } from './core/thumbs.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
-const version = '0.4.1';
+const version = '0.5.0';
 const startedAt = Date.now();
 
 /** 真正的 SQLite 库损坏（才会走"改名自愈"）；native 模块加载失败等启动期错误不算。 */
