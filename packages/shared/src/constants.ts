@@ -52,6 +52,9 @@ export const SETTING_KEYS = {
   keybindings: 'keybindings_json', // FR-11.4
   // 代码语法配色方案（FR-13.4 / T-098）：classic | warm | neon，独立于应用主题
   syntaxScheme: 'syntax_scheme',
+  // 个人主页（FR-13.7 / T-103）：用户名与头像文件名（头像文件在数据目录，不写项目目录）
+  profileName: 'profile_name',
+  profileAvatarPath: 'profile_avatar_path',
   lastBackupAt: 'last_backup_at',
   defaultProjectTab: 'default_project_tab', // files | overview
   // 可拖拽面板尺寸（纯 UI 偏好，但按 C-29 统一落服务端，不用 localStorage）：

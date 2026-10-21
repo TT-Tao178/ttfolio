@@ -182,6 +182,21 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
     return reply;
   });
 
+  // GET /avatar（个人头像，FR-13.7）：数据目录 avatar.png，只读、no-store
+  server.get('/avatar', async (_req, reply) => {
+    const full = path.join(ctx.layout.dataDir, 'avatar.png');
+    try {
+      const buf = await fsp.readFile(full);
+      reply.header('Content-Type', 'image/png');
+      reply.header('Cache-Control', 'no-store');
+      reply.header('X-Content-Type-Options', 'nosniff');
+      void reply.send(buf);
+    } catch {
+      void reply.code(404).send('not found');
+    }
+    return reply;
+  });
+
   // GET /thumbs/:projectId/:name（数据目录缩略图；文件名白名单，防穿越）
   server.get('/thumbs/:projectId/:name', async (req, reply) => {
     const { projectId, name } = req.params as { projectId: string; name: string };

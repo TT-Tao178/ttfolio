@@ -24,6 +24,7 @@ import { miscRoutes } from './routes/misc.js';
 import { contractRoutes } from './routes/contract.js';
 import { agentRoutes } from './routes/agent.js';
 import { mediaRoutes } from './routes/media.js';
+import { profileRoutes } from './routes/profile.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -163,6 +164,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   app.register(contractRoutes);
   app.register(agentRoutes);
   app.register(mediaRoutes);
+  app.register(profileRoutes);
 
   // 静态托管 web/dist（token 注入 index.html）
   app.get('/', async (_req, reply) => {

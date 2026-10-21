@@ -93,6 +93,15 @@ export const agentSessionSummarySchema = z.object({
   summary: z.string().trim().min(1).max(8000),
 });
 
+// ---------- 个人主页（FR-13.7 / T-103） ----------
+export const profilePatchSchema = z.object({
+  name: z.string().trim().max(30).nullish(),
+});
+export const profileAvatarSchema = z.object({
+  /** canvas 裁切缩放后的 PNG dataURL（128×128 显示，256×256 存储） */
+  dataUrl: z.string().min(1),
+});
+
 // ---------- 媒体（FR-13.5 / T-099） ----------
 export const mediaThumbPostSchema = z.object({
   /** 项目内相对路径（只进 sha1 哈希命名，不落文件系统路径） */

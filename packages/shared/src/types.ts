@@ -376,6 +376,15 @@ export interface AgentRepoSessionFile {
   changeCount: number;
 }
 
+/** 个人主页（FR-13.7，T-103）：本地单人身份卡。 */
+export interface ProfileInfo {
+  name: string | null;
+  hasAvatar: boolean;
+  projectCount: number;
+  usedDays: number;
+  version: string;
+}
+
 /** 忽略规则 */
 export interface IgnoreRule {
   id: string;

@@ -11,8 +11,16 @@ export interface ActorContext {
 
 const actorStorage = new AsyncLocalStorage<ActorContext>();
 
+/** 本机用户显示名（FR-13.7）：来自设置 profile_name，启动时与保存个人主页时同步。 */
+let defaultActorName: string | null = null;
+
+export function setDefaultActorName(name: string | null): void {
+  const trimmed = name === null ? '' : name.trim();
+  defaultActorName = trimmed === '' ? null : trimmed;
+}
+
 export function currentActor(): ActorContext {
-  return actorStorage.getStore() ?? { actor: 'local', ownerId: null };
+  return actorStorage.getStore() ?? { actor: defaultActorName ?? 'local', ownerId: null };
 }
 
 /** 在指定 actor 上下文内同步执行回调（测试与内部装配用）。 */

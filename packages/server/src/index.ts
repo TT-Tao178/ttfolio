@@ -13,6 +13,7 @@ import { buildApp } from './app.js';
 import { startUserContentServer } from './static/userContent.js';
 import { listIgnoreRules } from './db/repo/rulesRepo.js';
 import { checkPathOk } from './db/repo/projectsRepo.js';
+import { setDefaultActorName } from './core/actor.js';
 import { hasWindowsPathHazard } from './core/pathGuard.js';
 import { compileIgnore } from './core/ignore.js';
 import { createBackup } from './core/backup.js';
@@ -72,6 +73,9 @@ async function main(): Promise<void> {
   if (mig.applied.length > 0) {
     logger.info({ mod: 'boot', msg: `migrations applied: ${mig.applied.map((m) => m.file).join(', ')}` });
   }
+
+  // ---- 个人主页（FR-13.7）：审计 actor 默认取用户名 ----
+  setDefaultActorName(getSetting(db, 'profile_name'));
 
   // ---- 每日备份（>24h） ----
   const lastBackup = getSetting(db, SETTING_KEYS.lastBackupAt);
