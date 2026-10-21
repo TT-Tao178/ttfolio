@@ -133,6 +133,11 @@ export function rawUrl(projectId: string, rel: string): string {
   return `${userContentBase()}/raw/${projectId}/${rel.split('\\').join('/')}?token=${encodeURIComponent(token())}`;
 }
 
+/** 个人头像（FR-13.7）：数据目录 avatar.png，经用户内容端口伺服（query token）。 */
+export function avatarUrl(): string {
+  return `${userContentBase()}/avatar?token=${encodeURIComponent(token())}`;
+}
+
 /** 数据目录缩略图（FR-13.5）：sha1(相对路径).png，由渲染层生成后经服务端落盘。 */
 export function thumbUrl(projectId: string, thumbName: string): string {
   return `${userContentBase()}/thumbs/${projectId}/${thumbName}?token=${encodeURIComponent(token())}`;

@@ -297,7 +297,7 @@ function Shell(): React.JSX.Element {
             max={420}
             testId="split-sidebar"
             left={
-              <div style={{ height: '100%', overflow: 'auto' }}>
+              <div style={{ height: '100%', overflow: 'hidden' }}>
                 <Sidebar />
               </div>
             }

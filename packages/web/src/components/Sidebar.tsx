@@ -23,6 +23,7 @@ import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { SEMANTIC } from '@/theme/tokens';
+import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
 
 type MenuKey = string;
@@ -522,17 +523,21 @@ export function Sidebar(): React.JSX.Element {
   };
 
   return (
-    <>
-      <Menu
-        mode="inline"
-        inlineCollapsed={false}
-        selectedKeys={[selected]}
-        items={items.map((it) =>
-          it.key.startsWith('sep-') ? { key: it.key, type: 'group', label: it.label } : it,
-        )}
-        onClick={onClick}
-        style={{ height: '100%', borderInlineEnd: 'none' }}
-      />
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Menu
+          mode="inline"
+          inlineCollapsed={false}
+          selectedKeys={[selected]}
+          items={items.map((it) =>
+            it.key.startsWith('sep-') ? { key: it.key, type: 'group', label: it.label } : it,
+          )}
+          onClick={onClick}
+          style={{ borderInlineEnd: 'none' }}
+        />
+      </div>
+      {/* 侧栏底部账户条（FR-13.7）：常驻、不随菜单滚动 */}
+      <AccountBar />
       {/* 受控右键菜单（第 29 轮项目 / 第 31 轮集合，文件树/项目卡片同款）：固定定位 + document mousedown 关闭，
           容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行 */}
       {ctxMenu !== null && (ctxProject !== undefined || ctxCollection !== undefined) && (
@@ -567,7 +572,7 @@ export function Sidebar(): React.JSX.Element {
         />
       )}
       <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />
-    </>
+    </div>
   );
 }
 
