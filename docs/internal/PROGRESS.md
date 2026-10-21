@@ -19,6 +19,10 @@
   再应验；token 取自凭据管理器 git credential fill）：
   https://github.com/TT-Tao178/ttfolio/releases/tag/v0.4.0 ，资产由用户
   浏览器手动拖传。
+- **tag 时序坑（取证）**：建 Release 时远程尚无 v0.4.0，GitHub 自动在
+  当时的远程 main HEAD（ac02e09）上创建了 tag——晚于此的 push 被拒
+  （already exists）。已 `push --force` 把远程 tag 重定位到版本提交
+  f518f01 并 ls-remote 复核一致。后续先 push tag 再建 Release 页可免此坑。
 
 ## 第 54 轮：T-106 统一预览分发器 + 文件对比查看器 + 架构图变更明细（未出包）
 
