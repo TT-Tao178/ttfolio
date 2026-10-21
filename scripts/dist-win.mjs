@@ -23,7 +23,9 @@ const steps = [
   ['audit:prod', 'npm', ['run', 'audit:prod']],
   ['build', 'npm', ['run', 'build']],
   ['build:server', 'npm', ['run', 'build:server']],
-  ['electron-rebuild', 'npx', ['electron-rebuild', '-f', '-w', 'better-sqlite3']],
+  // 只重建 better-sqlite3：node-pty 是 N-API 预编译二进制（Electron 运行时可直接加载，
+  // 已在 Electron 内实测）；--only 避免 electron-rebuild 连带用 node-gyp 重编它
+  ['electron-rebuild', 'npx', ['electron-rebuild', '-f', '-o', 'better-sqlite3']],
   ['electron-builder', 'npx', ['electron-builder', '--win', 'nsis']],
   ['verify-dist-electron', 'node', ['scripts/verify-dist-electron.mjs']],
 ];
