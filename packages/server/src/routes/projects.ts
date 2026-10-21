@@ -14,7 +14,11 @@ import {
   collectionCreateSchema,
   collectionMembersSchema,
   collectionReorderSchema,
+  batchActionSchema,
+  tagPatchSchema,
+  tagMergeSchema,
 } from '@ttfolio/shared';
+import { renameTag, setTagColor, mergeTag, deleteTag } from '../db/repo/tagsRepo.js';
 import {
   listProjects,
   getProjectRow,
@@ -537,6 +541,137 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     ctx.db().prepare('DELETE FROM project_tags WHERE project_id = ? AND tag_id = ?').run(id, tagId);
     ctx.sse.publish('project.updated', { projectId: id });
     return ok({ deleted: true });
+  });
+
+  // ---- 批量操作台（FR-13.10 / T-107）：逐条复用单项目语义，逐条落审计 ----
+  app.post('/api/projects/batch-action', async (req) => {
+    const parsed = batchActionSchema.safeParse(req.body);
+    if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
+    const { projectIds, action } = parsed.data;
+    if (action === 'tag' && parsed.data.tagId === undefined)
+      return fail('BAD_REQUEST', '批量打标签需要 tagId');
+    if (action === 'collection' && parsed.data.collectionId === undefined)
+      return fail('BAD_REQUEST', '批量加入集合需要 collectionId');
+    const db = ctx.db();
+    let done = 0;
+    const failed: string[] = [];
+    for (const pid of projectIds) {
+      try {
+        const row = getProjectRow(db, pid);
+        if (row === undefined || row.deleted_at !== null) {
+          failed.push(pid);
+          continue;
+        }
+        if (action === 'archive' || action === 'unarchive') {
+          patchProject(db, pid, { status: action === 'archive' ? 'archived' : 'active' });
+        } else if (action === 'tag') {
+          const tag = db
+            .prepare<[string], { id: string }>('SELECT id FROM tags WHERE id = ?')
+            .get(parsed.data.tagId ?? '');
+          if (tag === undefined) {
+            failed.push(pid);
+            continue;
+          }
+          db.prepare('INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)').run(
+            pid,
+            tag.id,
+          );
+        } else if (action === 'collection') {
+          const col = db
+            .prepare<[string], { id: string }>('SELECT id FROM collections WHERE id = ?')
+            .get(parsed.data.collectionId ?? '');
+          if (col === undefined) {
+            failed.push(pid);
+            continue;
+          }
+          db.prepare(
+            'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+          ).run(col.id, pid);
+        } else {
+          // unregister：与单项目同语义——软删 + 缩略图清理，绝不删磁盘文件（FR-2.5）
+          softDeleteProject(db, pid);
+          clearProjectThumbs(ctx.layout.thumbsDir, pid);
+        }
+        logActivity(db, {
+          kind: `project.batch.${action}`,
+          level: 'L1',
+          projectId: pid,
+          detail:
+            action === 'tag'
+              ? { tagId: parsed.data.tagId }
+              : action === 'collection'
+                ? { collectionId: parsed.data.collectionId }
+                : undefined,
+          actor: currentActor().actor,
+        });
+        done++;
+      } catch {
+        failed.push(pid);
+      }
+    }
+    return ok({ done, failed });
+  });
+
+  // ---- 标签中枢（FR-13.10 / T-107）----
+  app.patch('/api/tags/:id', async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = tagPatchSchema.safeParse(req.body);
+    if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
+    const db = ctx.db();
+    if (parsed.data.name !== undefined) {
+      const r = renameTag(db, id, parsed.data.name.trim());
+      if (r === 'notfound') return fail('NOT_FOUND', '标签不存在', 404);
+      if (r === 'conflict') return fail('INVALID_NAME', '已有同名标签');
+    }
+    if (parsed.data.color !== undefined) {
+      if (!setTagColor(db, id, parsed.data.color)) return fail('NOT_FOUND', '标签不存在', 404);
+    }
+    const row = db
+      .prepare<[string], { id: string; name: string; color: string | null }>(
+        'SELECT id, name, color FROM tags WHERE id = ?',
+      )
+      .get(id);
+    if (row === undefined) return fail('NOT_FOUND', '标签不存在', 404);
+    logActivity(db, {
+      kind: 'tag.update',
+      level: 'L1',
+      detail: { id, name: parsed.data.name, colorChanged: parsed.data.color !== undefined },
+      actor: currentActor().actor,
+    });
+    return ok(row);
+  });
+
+  app.post('/api/tags/merge', async (req) => {
+    const parsed = tagMergeSchema.safeParse(req.body);
+    if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
+    const db = ctx.db();
+    const r = mergeTag(db, parsed.data.sourceId, parsed.data.targetId);
+    if (r.status !== 'ok') {
+      return r.status === 'same'
+        ? fail('INVALID_NAME', '不能合并到自身')
+        : fail('NOT_FOUND', '源或目标标签不存在', 404);
+    }
+    logActivity(db, {
+      kind: 'tag.merge',
+      level: 'L1',
+      detail: { sourceId: parsed.data.sourceId, targetId: parsed.data.targetId, moved: r.moved },
+      actor: currentActor().actor,
+    });
+    return ok({ moved: r.moved });
+  });
+
+  app.delete('/api/tags/:id', async (req) => {
+    const { id } = req.params as { id: string };
+    const db = ctx.db();
+    const affected = deleteTag(db, id);
+    if (affected === null) return fail('NOT_FOUND', '标签不存在', 404);
+    logActivity(db, {
+      kind: 'tag.delete',
+      level: 'L1',
+      detail: { id, affectedProjects: affected },
+      actor: currentActor().actor,
+    });
+    return ok({ deleted: true, affectedProjects: affected });
   });
 };
 

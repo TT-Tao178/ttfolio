@@ -25,6 +25,7 @@ import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/share
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
+import { TagHub } from './TagHub';
 import { UpdateCheck } from './UpdateCheck';
 import sponsorAlipay from '@/assets/sponsor/alipay.jpg';
 import sponsorWechat from '@/assets/sponsor/wechat.jpg';
@@ -302,6 +303,12 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
               setName={setCollectionName}
               onChange={invalidate}
             />
+          </Card>
+        </SectionAnchor>
+
+        <SectionAnchor id="tags">
+          <Card size="small" title={sectionTitle('tags')}>
+            <TagHub />
           </Card>
         </SectionAnchor>
 

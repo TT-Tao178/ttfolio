@@ -30,6 +30,7 @@ import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
 import { buildProjectMenu, useArchiveProject } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
+import { BatchActionBar } from './BatchActionBar';
 export { parseSubTab };
 import { SEMANTIC } from '@/theme/tokens';
 
@@ -65,6 +66,10 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
   const [relocateProject, setRelocateProject] = useState<ProjectSummary | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
+  // 批量多选（FR-13.10 / T-107）：卡片 Ctrl+点选 / 勾选角标与表格行选择框共享同一份选中集
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const toggleSelect = (id: string): void =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab);
@@ -319,6 +324,9 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                     onOpen={() => openProjectTab(p)}
                     onPin={() => pin.mutate(p)}
                     onAnalyze={() => analyze.mutate([p.id])}
+                    selected={selectedIds.includes(p.id)}
+                    selectMode={selectedIds.length > 0}
+                    onToggleSelect={() => toggleSelect(p.id)}
                   />
                 ))}
               </div>
@@ -329,6 +337,10 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                 dataSource={projects ?? []}
                 size="middle"
                 pagination={{ pageSize: 30 }}
+                rowSelection={{
+                  selectedRowKeys: selectedIds,
+                  onChange: (keys) => setSelectedIds(keys as string[]),
+                }}
                 onRow={(p) => ({
                   onContextMenu: (e) => {
                     e.preventDefault();
@@ -343,6 +355,9 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             )}
           </StateView>
           <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
+          {selectedIds.length > 0 && (
+            <BatchActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} />
+          )}
           {pickerProject !== null && (
             <CollectionPickerModal
               key={pickerProject.id}

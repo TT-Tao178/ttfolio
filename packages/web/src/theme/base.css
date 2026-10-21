@@ -108,6 +108,20 @@ body,
   opacity: 0.55;
 }
 
+/* 批量多选（FR-13.10）：卡片勾选角标默认隐藏，悬浮卡片或已选中时出现 */
+.tt-card-check {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ant-card:hover .tt-card-check {
+  opacity: 1;
+}
+.tt-card-check-on,
+.tt-card-check.ant-checkbox-wrapper-checked,
+.tt-card-check-mode {
+  opacity: 1;
+}
+
 /* 面包屑可点击段（第 27 轮按用户反馈：默认文字色、无下划线，hover 用浅背景块提示可点；
    背景色取 currentColor 低透明——深浅主题自动适配；负 margin 抵消 padding 避免布局位移） */
 .tt-crumb-link {

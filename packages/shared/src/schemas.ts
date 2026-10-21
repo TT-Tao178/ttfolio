@@ -136,6 +136,19 @@ export const collectionMembersSchema = z.object({
   replace: z.boolean().default(false),
 });
 
+// ---------- 批量操作台 + 标签中枢（FR-13.10 / T-107） ----------
+export const batchActionSchema = z.object({
+  projectIds: z.array(z.string()).min(1).max(200),
+  action: z.enum(['archive', 'unarchive', 'tag', 'collection', 'unregister']),
+  tagId: z.string().optional(),
+  collectionId: z.string().optional(),
+});
+export const tagPatchSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  color: z.string().max(32).nullable().optional(),
+});
+export const tagMergeSchema = z.object({ sourceId: z.string().min(1), targetId: z.string().min(1) });
+
 // ---------- 文件 ----------
 export const fsTreeQuerySchema = z.object({
   projectId: z.string(),

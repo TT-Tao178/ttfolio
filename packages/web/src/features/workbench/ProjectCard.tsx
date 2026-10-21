@@ -3,7 +3,7 @@
  * 从 Workbench.tsx 原地抽出：总览（Dashboard）也要放项目卡片，而 Workbench 已引用 Dashboard，
  * 若 Dashboard 反向 import Workbench 会形成循环依赖。
  */
-import { App, Avatar, Card, Dropdown, Menu, Tag } from 'antd';
+import { App, Avatar, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
 import { MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,11 +23,18 @@ export function ProjectCard({
   onOpen,
   onPin,
   onAnalyze,
+  selected,
+  selectMode,
+  onToggleSelect,
 }: {
   p: ProjectSummary;
   onOpen: () => void;
   onPin: () => void;
   onAnalyze: () => void;
+  /** 批量多选（FR-13.10 / T-107）：三 props 同源提供才启用勾选角标与 Ctrl+点选 */
+  selected?: boolean;
+  selectMode?: boolean;
+  onToggleSelect?: () => void;
 }): React.JSX.Element {
   const { message, modal } = App.useApp();
   const queryClient2 = useQueryClient();
@@ -123,7 +130,11 @@ export function ProjectCard({
     <Card
       hoverable
       size="small"
-      style={{ borderColor: p.pathOk ? undefined : SEMANTIC.error }}
+      style={{
+        position: 'relative',
+        borderColor: selected === true ? SEMANTIC.primary : p.pathOk ? undefined : SEMANTIC.error,
+        boxShadow: selected === true ? `0 0 0 1px ${SEMANTIC.primary}` : undefined,
+      }}
       onClick={(e) => {
         // 三类点击要忽略（都沿 React 树冒泡到卡片，会造成「点弹窗按钮却打开项目/切页」）：
         // 1) Dropdown 菜单项：弹层 DOM 挂在触发器父节点（卡片内），closest 可识别
@@ -132,6 +143,11 @@ export function ProjectCard({
         if ((e.target as HTMLElement).closest('[data-testid="project-ctx-menu"]') !== null) return;
         // 3) Modal 弹窗内按钮：portal 到 body，DOM 上不在卡片内——用 contains 识别
         if (!e.currentTarget.contains(e.target as Node)) return;
+        // Ctrl/⌘+点选（FR-13.10 批量多选）：切换选中而不打开
+        if (onToggleSelect !== undefined && (e.ctrlKey || e.metaKey)) {
+          onToggleSelect();
+          return;
+        }
         onOpen();
       }}
       onContextMenu={(e) => {
@@ -147,6 +163,18 @@ export function ProjectCard({
       data-testid="project-card"
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
+          {onToggleSelect !== undefined && (
+            <Checkbox
+              className={`tt-card-check${selected === true ? ' tt-card-check-on' : ''}${
+                selectMode === true ? ' tt-card-check-mode' : ''
+              }`}
+              checked={selected === true}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect();
+              }}
+            />
+          )}
           <Avatar style={{ background: SEMANTIC.primary, flexShrink: 0 }} size={24}>
             {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
           </Avatar>

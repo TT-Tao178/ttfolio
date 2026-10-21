@@ -18,6 +18,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'appearance', label: '外观与密度', title: '外观' },
   { key: 'datasource', label: '数据源与根目录', title: '数据源与根目录' },
   { key: 'collections', label: '集合（工作集）', title: '集合（工作集）' },
+  { key: 'tags', label: '标签中枢', title: '标签中枢' },
   { key: 'ignore', label: '忽略规则', title: '忽略规则' },
   { key: 'templates', label: '命令模板', title: '命令模板' },
   { key: 'shortcuts', label: '快捷键', title: '快捷键' },

@@ -28,6 +28,7 @@ import {
 } from './db/repo/metaRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { setArchiveViewSnapshot, getArchiveViewSnapshot } from './db/repo/docsRepo.js';
+import { renameTag, mergeTag, deleteTag, listTagsWithCount } from './db/repo/tagsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
@@ -445,6 +446,49 @@ describe('架构图查看快照（FR-13.9 ③ / T-106c）', () => {
     ).run();
     expect(getArchiveViewSnapshot(db, 'arch-x')).toBeNull();
     expect(getArchiveViewSnapshot(db, 'arch-none')).toBeNull();
+  });
+});
+
+describe('标签中枢（FR-13.10 / T-107）', () => {
+  it('rename：重名拒绝/不存在；merge：引用迁移去重 + 源删除；delete：级联计数', () => {
+    const dirT = path.join(root, 'tag 项目');
+    fs.mkdirSync(dirT, { recursive: true });
+    const pt = insertProject(db, {
+      dirPath: dirT,
+      dirPathKey: pathKey(dirT),
+      diskName: 'tag 项目',
+      defaultArchDir: '架构图',
+    });
+    const ins = db.prepare('INSERT INTO tags (id, name) VALUES (?, ?)');
+    ins.run('tag-a', '前端');
+    ins.run('tag-b', 'fe');
+    ins.run('tag-c', '孤立');
+    const link = db.prepare('INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)');
+    link.run(pt.id, 'tag-a');
+    link.run(pt.id, 'tag-b');
+
+    // 重命名：重名冲突 / 不存在 / 正常
+    expect(renameTag(db, 'tag-a', 'fe')).toBe('conflict');
+    expect(renameTag(db, 'tag-x', '新名')).toBe('notfound');
+    expect(renameTag(db, 'tag-a', '前端栈')).toBe('ok');
+
+    // 合并：tag-b 引用迁到 tag-a（项目已挂 tag-a → OR IGNORE 去重，moved=0 但引用保留）
+    const r = mergeTag(db, 'tag-b', 'tag-a');
+    expect(r).toEqual({ status: 'ok', moved: 0 });
+    expect(mergeTag(db, 'tag-a', 'tag-a')).toEqual({ status: 'same' });
+    expect(mergeTag(db, 'tag-x', 'tag-a')).toEqual({ status: 'missing' });
+    const refs = db
+      .prepare<[string], { c: number }>('SELECT COUNT(*) AS c FROM project_tags WHERE tag_id = ?')
+      .get('tag-a');
+    expect(refs?.c).toBe(1);
+    expect(db.prepare('SELECT id FROM tags WHERE id = ?').get('tag-b')).toBeUndefined();
+
+    // 删除：返回受影响项目数，级联清引用
+    expect(deleteTag(db, 'tag-c')).toBe(0);
+    expect(deleteTag(db, 'tag-a')).toBe(1);
+    expect(db.prepare('SELECT COUNT(*) AS c FROM project_tags').get()).toEqual({ c: 0 });
+    const listed = listTagsWithCount(db).find((t) => t.id === 'tag-a');
+    expect(listed).toBeUndefined();
   });
 });
 
