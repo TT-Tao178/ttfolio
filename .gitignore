@@ -61,3 +61,4 @@ desktop.ini
 /app/
 /dist-electron/
 /dist-electron-tmp*/
+/dist-electron-*/
