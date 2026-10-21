@@ -342,6 +342,26 @@ export interface AgentManifest {
   projects: AgentManifestProject[];
 }
 
+/** 资源仓库会话（FR-13.3，T-097）。endedAt 为 null 表示记录中。 */
+export interface AgentRepoSession {
+  id: string;
+  projectId: string;
+  title: string | null;
+  actor: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  summary: string | null;
+  fileCount: number;
+}
+
+/** 会话修改过的文件：首见/末见/次数即天然时间段（只记路径，不快照内容）。 */
+export interface AgentRepoSessionFile {
+  path: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  changeCount: number;
+}
+
 /** 忽略规则 */
 export interface IgnoreRule {
   id: string;

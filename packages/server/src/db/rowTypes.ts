@@ -34,6 +34,8 @@ export interface ProjectRow {
   analyze_partial: number;
   analyze_error: string | null;
   owner_id: string | null;
+  /** 0005 迁移新增：资源仓库开关（FR-13.3，默认 0 关闭）。 */
+  agent_repo_enabled: number;
   rev: number;
   created_at: string;
   updated_at: string;
@@ -199,4 +201,24 @@ export interface ActivityRow {
   target_path: string | null;
   detail_json: string | null;
   actor: string;
+}
+
+/** 资源仓库会话（0005 迁移 / FR-13.3）。ended_at 为 NULL 表示记录中。 */
+export interface AgentSessionRow {
+  id: string;
+  project_id: string;
+  title: string | null;
+  actor: string | null;
+  started_at: string;
+  ended_at: string | null;
+  summary: string | null;
+}
+
+/** 会话修改过的文件（首见/末见/次数即天然时间段；只记路径不快照内容）。 */
+export interface AgentSessionFileRow {
+  session_id: string;
+  path: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  change_count: number;
 }
