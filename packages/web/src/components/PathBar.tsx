@@ -280,6 +280,8 @@ function subTabLabel(sub: string): string {
       return '文档';
     case 'live':
       return '动态';
+    case 'repo':
+      return '仓库';
     default:
       return sub;
   }

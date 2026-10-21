@@ -1,5 +1,18 @@
 /** 项目页（3.3）：页签固定 概览→文件→Git→架构图→文档，快捷键 1–5，默认落「文件」。 */
-import { Alert, Button, Descriptions, Form, Input, Modal, Progress, Space, Tabs, Tag, App } from 'antd';
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Form,
+  Input,
+  Modal,
+  Progress,
+  Space,
+  Switch,
+  Tabs,
+  Tag,
+  App,
+} from 'antd';
 import {
   ReloadOutlined,
   StarOutlined,
@@ -23,6 +36,7 @@ import { ArchivesTab } from '@/features/archives/ArchivesTab';
 import { DocsTab } from '@/features/docs/DocsTab';
 import { TodoList } from '@/features/todos/TodoList';
 import { AgentLiveTab } from '@/features/agent/AgentLiveTab';
+import { RepoTab } from '@/features/agent/RepoTab';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectPage({
@@ -148,6 +162,7 @@ export function ProjectPage({
           { key: 'archives', label: p?.hasArch === true ? '架构图 ✓' : '架构图' },
           { key: 'docs', label: p?.hasDocs === true ? '文档 ✓' : '文档' },
           { key: 'live', label: '动态' },
+          ...(p?.agentRepoEnabled === true ? [{ key: 'repo', label: '仓库' }] : []),
         ]}
       />
       <div
@@ -192,6 +207,17 @@ export function ProjectPage({
                     </Tag>
                   </Descriptions.Item>
                   <Descriptions.Item label="路径">{p.dirPath}</Descriptions.Item>
+                  <Descriptions.Item label="资源仓库" data-testid="repo-toggle-cell">
+                    <Switch
+                      size="small"
+                      checked={p.agentRepoEnabled}
+                      onChange={(v) => patch.mutate({ agentRepoEnabled: v })}
+                      data-testid="repo-toggle"
+                    />
+                    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.65 }}>
+                      启用后项目页出现「仓库」页签（编辑会话沉淀，只记路径不复制内容）
+                    </span>
+                  </Descriptions.Item>
                 </Descriptions>
                 <div style={{ marginTop: 16 }}>
                   <strong>语言占比</strong>
@@ -258,6 +284,14 @@ export function ProjectPage({
             <DocsTab projectId={projectId} />
           ) : active === 'live' ? (
             <AgentLiveTab projectId={projectId} />
+          ) : active === 'repo' ? (
+            p?.agentRepoEnabled === true ? (
+              <RepoTab projectId={projectId} />
+            ) : (
+              <StateView loading={false} empty emptyText="资源仓库未启用：回到「概览」在项目属性中开启">
+                <div />
+              </StateView>
+            )
           ) : (
             <StateView loading={false} empty emptyText={`未知页签：${active}`}>
               <div />

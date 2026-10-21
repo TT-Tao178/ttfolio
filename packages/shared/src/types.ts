@@ -64,6 +64,8 @@ export interface ProjectDetail extends ProjectSummary {
   mounts: MountInfo[];
   archives: ArchiveInfo[];
   todoOpenCount: number;
+  /** 资源仓库开关（FR-13.3，默认关；关闭时「仓库」页签不渲染，数据保留） */
+  agentRepoEnabled: boolean;
 }
 
 export interface MountInfo {

@@ -31,6 +31,7 @@ import {
   type ListFilters,
 } from '../db/repo/projectsRepo.js';
 import { logActivity, recordRecentFile, listRecentFiles } from '../db/repo/metaRepo.js';
+import { getAgentRepoEnabled } from '../db/repo/agentSessionRepo.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
 import { listTodos } from '../db/repo/sessionRepo.js';
 import { pathKey } from '../db/repo/docsRepo.js';
@@ -168,6 +169,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     return ok({
       ...summary,
       defaultArchDir: getProjectRow(db, id)?.default_arch_dir ?? '架构图',
+      agentRepoEnabled: getAgentRepoEnabled(db, id),
       mounts: listMounts(db, id),
       archives,
       todoOpenCount: listTodos(db, { projectId: id, includeDone: false }).length,

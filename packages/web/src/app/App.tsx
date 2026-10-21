@@ -201,10 +201,10 @@ function Shell(): React.JSX.Element {
         openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
       } else if (e.key === '?' && !inInput) {
         void message.info(
-          '快捷键：Ctrl+K 面板 · Ctrl+W 关标签 · Ctrl+Tab 切标签 · Alt+←/→ 前进后退 · Ctrl+S 保存 · 1-6 切项目页签 · F2 重命名 · Delete 删除 · Ctrl+, 设置',
+          '快捷键：Ctrl+K 面板 · Ctrl+W 关标签 · Ctrl+Tab 切标签 · Alt+←/→ 前进后退 · Ctrl+S 保存 · 1-7 切项目页签 · F2 重命名 · Delete 删除 · Ctrl+, 设置',
         );
-      } else if (!inInput && /^[1-6]$/.test(e.key) && activeTab?.kind === 'project') {
-        const map = ['overview', 'files', 'git', 'archives', 'docs', 'live'];
+      } else if (!inInput && /^[1-7]$/.test(e.key) && activeTab?.kind === 'project') {
+        const map = ['overview', 'files', 'git', 'archives', 'docs', 'live', 'repo'];
         const sub = map[Number(e.key) - 1];
         if (sub !== undefined) updateActiveLocation({ subTab: sub }, true);
       }
