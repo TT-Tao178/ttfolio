@@ -185,7 +185,8 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
   // GET /thumbs/:projectId/:name（数据目录缩略图；文件名白名单，防穿越）
   server.get('/thumbs/:projectId/:name', async (req, reply) => {
     const { projectId, name } = req.params as { projectId: string; name: string };
-    if (THUMB_NAME.test(name) === false || /^[0-9a-f-]{6,64}$/.test(projectId) === false) {
+    // projectId 是 ULID（Crockford base32，含大写字母）；只允许安全字符集，防路径注入
+    if (THUMB_NAME.test(name) === false || /^[A-Za-z0-9_-]{1,64}$/.test(projectId) === false) {
       void reply.code(404).send('not found');
       return reply;
     }

@@ -49,6 +49,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       return fail('IO_ERROR', `缩略图写入失败：${err instanceof Error ? err.message : String(err)}`);
     }
     logActivity(db, { kind: 'media.thumb.write', level: 'L1', projectId, detail: { file: name } });
-    return ok({ thumb: `${projectId}/${name}` });
+    // 只返回文件名：前端 thumbUrl(projectId, name) 负责拼 /thumbs/:projectId/:name
+    return ok({ thumb: name });
   });
 };
