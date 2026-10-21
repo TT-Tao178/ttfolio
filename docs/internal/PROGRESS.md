@@ -1,5 +1,27 @@
 # PROGRESS
 
+## 第 48 轮：T-103 个人主页（本地单人身份卡，用户点名单条实施，未出包）
+
+> 用户手测 0.3.10 前点名实现 T-103。设计文档先收编 FR-13.7（4.13 节），
+> 两个提交（服务端数据层 / 前端收口），每提交门禁三绿。
+
+- **服务端（82eb4b2）**：设置两键 profile_name/profile_avatar_path；actor
+  默认名机制（setDefaultActorName，currentActor 未进入 agent 上下文时返回
+  用户名，启动载入、保存同步——agent 的 x-ttfolio-actor 仍优先）；新
+  routes/profile.ts：GET 资料与统计（登记项目数/使用天数/版本）、PATCH
+  用户名（trim、30 字、空串清空并回落 local）、头像 PNG dataURL 白名单
+  （约 1MB）写数据目录 avatar.png、DELETE 清除；usedDays 自最早审计记录
+  起算（无记录按第 1 天，如实口径，不编造安装时间）；userContent 新增只读
+  /avatar（query token，no-store）。
+- **前端（31f964d）**：侧栏底部账户条（24px 头像+用户名、hover 高亮、点击
+  开弹窗、窄于 150px 退化为纯头像圆、首字母主色兜底）；个人主页弹窗（点
+  头像选本地图片→canvas 居中裁切缩放 256×256 PNG→上传、用户名输入带计数、
+  统计、移除头像、保存后刷新）；Sidebar 改 flex 列布局让菜单区内部滚动、
+  账户条常驻；api.avatarUrl。
+- **验收锚点**：profile.test.ts 5 条（资料往返、30 字限制、头像校验与落盘、
+  actor 同步与 agent 优先、usedDays 口径）；真实浏览器视觉与上传交互留待
+  用户手测。
+
 ## 第 47 轮：第二批规划任务 T-098~T-100（体验与效率，用户点名分批实施 → v0.3.10）
 
 > 第二批无批内强依赖，按 T-098 → T-099 → T-100 顺序实施；6 个功能提交 +
