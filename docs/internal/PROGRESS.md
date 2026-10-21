@@ -1,5 +1,42 @@
 # PROGRESS
 
+## 第 54 轮：T-106 统一预览分发器 + 文件对比查看器 + 架构图变更明细（未出包）
+
+> 批内第三条（本批 = T-109 + T-105 + T-106，批后统一出 0.4.0）。
+
+- **规格先收编**：设计文档 4.13 节新增 FR-13.9（三小节 + csv 保留编辑的
+  边界修正 + Git 变更列表保持 diff 语义的边界），附新增注记。
+- **摸底结论（实现前的取证）**：OfficePreview + GET /api/docs/raw 本就接受
+  项目内路径（不带 mountId 走 resolveInProject）——预览缺口只是 FilesTab
+  右栏「图片/编辑器」二分没接它；DiffView 为 unified 单栏且服务端 diff 不
+  支持任意双文件 → 对比器走纯前端行对齐；回收站无内容读取通道；archives
+  变更检测是拉取式标量对比、无清单快照。
+- **分发器 + 对比（13e2b7b）**：resolveViewer 纯函数（office=docx/pdf/
+  xlsx/xls；csv 刻意保留编辑器防编辑能力回归）→ FilesTab 右栏 Office 白
+  名单直连 OfficePreview，文件树/搜索/命令面板/最近查看全部生效；新
+  TabKind compare（tabKey 含规格串天然去重、随会话恢复）+ compareShared
+  纯函数（规格编解码坏值兜底；公共前后缀裁剪后 LCS 对齐，Uint32Array 上限
+  1500²、超限诚实降级平行排列；相邻删/插段配对成修改行）+ CompareView 单
+  滚动容器四列网格（行号×两侧天然同步，复用 tt-diff-* 配色 + 新增
+  tt-diff-chg，渲染上限 4000 行如实提示）；入口=文件树右键「与其他文件
+  对比…」（项目下拉+相对路径）与回收站条目「对比」（原路径前缀匹配登记
+  项目）；服务端 TrashService.readEntryFile（严格 isInsideOrEqual 防穿越
+  ——lint C-02 拦了 startsWith 首版，改用 pathGuard 助手、文本 ≤5MB、
+  嗅探二进制拒绝、孤儿 rel_path 防护同源）+ GET /api/trash/:id/file。
+- **架构图变更明细（a6a9c04）**：迁移 0007 archive_view_snapshots（外键
+  级联、只增不改，user_version=7）；viewed 端点落 HTML 清单快照；GET
+  archives 每项附 viewSnapshot（可选字段，toArchiveInfo 其他调用点零改
+  动）；ArchivesTab 变更 Alert 升级「新增 N/移除 M + 对照时间」（每侧前 8
+  条，无快照说明本次打开后开始记录）；快照只存索引库，红线 2 不变。
+- **验证**：门禁三绿（205 条，本轮新增 14：viewerDispatch 4 +
+  compareShared 9 + viewDiff 4 + 集成 3，另 actor.test 适配）；npm run
+  build 通过。手测点：文件树打开 docx/xlsx 预览、两文件并排对比与跨项目
+  对比、回收站「对比」、架构图变更增减清单。
+- **过程小坑**：① recent_files/archive_view_snapshots 都有外键——集成
+  测试造数必须先插真实项目/图集行（FK 失败两次）；② LCS 把「旧行→新行」
+  判成删+插，配对后处理（pairRuns）才是并排视图的预期语义；③ CompareView
+  行号计数初版写进 map 回调作用域恒为 0，提出到外层计数。
+
 ## 第 53 轮：T-105 审计与活动中心（活动记录/时间线/最近查看，未出包）
 
 > 批内第二条（第 52 轮 T-109 之后），版本仍 0.3.12，本批批后统一出 0.4.0
