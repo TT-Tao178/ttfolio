@@ -258,11 +258,11 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       });
       ctx.changes.publish({
         projectId: b.projectId,
-        relPaths: [guarded.relToRoot],
+        relPaths: [relToRootOf(guarded.projectRoot, guarded.real)],
         kind: 'create',
         source: 'api',
       });
-      return ok({ path: guarded.relToRoot });
+      return ok({ path: relToRootOf(guarded.projectRoot, guarded.real) });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }
@@ -506,6 +506,12 @@ function checkWritable(absPath: string): void {
   } catch {
     throw new AppError('PERMISSION_DENIED', '文件只读或权限不足，保存失败（不会修改文件权限）');
   }
+}
+
+/** 项目根相对路径（正斜杠）——变更流水与文件树共用口径；guardPath 的 relToRoot
+ *  对「尚不存在的目标」是相对最近存在的祖先，不能直接用于流水。 */
+function relToRootOf(projectRoot: string, abs: string): string {
+  return path.relative(projectRoot, abs).split(path.sep).join('/');
 }
 
 function toApiErrorTuple(err: unknown): [import('@ttfolio/shared').ErrorCode, string, number, unknown?] {
