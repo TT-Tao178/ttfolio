@@ -261,7 +261,7 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
     id: 'nav.back',
     title: '后退',
     category: '视图',
-    keys: 'Alt+Left',
+    keys: 'Alt+ArrowLeft',
     keyEditable: true,
     run: (ctx) => ctx.store.navigate(-1),
   },
@@ -269,7 +269,7 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
     id: 'nav.forward',
     title: '前进',
     category: '视图',
-    keys: 'Alt+Right',
+    keys: 'Alt+ArrowRight',
     keyEditable: true,
     run: (ctx) => ctx.store.navigate(1),
   },
@@ -428,6 +428,26 @@ export function chordMatches(
     chord.alt === e.altKey &&
     chord.key === key
   );
+}
+
+/** 键盘事件 → chord 字符串（改绑捕获用）。无修饰键返回 null（不让普通按键劫持输入）。 */
+export function chordFromEvent(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): string | null {
+  const modOnly = ['Control', 'Meta', 'Shift', 'Alt', 'CapsLock'];
+  if (modOnly.includes(e.key)) return null;
+  const mods: string[] = [];
+  if (e.ctrlKey || e.metaKey) mods.push('Ctrl');
+  if (e.shiftKey) mods.push('Shift');
+  if (e.altKey) mods.push('Alt');
+  if (mods.length === 0) return null;
+  let key = e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  if (key === 'Escape') key = 'Esc';
+  return [...mods, key].join('+');
 }
 
 /** 生效快捷键：设置覆盖（keybindings_json）优先，否则用默认。 */

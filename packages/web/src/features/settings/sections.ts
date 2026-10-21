@@ -20,6 +20,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'collections', label: '集合（工作集）', title: '集合（工作集）' },
   { key: 'ignore', label: '忽略规则', title: '忽略规则' },
   { key: 'templates', label: '命令模板', title: '命令模板' },
+  { key: 'shortcuts', label: '快捷键', title: '快捷键' },
   { key: 'watch', label: '文件监听与保存', title: '文件监听与保存' },
   { key: 'data', label: '数据与备份', title: '数据与备份' },
   { key: 'about', label: '关于', title: '关于' },

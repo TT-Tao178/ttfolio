@@ -6,7 +6,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
 import { SettingsProvider, useSettings } from '@/app/settings';
 import { useAppStore, serializeSession } from '@/app/store';
-import { useCloseTab } from '@/app/useCloseTab';
 import { useSse, type SseState } from '@/app/sse';
 import { TabBar } from '@/components/TabBar';
 import { PathBar } from '@/components/PathBar';
@@ -20,6 +19,15 @@ import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
+import {
+  BUILTIN_COMMANDS,
+  chordMatches,
+  effectiveChord,
+  helpText,
+  parseChord,
+  pluginCommandContributions,
+} from '@/features/command/registry';
+import { useCommandContext } from '@/features/command/useCommandContext';
 import { GitOverview, GitTab } from '@/features/git/GitTab';
 import { CommitView } from '@/features/git/CommitView';
 import { api } from '@/lib/api';
@@ -84,7 +92,7 @@ function Shell(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.kind]);
   // Ctrl+W 与标签 × 同一套关闭逻辑（评审：此前 Ctrl+W 对脏标签静默拦截无反馈）
-  const closeTabConfirmed = useCloseTab();
+  const commandCtx = useCommandContext();
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);
@@ -165,64 +173,50 @@ function Shell(): React.JSX.Element {
     return () => clearTimeout(t);
   }, [tabs, activeTabId]);
 
-  // 全局快捷键（3.6 / FR-11.4）
+  // 全局快捷键（3.6 / FR-11.4 / FR-13.6）：注册表驱动，可改绑（keybindings_json）
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      const mod = e.ctrlKey || e.metaKey;
-      const inInput = (e.target as HTMLElement | null)?.tagName?.match(/INPUT|TEXTAREA/) !== null;
-      if (mod && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setPalette(!paletteOpen);
-      } else if (mod && e.key.toLowerCase() === 'w') {
-        e.preventDefault();
-        const tab = tabs.find((t) => t.id === activeTabId);
-        if (tab !== undefined) closeTabConfirmed(tab);
-      } else if (mod && e.key === 'Tab') {
-        e.preventDefault();
-        const idx = tabs.findIndex((t) => t.id === activeTabId);
-        const next = tabs[(idx + (e.shiftKey ? -1 : 1) + tabs.length) % Math.max(tabs.length, 1)];
-        if (next !== undefined) useAppStore.getState().activateTab(next.id);
-      } else if (e.altKey && e.key === 'ArrowLeft') {
-        updateActiveLocation({}, false);
-        useAppStore.getState().navigate(-1);
-      } else if (e.altKey && e.key === 'ArrowRight') {
-        useAppStore.getState().navigate(1);
-      } else if (mod && e.key.toLowerCase() === 'b') {
-        // 右栏开关（与原型一致：Ctrl/⌘+B）。非项目标签下右栏强制折叠、
-        // 切换无视觉变化——给出提示而不是无声无息（体检用户反馈"点了没反应"）
-        e.preventDefault();
-        if (activeTab?.kind === 'project' && activeTab.projectId !== null) {
-          setDetail(!useAppStore.getState().detailVisible);
-        } else {
-          void message.info('右栏详情在打开项目后可用');
-        }
-      } else if (mod && e.key === ',') {
-        e.preventDefault();
-        openTab({ kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '设置');
-      } else if (e.key === '?' && !inInput) {
-        void message.info(
-          '快捷键：Ctrl+K 面板 · Ctrl+W 关标签 · Ctrl+Tab 切标签 · Alt+←/→ 前进后退 · Ctrl+S 保存 · 1-8 切项目页签 · F2 重命名 · Delete 删除 · Ctrl+, 设置',
-        );
-      } else if (!inInput && /^[1-8]$/.test(e.key) && activeTab?.kind === 'project') {
+      const inInput =
+        (e.target as HTMLElement | null)?.tagName?.match(/INPUT|TEXTAREA/) !== null ||
+        (e.target as HTMLElement | null)?.isContentEditable === true;
+      if (e.key === '?' && !inInput) {
+        void message.info(`${helpText(settings.keybindings)} · 1-8 切项目页签 · F2 重命名 · Delete 删除`);
+        return;
+      }
+      if (!inInput && /^[1-8]$/.test(e.key) && activeTab?.kind === 'project') {
         const map = ['overview', 'files', 'git', 'archives', 'docs', 'live', 'repo', 'media'];
         const sub = map[Number(e.key) - 1];
         if (sub !== undefined) updateActiveLocation({ subTab: sub }, true);
+        return;
+      }
+      // editor.save 由 EditorPane 执行（需编辑器内部状态）；其余可改绑命令在此统一匹配
+      for (const c of [...BUILTIN_COMMANDS, ...pluginCommandContributions]) {
+        if (c.keyEditable !== true || c.id === 'editor.save') continue;
+        const chordStr = effectiveChord(c, settings.keybindings);
+        if (chordStr === null) continue;
+        const chord = parseChord(chordStr);
+        if (chord === null || !chordMatches(chord, e)) continue;
+        // 面板开关（Ctrl+K / Ctrl+Shift+P）在面板输入框聚焦时也要生效；
+        // 其余全局快捷键在输入框内不劫持（Esc 由面板自理）
+        const isPaletteToggle = c.id === 'palette.search' || c.id === 'palette.commands';
+        if (paletteOpen && inInput && !isPaletteToggle) continue;
+        e.preventDefault();
+        if (c.id === 'palette.search') {
+          // Ctrl+K 语义是「开关面板」，不是「打开」（再按一次收起）
+          setPalette(!paletteOpen, { mode: 'search' });
+        } else if (c.id === 'palette.commands') {
+          setPalette(!paletteOpen || useAppStore.getState().paletteMode !== 'command', {
+            mode: 'command',
+          });
+        } else {
+          void Promise.resolve(c.run(commandCtx, {})).catch(() => {});
+        }
+        return;
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [
-    paletteOpen,
-    setPalette,
-    tabs,
-    activeTabId,
-    activeTab,
-    closeTabConfirmed,
-    updateActiveLocation,
-    openTab,
-    message,
-    setDetail,
-  ]);
+  }, [paletteOpen, setPalette, activeTab, updateActiveLocation, message, settings.keybindings, commandCtx]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

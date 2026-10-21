@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUILTIN_COMMANDS,
+  chordFromEvent,
   chordMatches,
   effectiveChord,
   filterCommands,
@@ -84,6 +85,24 @@ describe('chord 解析与命中（FR-11.4）', () => {
     expect(chordMatches(chord, base)).toBe(true);
     expect(chordMatches(chord, { ...base, metaKey: true, ctrlKey: false })).toBe(true);
     expect(chordMatches(chord, { ...base, shiftKey: false })).toBe(false);
+  });
+
+  it('chordFromEvent：捕获为 chord 串，无修饰键拒绝，可与 parseChord 往返', () => {
+    const ev = (key: string, mods: { c: boolean; s: boolean; a: boolean }) => ({
+      key,
+      ctrlKey: mods.c,
+      metaKey: false,
+      shiftKey: mods.s,
+      altKey: mods.a,
+    });
+    expect(chordFromEvent(ev('p', { c: true, s: true, a: false }))).toBe('Ctrl+Shift+P');
+    expect(chordFromEvent(ev('Tab', { c: true, s: false, a: false }))).toBe('Ctrl+Tab');
+    expect(chordFromEvent(ev('ArrowLeft', { c: false, s: false, a: true }))).toBe('Alt+ArrowLeft');
+    expect(chordFromEvent(ev('k', { c: false, s: false, a: false }))).toBeNull();
+    expect(chordFromEvent(ev('Shift', { c: false, s: true, a: false }))).toBeNull();
+    const back = chordFromEvent(ev('p', { c: true, s: true, a: false }));
+    const chord = back !== null ? parseChord(back) : null;
+    expect(chord).toEqual({ ctrl: true, shift: true, alt: false, key: 'p' });
   });
 
   it('effectiveChord：设置覆盖优先', () => {

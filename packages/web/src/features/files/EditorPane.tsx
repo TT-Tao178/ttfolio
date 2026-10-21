@@ -12,6 +12,7 @@ import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { langExtension } from './langExt';
 import { cmTheme, cmHighlight } from '@/theme/codemirror';
+import { chordMatches, effectiveChord, parseChord } from '@/features/command/registry';
 import { SEMANTIC } from '@/theme/tokens';
 import { useSettingsDark } from './useDark';
 
@@ -219,17 +220,30 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
     [base, projectId, path, pathKey, draftKey, message, queryClient, saving],
   );
 
-  // Ctrl+S
+  // 保存快捷键（FR-11.4 / FR-13.6）：按设置里的绑定匹配（可改绑）；命令面板「保存」广播事件同一条路。
+  // 仅在编辑态且有改动时执行，避免只读浏览时误写盘。
   useEffect(() => {
+    const chordStr = effectiveChord(
+      { id: 'editor.save', title: '', category: '文件', keys: 'Ctrl+S', run: () => {} },
+      settings.keybindings,
+    );
+    const chord = chordStr !== null ? parseChord(chordStr) : null;
     const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      if (chord !== null && chordMatches(chord, e) && editMode && dirty) {
         e.preventDefault();
         void save(false);
       }
     };
+    const onCommandSave = (): void => {
+      if (editMode && dirty) void save(false);
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [save]);
+    window.addEventListener('ttfolio:save', onCommandSave);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('ttfolio:save', onCommandSave);
+    };
+  }, [save, settings.keybindings, editMode, dirty]);
 
   // 草稿 1s 防抖（C-07）
   const onChange = (v: string): void => {

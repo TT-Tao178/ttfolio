@@ -35,6 +35,7 @@ import { EditorView } from '@codemirror/view';
 import { cmTheme, cmHighlight } from '@/theme/codemirror';
 import { langExtension } from '@/features/files/langExt';
 import { useSettingsDark } from '@/features/files/useDark';
+import { BUILTIN_COMMANDS, chordFromEvent, effectiveChord } from '@/features/command/registry';
 
 /**
  * 默认架构图目录名输入：改为**受控 + 跟服务端值同步**。
@@ -399,6 +400,16 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
               模板必须包含占位符 {'{path}'} / {'{file}'} / {'{project}'} / {'{paths}'} 之一；以「可执行文件 +
               参数数组」执行，禁止 shell 拼接。
             </p>
+          </Card>
+        </SectionAnchor>
+
+        <SectionAnchor id="shortcuts">
+          <Card size="small" title={sectionTitle('shortcuts')}>
+            <p style={{ fontSize: 12, opacity: 0.65, marginTop: 0 }}>
+              快捷键由命令注册表生成，「?」帮助同步更新。至少要带一个修饰键（Ctrl/Shift/Alt），
+              避免抢普通输入；改绑与其它命令冲突时会提示。保存/搜索/切页签均可改。
+            </p>
+            <KeybindingsCard />
           </Card>
         </SectionAnchor>
 
@@ -875,3 +886,94 @@ function SchemePreview({ dark, scheme }: { dark: boolean; scheme: string }): Rea
     />
   );
 }
+
+/** 快捷键改绑（FR-11.4 / FR-13.6）：注册表里的 keyEditable 命令逐条可改绑/恢复默认。 */
+function KeybindingsCard(): React.JSX.Element {
+  const { settings, setSetting } = useSettings();
+  const { message } = App.useApp();
+  const [capturing, setCapturing] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (capturing === null) return undefined;
+    const onKey = (e: KeyboardEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        setCapturing(null);
+        return;
+      }
+      const chord = chordFromEvent(e);
+      if (chord === null) {
+        void message.info('需要带修饰键（Ctrl/Shift/Alt），Esc 取消');
+        return;
+      }
+      const conflict = editableCommands.find(
+        (c) =>
+          c.id !== capturing &&
+          effectiveChord(c, settings.keybindings)?.toLowerCase() === chord.toLowerCase(),
+      );
+      if (conflict !== undefined) {
+        void message.warning(`与「${conflict.title}」冲突，请换一个组合`);
+        return;
+      }
+      setSetting('keybindings', { ...settings.keybindings, [capturing]: chord });
+      setCapturing(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturing, settings.keybindings, setSetting, message]);
+
+  return (
+    <div>
+      {editableCommands.map((c) => {
+        const chord = effectiveChord(c, settings.keybindings);
+        const isCustom = settings.keybindings[c.id] !== undefined;
+        return (
+          <div
+            key={c.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '6px 0',
+              borderBottom: `1px solid ${SEMANTIC.split}`,
+            }}
+          >
+            <span style={{ flex: 1, fontSize: 13 }}>
+              {c.title}
+              {isCustom && (
+                <Tag style={{ marginLeft: 8 }} color="blue">
+                  已改绑
+                </Tag>
+              )}
+            </span>
+            <Tag className="tt-mono" style={{ margin: 0 }}>
+              {capturing === c.id ? '按下新组合…' : (chord ?? '未绑定')}
+            </Tag>
+            <Button
+              size="small"
+              onClick={() => setCapturing(capturing === c.id ? null : c.id)}
+              data-testid={`kb-edit-${c.id}`}
+            >
+              {capturing === c.id ? '取消' : '改绑'}
+            </Button>
+            <Button
+              size="small"
+              disabled={!isCustom}
+              onClick={() => {
+                const next = { ...settings.keybindings };
+                delete next[c.id];
+                setSetting('keybindings', next);
+              }}
+            >
+              恢复默认
+            </Button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 可改绑命令（注册表单一来源；editor.save 由编辑器响应广播事件）。 */
+const editableCommands = BUILTIN_COMMANDS.filter((c) => c.keyEditable === true);
