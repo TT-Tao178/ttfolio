@@ -18,6 +18,14 @@ import {
   needsReanalyze,
 } from './db/repo/projectsRepo.js';
 import { getSession, putSession, listTodos, createTodo, patchTodo } from './db/repo/sessionRepo.js';
+import {
+  logActivity,
+  listActivity,
+  recordRecentFile,
+  listRecentFiles,
+  getSetting,
+  setSetting,
+} from './db/repo/metaRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
@@ -339,6 +347,47 @@ describe('跨项目未完成清单（FR-9.3 / T-109）', () => {
     softDeleteProject(db, pb.id);
     const after = listTodos(db, { scopeAll: true, includeDone: false });
     expect(after.map((t) => t.title)).toEqual(['甲任务']);
+  });
+});
+
+describe('活动查询与最近查看（FR-13.8 / T-105）', () => {
+  it('listActivity 过滤（kind 前缀/级别/offset）；recent_files 计数与项目过滤；pins 存取', () => {
+    logActivity(db, { kind: 'git.commit', level: 'L2' });
+    logActivity(db, { kind: 'trash.empty', level: 'L3' });
+    // recent_files 外键指向 projects，须用真实项目行
+    const dirR = path.join(root, 'recent 项目');
+    fs.mkdirSync(dirR, { recursive: true });
+    const pr = insertProject(db, {
+      dirPath: dirR,
+      dirPathKey: pathKey(dirR),
+      diskName: 'recent 项目',
+      defaultArchDir: '架构图',
+    });
+    recordRecentFile(db, pr.id, 'docs/a.md');
+    recordRecentFile(db, pr.id, 'docs/a.md');
+
+    const all = listActivity(db, { limit: 100 });
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    const gitOnly = listActivity(db, { limit: 100, kindPrefix: 'git.' });
+    expect(gitOnly).toHaveLength(1);
+    expect(gitOnly[0]?.kind).toBe('git.commit');
+    const l3 = listActivity(db, { limit: 100, level: 'L3' });
+    expect(l3.length).toBeGreaterThanOrEqual(1);
+    expect(l3.every((e) => e.level === 'L3')).toBe(true);
+    const paged = listActivity(db, { limit: 1, offset: 1 });
+    expect(paged).toHaveLength(1);
+    expect(paged[0]?.id).not.toBe(all[0]?.id);
+
+    const recent = listRecentFiles(db, 10);
+    const ax = recent.find((r) => r.path === 'docs/a.md');
+    expect(ax?.openCount).toBe(2);
+    expect(ax?.projectId).toBe(pr.id);
+    const onlyR = listRecentFiles(db, 10, pr.id);
+    expect(onlyR.length).toBeGreaterThan(0);
+    expect(onlyR.every((r) => r.projectId === pr.id)).toBe(true);
+
+    setSetting(db, 'recent_pins', JSON.stringify([`${pr.id}|docs/a.md`]));
+    expect(getSetting(db, 'recent_pins')).toBe(`["${pr.id}|docs/a.md"]`);
   });
 });
 

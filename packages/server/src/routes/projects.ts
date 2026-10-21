@@ -30,7 +30,13 @@ import {
   listCollections,
   type ListFilters,
 } from '../db/repo/projectsRepo.js';
-import { logActivity, recordRecentFile, listRecentFiles } from '../db/repo/metaRepo.js';
+import {
+  logActivity,
+  recordRecentFile,
+  listRecentFiles,
+  getSetting,
+  setSetting,
+} from '../db/repo/metaRepo.js';
 import { getAgentRepoEnabled } from '../db/repo/agentSessionRepo.js';
 import { clearProjectThumbs } from '../core/thumbs.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
@@ -389,9 +395,27 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
 
   // ---- 最近打开 ----
   app.get('/api/recent', async (req) => {
-    const q = req.query as { type?: string };
-    if (q.type === 'files') return ok(listRecentFiles(ctx.db(), 50));
+    const q = req.query as { type?: string; limit?: string; projectId?: string };
+    if (q.type === 'files') {
+      const limit = Math.min(Math.max(Number(q.limit ?? '50'), 1), 200);
+      return ok(listRecentFiles(ctx.db(), limit, q.projectId));
+    }
     return ok(listProjects(ctx.db(), { status: 'all', sort: 'last_opened' }).slice(0, 20));
+  });
+
+  // 最近查看收藏（FR-13.8 / T-105）：settings 键 recent_pins 存 `projectId|path` 字符串数组
+  app.get('/api/recent/pins', async () => {
+    return ok({ pins: parsePins(getSetting(ctx.db(), 'recent_pins')) });
+  });
+
+  app.put('/api/recent/pins', async (req) => {
+    const b = (req.body ?? {}) as { pins?: unknown };
+    if (!Array.isArray(b.pins) || b.pins.some((x) => typeof x !== 'string')) {
+      return fail('BAD_REQUEST', 'pins 必须是字符串数组');
+    }
+    const pins = [...new Set(b.pins as string[])].filter((s) => s !== '' && s.length <= 500).slice(0, 200);
+    setSetting(ctx.db(), 'recent_pins', JSON.stringify(pins));
+    return ok({ pins });
   });
 
   // ---- 集合 ----
@@ -521,6 +545,18 @@ function defaultArchDirName(db: import('better-sqlite3').Database): string {
     .prepare<[string], { value: string | null }>('SELECT value FROM settings WHERE key = ?')
     .get('default_arch_dir_name');
   return row?.value ?? '架构图';
+}
+
+/** recent_pins 反序列化：坏值/类型不符一律回落空数组（存储被外部改坏时不炸 UI）。 */
+function parsePins(raw: string | null): string[] {
+  if (raw === null) return [];
+  try {
+    const v: unknown = JSON.parse(raw);
+    if (!Array.isArray(v)) return [];
+    return v.filter((x): x is string => typeof x === 'string');
+  } catch {
+    return [];
+  }
 }
 
 function toApiErrorTuple(err: unknown): [import('@ttfolio/shared').ErrorCode, string, number] {

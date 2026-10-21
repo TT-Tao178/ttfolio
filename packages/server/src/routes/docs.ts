@@ -25,7 +25,7 @@ import {
   listAllMounts,
 } from '../db/repo/docsRepo.js';
 import { getProjectRow, listProjects } from '../db/repo/projectsRepo.js';
-import { logActivity, getSetting } from '../db/repo/metaRepo.js';
+import { logActivity, getSetting, recordRecentFile } from '../db/repo/metaRepo.js';
 import { resolveInProject } from '../roots.js';
 import { buildMatcher } from '../core/search.js';
 import { currentActor } from '../core/actor.js';
@@ -419,6 +419,9 @@ export const docsRoutes: FastifyPluginAsync = async (app) => {
       const st = fsx.statSafe(abs);
       if (st === null) return fail('NOT_FOUND', '文档不存在', 404);
       const content = fsx.readTextFile(abs, 20 * 1024 * 1024);
+      // 最近查看（FR-13.8 / T-105）：项目内文档打开计入 recent_files；
+      // 挂载文档路径不在项目根内，点了也打不开文件页签，不记
+      if (q.mountId === undefined) recordRecentFile(ctx.db(), q.projectId, q.path);
       return ok({
         path: q.path,
         mountId: q.mountId ?? null,

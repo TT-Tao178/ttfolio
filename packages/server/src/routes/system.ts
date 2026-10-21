@@ -546,9 +546,42 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get('/api/activity', async (req) => {
-    const q = req.query as { limit?: string; projectId?: string };
+    // FR-13.8 / T-105：活动中心查询——limit/offset 分页 + 项目/actor/级别/kind 前缀/时间段过滤
+    const q = req.query as {
+      limit?: string;
+      offset?: string;
+      projectId?: string;
+      actor?: string;
+      level?: string;
+      kind?: string;
+      kinds?: string;
+      since?: string;
+      until?: string;
+    };
     const limit = Math.min(Math.max(Number(q.limit ?? '100'), 1), 1000);
-    return ok(listActivity(ctx.db(), limit, q.projectId));
+    const offset = Math.max(Number(q.offset ?? '0') || 0, 0);
+    const level = q.level === 'L1' || q.level === 'L2' || q.level === 'L3' ? q.level : undefined;
+    const kinds =
+      q.kinds !== undefined && q.kinds !== ''
+        ? q.kinds
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s !== '')
+        : undefined;
+    const nz = (v: string | undefined): string | undefined => (v === undefined || v === '' ? undefined : v);
+    return ok(
+      listActivity(ctx.db(), {
+        limit,
+        offset,
+        projectId: nz(q.projectId),
+        actor: nz(q.actor),
+        level,
+        kindPrefix: nz(q.kind),
+        kinds,
+        since: nz(q.since),
+        until: nz(q.until),
+      }),
+    );
   });
 
   app.get('/api/data-stats', async () => {

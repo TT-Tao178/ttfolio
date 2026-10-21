@@ -74,7 +74,7 @@ describe('logActivity 审计默认值（FR-13.1：未显式传 actor 时取当�
     logActivity(db, { kind: 'test.user.op', level: 'L1' });
     logActivity(db, { kind: 'test.explicit.op', level: 'L1', actor: 'someone' });
 
-    const rows = listActivity(db, 10);
+    const rows = listActivity(db, { limit: 10 });
     const byKind = new Map(rows.map((r) => [r.kind, r.actor]));
     expect(byKind.get('test.agent.op')).toBe('claude-code');
     expect(byKind.get('test.user.op')).toBe('local');

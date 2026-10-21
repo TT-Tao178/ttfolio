@@ -54,15 +54,58 @@ export function logActivity(
   );
 }
 
-export function listActivity(db: Database.Database, limit: number, projectId?: string): ActivityEntry[] {
-  const rows =
-    projectId !== undefined
-      ? getAll<ActivityRow>(
-          db,
-          'SELECT * FROM activity_log WHERE project_id = ? ORDER BY at DESC, id DESC LIMIT ?',
-          [projectId, limit],
-        )
-      : getAll<ActivityRow>(db, 'SELECT * FROM activity_log ORDER BY at DESC, id DESC LIMIT ?', [limit]);
+export interface ActivityQuery {
+  limit: number;
+  offset?: number;
+  projectId?: string;
+  actor?: string;
+  level?: string;
+  /** kind 前缀匹配（如 'git.' 匹配 git.commit/git.checkout…） */
+  kindPrefix?: string;
+  /** kind 精确集合（最近查看等聚合场景） */
+  kinds?: string[];
+  /** ISO 日期或日期时间；since 含端、until 传 YYYY-MM-DD 时按当日末尾含端 */
+  since?: string;
+  until?: string;
+}
+
+export function listActivity(db: Database.Database, opts: ActivityQuery): ActivityEntry[] {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (opts.projectId !== undefined && opts.projectId !== '') {
+    where.push('project_id = ?');
+    params.push(opts.projectId);
+  }
+  if (opts.actor !== undefined && opts.actor !== '') {
+    where.push('actor = ?');
+    params.push(opts.actor);
+  }
+  if (opts.level !== undefined && opts.level !== '') {
+    where.push('level = ?');
+    params.push(opts.level);
+  }
+  if (opts.kindPrefix !== undefined && opts.kindPrefix !== '') {
+    where.push('kind LIKE ?');
+    params.push(`${opts.kindPrefix}%`);
+  }
+  if (opts.kinds !== undefined && opts.kinds.length > 0) {
+    where.push(`kind IN (${opts.kinds.map(() => '?').join(',')})`);
+    params.push(...opts.kinds);
+  }
+  if (opts.since !== undefined && opts.since !== '') {
+    where.push('at >= ?');
+    params.push(opts.since);
+  }
+  if (opts.until !== undefined && opts.until !== '') {
+    where.push('at <= ?');
+    params.push(/^\d{4}-\d{2}-\d{2}$/.test(opts.until) ? `${opts.until}T23:59:59.999` : opts.until);
+  }
+  const rows = getAll<ActivityRow>(
+    db,
+    `SELECT * FROM activity_log ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`,
+    [...params, opts.limit, opts.offset ?? 0],
+  );
   return rows.map((r) => ({
     id: r.id,
     at: r.at,
@@ -109,12 +152,20 @@ export function recordRecentFile(db: Database.Database, projectId: string, path:
 export function listRecentFiles(
   db: Database.Database,
   limit: number,
+  projectId?: string,
 ): Array<{ projectId: string; path: string; openedAt: string; openCount: number }> {
-  const rows = getAll<{ project_id: string; path: string; opened_at: string; open_count: number }>(
-    db,
-    'SELECT project_id, path, opened_at, open_count FROM recent_files ORDER BY opened_at DESC LIMIT ?',
-    [limit],
-  );
+  const rows =
+    projectId !== undefined && projectId !== ''
+      ? getAll<{ project_id: string; path: string; opened_at: string; open_count: number }>(
+          db,
+          'SELECT project_id, path, opened_at, open_count FROM recent_files WHERE project_id = ? ORDER BY opened_at DESC LIMIT ?',
+          [projectId, limit],
+        )
+      : getAll<{ project_id: string; path: string; opened_at: string; open_count: number }>(
+          db,
+          'SELECT project_id, path, opened_at, open_count FROM recent_files ORDER BY opened_at DESC LIMIT ?',
+          [limit],
+        );
   return rows.map((r) => ({
     projectId: r.project_id,
     path: r.path,
