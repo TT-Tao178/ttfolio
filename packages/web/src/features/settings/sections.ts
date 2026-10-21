@@ -25,6 +25,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { key: 'watch', label: '文件监听与保存', title: '文件监听与保存' },
   { key: 'data', label: '数据与备份', title: '数据与备份' },
   { key: 'health', label: '库体检', title: '库体检' },
+  { key: 'plugins', label: '插件', title: '插件' },
   { key: 'about', label: '关于', title: '关于' },
 ];
 

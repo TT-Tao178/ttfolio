@@ -285,6 +285,10 @@ export type SseEventName =
   | 'git.changed'
   | 'search.index.progress'
   | 'trash.changed'
+  /** 插件启停/安装变化（FR-14.1） */
+  | 'plugin.changed'
+  /** 脚本插件输出行（FR-14.1） */
+  | 'plugin.output'
   | 'notice';
 
 export interface SseEvent {
@@ -307,7 +311,8 @@ export type TabKind =
   | 'trash'
   | 'activity'
   | 'compare'
-  | 'doclib';
+  | 'doclib'
+  | 'plugins';
 
 export interface SessionTab {
   id: string;

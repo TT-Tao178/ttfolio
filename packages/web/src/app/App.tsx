@@ -6,7 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
 import { SettingsProvider, useSettings } from '@/app/settings';
 import { useAppStore, serializeSession } from '@/app/store';
-import { useSse, type SseState } from '@/app/sse';
+import { useSse, subscribeSseEvents, type SseState } from '@/app/sse';
 import { TabBar } from '@/components/TabBar';
 import { PathBar } from '@/components/PathBar';
 import { StatusBar } from '@/components/StatusBar';
@@ -20,6 +20,8 @@ import { TrashPage } from '@/features/trash/TrashPage';
 import { ActivityPage } from '@/features/activity/ActivityPage';
 import { CompareView } from '@/features/compare/CompareView';
 import { DocLibraryPage } from '@/features/docs/DocLibraryPage';
+import { PluginsPage } from '@/features/plugins/PluginsPage';
+import { toCommandDefs, type PluginContribution } from '@/features/plugins/pluginCommands';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import {
@@ -91,6 +93,7 @@ function Shell(): React.JSX.Element {
       search: 'search',
       activity: 'activity',
       doclib: 'docs',
+      plugins: 'settings',
       settings: 'settings',
     };
     const target = activeTab !== null ? map[activeTab.kind] : undefined;
@@ -101,6 +104,31 @@ function Shell(): React.JSX.Element {
   const commandCtx = useCommandContext();
   // 缩略图后台补建（FR-13.5 / T-113）：分析完成后静默补齐缺失的网格缩略图
   useThumbBackfill();
+  // 插件命令贡献（FR-14.1 / T-101）：启用的插件命令并入命令注册表；插件启停即时刷新
+  const [, forcePluginCmds] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = (): void => {
+      void api
+        .get<PluginContribution[]>('/api/plugins/contributions')
+        .then((list) => {
+          pluginCommandContributions.length = 0;
+          pluginCommandContributions.push(...toCommandDefs(list));
+          if (alive) forcePluginCmds((x) => x + 1);
+        })
+        .catch(() => {
+          /* 插件清单拉取失败不影响内置命令 */
+        });
+    };
+    load();
+    const off = subscribeSseEvents((e) => {
+      if (e.event === 'plugin.changed') load();
+    });
+    return () => {
+      alive = false;
+      off();
+    };
+  }, []);
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);
@@ -339,6 +367,8 @@ function Shell(): React.JSX.Element {
                         <CompareView specJson={activeTab.targetPath ?? ''} />
                       ) : activeTab.kind === 'doclib' ? (
                         <DocLibraryPage />
+                      ) : activeTab.kind === 'plugins' ? (
+                        <PluginsPage />
                       ) : activeTab.kind === 'settings' ? (
                         <SettingsPage anchor={activeTab.subTab} />
                       ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (

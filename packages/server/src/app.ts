@@ -26,6 +26,7 @@ import { agentRoutes } from './routes/agent.js';
 import { mediaRoutes } from './routes/media.js';
 import { profileRoutes } from './routes/profile.js';
 import { changesRoutes } from './routes/changes.js';
+import { pluginsRoutes } from './routes/plugins.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -176,6 +177,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   app.register(mediaRoutes);
   app.register(profileRoutes);
   app.register(changesRoutes);
+  app.register(pluginsRoutes);
 
   // 静态托管 web/dist（token 注入 index.html）
   app.get('/', async (_req, reply) => {

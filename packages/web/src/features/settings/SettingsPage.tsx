@@ -24,6 +24,7 @@ import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/shared';
 import { fmtBytes } from '@/lib/format';
 import { useSettings } from '@/app/settings';
+import { useAppStore } from '@/app/store';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
 import { TagHub } from './TagHub';
 import { HealthCard } from './HealthCard';
@@ -589,6 +590,30 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
         <SectionAnchor id="health">
           <Card size="small" title={sectionTitle('health')}>
             <HealthCard />
+          </Card>
+        </SectionAnchor>
+
+        <SectionAnchor id="plugins">
+          <Card size="small" title={sectionTitle('plugins')}>
+            <p style={{ fontSize: 12, opacity: 0.7, marginTop: 0 }}>
+              插件可扩展命令与信息卡（声明式零代码），或经受控 API 运行本地脚本。断网时全部本地插件
+              功能可用；在线市场仅作可选补充。
+            </p>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() =>
+                useAppStore
+                  .getState()
+                  .openTab(
+                    { kind: 'plugins', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                    '插件广场',
+                  )
+              }
+              data-testid="open-plugins-page"
+            >
+              打开插件广场
+            </Button>
           </Card>
         </SectionAnchor>
 
