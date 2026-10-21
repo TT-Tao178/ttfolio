@@ -42,6 +42,12 @@
   taskkill /T /F 杀进程树，本轮已实测端口释放。
 - **收口**：任务总表生成器把 T-098/099/100 移入 PLANNED_DONE 并重生成
   （规划已完成 6 / 待做 10）；KNOWN-GAPS 仍为三项（无新打折项）。
+- **出包**：版本收口 0.3.10 三处同轮（af469c9）；**首次 dist:win 失败在
+  electron-rebuild（EPERM unlink better_sqlite3.node）——取证为前几轮探针
+  残留的 tsx 服务进程仍持有 .node（不是用户 dev），进程树杀净后一次通过**，
+  自检 8 项全绿含 0.3.10 断言；rebuild 翻回 Node ABI、门禁复跑三绿（159 条）；
+  安装包 ttFolio-Setup-0.3.10.exe 入 dist-electron（包数 9：0.3.2~0.3.10）；
+  tag v0.3.10 与 main 已推送，Release 页资产由用户手动拖传（对照清单补行）。
 
 ## 第 46 轮：第一批规划任务 T-095~T-097（Agent 协作三部曲，用户点名分批实施 → v0.3.9）
 
