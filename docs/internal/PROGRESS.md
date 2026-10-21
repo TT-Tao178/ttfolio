@@ -1,5 +1,39 @@
 # PROGRESS
 
+## 第 53 轮：T-105 审计与活动中心（活动记录/时间线/最近查看，未出包）
+
+> 批内第二条（第 52 轮 T-109 之后），版本仍 0.3.12，本批批后统一出 0.4.0
+> （用户指定批次版本，非 0.3.13）。
+
+- **规格先收编**：设计文档 4.13 节新增 FR-13.8（活动中心三页签 + 数据源 +
+  收藏边界 + schema 零新增），附 T-105 新增注记。
+- **核对修正一处方案假设**：任务表原方案写「打开动作已记审计（kind 为
+  fs.open 等）」——实查不成立（现有 kind 只有 fs.save/open.external 等，
+  无打开类审计点）。改用既有 `recent_files` 表作数据源（文件读取一直在
+  落，文档内容读取本轮补 `recordRecentFile`，挂载文档路径不在项目根内
+  不记），架构图查看不进最近查看（沿用审计 viewed 语义），schema 零新增。
+- **服务端（78f3548）**：listActivity 改 opts 签名（limit/offset/
+  projectId/actor/level/kind 前缀/kinds 精确集/since/until——until 传
+  YYYY-MM-DD 按当日末尾含端），GET /api/activity 透传且 level 白名单；
+  GET /api/recent 支持 limit（≤200）与 projectId；新增 GET/PUT
+  /api/recent/pins（settings 键 recent_pins，≤200 条、单条 ≤500 字符、
+  坏值回落空数组）；docs content 项目内读取补 recordRecentFile；actor.test
+  适配新签名；集成测试补过滤/计数/pins 往返锚点。
+- **web（33dd6bd）**：侧栏新增「活动」域（域条 FieldTime 图标，单入口，
+  TabKind/Domain 补 activity，App 渲染分支与域跟随映射补齐）；ActivityPage
+  三页签共用 useInfiniteQuery：活动记录（项目/级别/类型/时间段筛选 + 加载
+  更多 + 导出 CSV——BOM UTF-8、按钮文案如实标注「当前已加载」）、时间线
+  （按本地日分组回放，共用筛选与行组件）、最近查看（全库/项目内两作用域 +
+  星标收藏置顶 + 打开计数/相对时间）；条目点击按 kind 跳转（git→Git 页签/
+  带路径→文件/其余→概览/全局类→回收站与设置页）；activityHelpers 纯函数
+  5 条单测；dayjs 声明为 web 显式依赖（antd 传递依赖，RangePicker 直用）。
+- **验证**：typecheck/lint/test 全绿（188 条，新增 6）；npm run build 通过。
+  手测点：活动页四维筛选与 CSV、时间线分组、最近查看收藏置顶、条目跳转、
+  打开文档后最近查看出条目。
+- **过程小坑**：① recent_files 外键指向 projects，集成测试造数须插真实
+  项目行（FOREIGN KEY 失败一次）；② RecentTab 初版嵌在父组件体内会导致
+  每次渲染重挂载丢页签内状态——提为顶层组件。
+
 ## 第 52 轮：T-109 规格补全三小项（核对 + FR-9.3 跨项目未完成清单落地，未出包）
 
 > 批前基线：main 与远程同步（ac02e09），0.3.12 已发布、门禁三绿（176 条）。
