@@ -6,6 +6,17 @@ import type { SseEvent } from '@ttfolio/shared';
 
 export type SseState = 'connecting' | 'open' | 'closed';
 
+/** 组件级原始事件总线（FR-13.2）：Query 失效之外的订阅方（如动态页签文件流）从这里拿事件。 */
+type SseListener = (e: SseEvent) => void;
+const listeners = new Set<SseListener>();
+
+export function subscribeSseEvents(fn: SseListener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
 export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) => void): void {
   const queryClient = useQueryClient();
   const lastIdRef = useRef<number>(undefined);
@@ -32,7 +43,20 @@ export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) =
         }
         const id = Number.parseInt(ev.lastEventId ?? '', 10);
         if (Number.isFinite(id)) lastIdRef.current = id;
-        onEventRef.current?.({ id: Number.isFinite(id) ? id : 0, event: name as SseEvent['event'], data });
+        const evt: SseEvent = {
+          id: Number.isFinite(id) ? id : 0,
+          event: name as SseEvent['event'],
+          data,
+        };
+        onEventRef.current?.(evt);
+        // 总线分发：单个订阅方异常不拖垮 SSE 主链路
+        for (const fn of listeners) {
+          try {
+            fn(evt);
+          } catch {
+            /* 忽略订阅方错误 */
+          }
+        }
         const projectId = typeof data['projectId'] === 'string' ? (data['projectId'] as string) : null;
         switch (name) {
           case 'project.analyzed':

@@ -22,6 +22,7 @@ import { GitTab } from '@/features/git/GitTab';
 import { ArchivesTab } from '@/features/archives/ArchivesTab';
 import { DocsTab } from '@/features/docs/DocsTab';
 import { TodoList } from '@/features/todos/TodoList';
+import { AgentLiveTab } from '@/features/agent/AgentLiveTab';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectPage({
@@ -130,7 +131,7 @@ export function ProjectPage({
           </Button>
         </Space>
       </div>
-      {/* 项目页五页签（对齐原型 3.3）：鼠标可达；快捷键 1–5 走同一套 updateActiveLocation */}
+      {/* 项目页页签（3.3 / FR-13）：概览→文件→Git→架构图→文档→动态（FR-13.2）→仓库（FR-13.3，可选）→媒体（FR-13.5）；快捷键 1–8 走同一套 updateActiveLocation */}
       <Tabs
         size="small"
         activeKey={active}
@@ -146,6 +147,7 @@ export function ProjectPage({
           },
           { key: 'archives', label: p?.hasArch === true ? '架构图 ✓' : '架构图' },
           { key: 'docs', label: p?.hasDocs === true ? '文档 ✓' : '文档' },
+          { key: 'live', label: '动态' },
         ]}
       />
       <div
@@ -254,6 +256,8 @@ export function ProjectPage({
             <ArchivesTab projectId={projectId} />
           ) : active === 'docs' ? (
             <DocsTab projectId={projectId} />
+          ) : active === 'live' ? (
+            <AgentLiveTab projectId={projectId} />
           ) : (
             <StateView loading={false} empty emptyText={`未知页签：${active}`}>
               <div />
