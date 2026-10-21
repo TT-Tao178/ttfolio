@@ -1,5 +1,20 @@
 # PROGRESS
 
+## 第 50 轮：v0.3.11 出包（T-103 + T-114 + T-113 随版本发布）
+
+- **版本收口（c28905e）**：0.3.11 三处同轮；CHANGELOG 按用户可感知变化写
+  （个人主页 / 媒体自动滚动 / 缩略图清晰度与缓存）。
+- **出包两坑（均按预案过）**：① `audit:prod` 首次失败——npm 审计端点
+  ECONNRESET（网络瞬时抖动），单跑三次均 0 漏洞后重跑链路；②
+  electron-builder EBUSY 锁旧 `win-unpacked/resources/app.asar`（用户已装
+  的 0.3.1 在 E: 盘、与本次无关，未动它）——按预案换全新输出目录
+  `dist-electron-tmp1` 构建，`VERIFY_DIST` 自检 8 项全绿含 0.3.11 断言，
+  安装包与 blockmap 移回 dist-electron 后删 tmp（app.asar 被系统扫描短暂
+  占用，退避重试后删净）。
+- **收口**：rebuild better-sqlite3 翻回 Node ABI、门禁复跑三绿（174 条）；
+  安装包 ttFolio-Setup-0.3.11.exe 入 dist-electron（包数 10：0.3.2~0.3.11）；
+  tag v0.3.11 与 main 已推送，Release 页资产由用户手动拖传（对照清单补行）。
+
 ## 第 49 轮：T-113 缩略图管线 v2（清晰度与缓存，用户点名单条实施，未出包）
 
 > 批前基线：另一会话已在本仓库提交 T-114（3915f75 媒体网格自动滚动）并更新
