@@ -32,6 +32,7 @@ import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
 import { analyzeProject } from './core/analyzer/index.js';
 import { diff, commit } from './core/git.js';
+import { TrashService } from './core/trash.js';
 import { listMedia } from './db/repo/mediaRepo.js';
 import { SseHub } from './core/sse.js';
 import { AppError } from './core/errors.js';
@@ -388,6 +389,32 @@ describe('活动查询与最近查看（FR-13.8 / T-105）', () => {
 
     setSetting(db, 'recent_pins', JSON.stringify([`${pr.id}|docs/a.md`]));
     expect(getSetting(db, 'recent_pins')).toBe(`["${pr.id}|docs/a.md"]`);
+  });
+});
+
+describe('回收站副本只读读取（FR-13.9 / T-106b）', () => {
+  it('readEntryFile：文本可读、目录条目相对名可读、二进制/越界/缺失拒绝', () => {
+    const trashDir = path.join(root, 'trash-it');
+    fs.mkdirSync(trashDir, { recursive: true });
+    const svc = new TrashService(trashDir);
+
+    const f = path.join(root, 'cmp-note.txt');
+    fs.writeFileSync(f, 'hello\nworld');
+    const fid = svc.moveToTrash(db, [f], null, null)[0];
+    if (fid === undefined) throw new Error('moveToTrash 未返回 id');
+    expect(svc.readEntryFile(db, fid, 'cmp-note.txt').content).toBe('hello\nworld');
+
+    const dir = path.join(root, 'cmp-dir');
+    fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'sub', 'a.txt'), 'A');
+    fs.writeFileSync(path.join(dir, 'bin.dat'), Buffer.from([0, 1, 2, 3, 0, 1]));
+    const did = svc.moveToTrash(db, [dir], null, null)[0];
+    if (did === undefined) throw new Error('moveToTrash 未返回 id');
+    expect(svc.readEntryFile(db, did, 'sub/a.txt').content).toBe('A');
+    expect(() => svc.readEntryFile(db, did, 'bin.dat')).toThrow(/对比/);
+    expect(() => svc.readEntryFile(db, did, '../x.txt')).toThrow(/越界/);
+    expect(() => svc.readEntryFile(db, did, 'missing.txt')).toThrow(/不存在/);
+    expect(() => svc.readEntryFile(db, 'nope', 'x.txt')).toThrow(/不存在/);
   });
 });
 

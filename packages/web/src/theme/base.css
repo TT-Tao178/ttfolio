@@ -101,6 +101,9 @@ body,
 .tt-diff-del {
   background: rgba(255, 77, 79, 0.1);
 }
+.tt-diff-chg {
+  background: rgba(250, 173, 20, 0.14);
+}
 .tt-diff-hunk {
   opacity: 0.55;
 }

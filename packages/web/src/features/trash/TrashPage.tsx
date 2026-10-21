@@ -1,12 +1,22 @@
 /** 回收站页（FR-4.9）：列表/预览/恢复/彻底删除/清空/保留策略清理。 */
 import { Alert, App, Button, Empty, List, Modal, Space, Tag } from 'antd';
-import { DeleteOutlined, UndoOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DiffOutlined, UndoOutlined } from '@ant-design/icons';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { TrashItem } from '@ttfolio/shared';
+import type { ProjectSummary, TrashItem } from '@ttfolio/shared';
 import { fmtBytes, relTime } from '@/lib/format';
 import { StateView } from '@/components/StateView';
+import { useAppStore } from '@/app/store';
+import { encodeCompareSpec } from '@/features/compare/compareShared';
+
+/** 路径归一（前斜杠 + 去尾分隔 + 小写），用于「原路径属于哪个登记项目」的前缀匹配。 */
+function normPath(p: string): string {
+  return p
+    .replace(/[\\/]+/g, '/')
+    .replace(/\/$/, '')
+    .toLowerCase();
+}
 
 export function TrashPage(): React.JSX.Element {
   const { message, modal } = App.useApp();
@@ -22,6 +32,36 @@ export function TrashPage(): React.JSX.Element {
     queryFn: () => api.get<{ entries: string[] }>(`/api/trash/${preview?.id}/preview`),
     enabled: preview !== null,
   });
+  const { data: projects } = useQuery({
+    queryKey: ['projects', 'trash-page'],
+    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active' }),
+  });
+
+  /** 原路径命中的登记项目（前缀匹配）；未登记返回 null（无法与当前文件对比）。 */
+  const matchProject = (originPath: string): ProjectSummary | null => {
+    const o = normPath(originPath);
+    return (projects ?? []).find((p) => o.startsWith(`${normPath(p.dirPath)}/`)) ?? null;
+  };
+
+  /** 与当前文件对比（FR-13.9 / T-106b）：左=项目内现存原路径，右=回收站副本。 */
+  const openCompare = (t: TrashItem): void => {
+    const p = matchProject(t.originPath);
+    if (p === null) return;
+    const rel = normPath(t.originPath).slice(normPath(p.dirPath).length + 1);
+    useAppStore.getState().openTab(
+      {
+        kind: 'compare',
+        projectId: null,
+        targetPath: encodeCompareSpec({
+          left: { projectId: p.id, path: rel },
+          right: { trashId: t.id, name: t.name },
+        }),
+        subTab: null,
+        scroll: 0,
+      },
+      `对比 ${t.name}`,
+    );
+  };
 
   const invalidate = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['trash'] });
@@ -143,6 +183,16 @@ export function TrashPage(): React.JSX.Element {
                   <Button size="small" onClick={() => setPreview(t)}>
                     预览
                   </Button>
+                  {t.kind === 'file' && matchProject(t.originPath) !== null && (
+                    <Button
+                      size="small"
+                      icon={<DiffOutlined />}
+                      onClick={() => openCompare(t)}
+                      title="与项目内的当前文件并排对比（仅文本 ≤5MB）"
+                    >
+                      对比
+                    </Button>
+                  )}
                   <Button
                     size="small"
                     type="primary"

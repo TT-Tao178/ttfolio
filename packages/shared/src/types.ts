@@ -292,7 +292,8 @@ export type TabKind =
   | 'search'
   | 'settings'
   | 'trash'
-  | 'activity';
+  | 'activity'
+  | 'compare';
 
 export interface SessionTab {
   id: string;

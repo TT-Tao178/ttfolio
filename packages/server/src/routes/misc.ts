@@ -44,6 +44,18 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
     return ok({ entries: ctx.trash.previewEntries(ctx.db(), id) });
   });
 
+  // 回收站条目内单文件只读读取（FR-13.9 / T-106b：与现存原文件对比）。文本 ≤5MB，越界全拒。
+  app.get('/api/trash/:id/file', async (req) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { name?: string };
+    if (q.name === undefined || q.name === '') return fail('BAD_REQUEST', '缺少 name');
+    try {
+      return ok(ctx.trash.readEntryFile(ctx.db(), id, q.name));
+    } catch (err) {
+      return fail(...toApiErrorTuple(err));
+    }
+  });
+
   app.post('/api/trash/restore', async (req) => {
     const b = (req.body ?? {}) as { id?: string; targetDir?: string };
     if (b.id === undefined) return fail('BAD_REQUEST', '缺少 id');

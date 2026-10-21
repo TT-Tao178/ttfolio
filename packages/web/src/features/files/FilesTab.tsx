@@ -25,6 +25,7 @@ import {
   FileAddOutlined,
   FolderAddOutlined,
   LinkOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,6 +39,9 @@ import { EditorPane } from './EditorPane';
 import { PaneSplit } from '@/components/PaneSplit';
 import { ImagePreview } from './ImagePreview';
 import { MoveCopyModal } from './MoveCopyModal';
+import { OfficePreview } from '@/features/docs/OfficePreview';
+import { resolveViewer } from './viewerDispatch';
+import { ComparePickModal } from '@/features/compare/ComparePickModal';
 
 const GIT_COLORS: Record<string, string> = {
   modified: SEMANTIC.warning,
@@ -124,6 +128,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   // dirPath 为复制绝对路径所需的项目根（与详情页共享查询缓存）
   const [mcTarget, setMcTarget] = useState<{ items: string[]; mode: 'move' | 'copy' } | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  // 文件对比（FR-13.9 / T-106b）：右键「与其他文件对比…」的基準文件
+  const [compareBase, setCompareBase] = useState<string | null>(null);
   const { data: detailData } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`),
@@ -488,6 +494,10 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                 }
                 style={{ marginTop: 64 }}
               />
+            ) : resolveViewer(openPath) === 'office' ? (
+              // FR-13.9 预览分发器：Office 白名单直连 OfficePreview（/api/docs/raw 项目内通道），
+              // docx/pdf/xlsx/xls 从任何入口打开都不再落「二进制不预览」
+              <OfficePreview projectId={projectId} path={openPath} mountId={null} />
             ) : isImage ? (
               <ImagePreview projectId={projectId} path={openPath} />
             ) : (
@@ -544,6 +554,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               else if (key === 'delete') confirmDelete(path);
               else if (key === 'copy-to') setMcTarget({ items: [path], mode: 'copy' });
               else if (key === 'move-to') setMcTarget({ items: [path], mode: 'move' });
+              else if (key === 'compare') setCompareBase(path);
               else if (key === 'explorer')
                 void api.post('/api/open', { target: 'explorer', projectId, path });
               else if (key === 'copy-rel') writeClipboard(path, `已复制相对路径：${path}`);
@@ -563,6 +574,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               { type: 'divider' as const },
               { key: 'copy-to', label: '复制到…', icon: <CopyOutlined /> },
               { key: 'move-to', label: '移动到…', icon: <ScissorOutlined /> },
+              { key: 'compare', label: '与其他文件对比…', icon: <SwapOutlined /> },
               { key: 'explorer', label: '在资源管理器中打开', icon: <FolderOpenOutlined /> },
               { type: 'divider' as const },
               { key: 'copy-rel', label: '复制相对路径' },
@@ -570,6 +582,9 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
             ]}
           />
         </div>
+      )}
+      {compareBase !== null && (
+        <ComparePickModal projectId={projectId} basePath={compareBase} onClose={() => setCompareBase(null)} />
       )}
     </div>
   );

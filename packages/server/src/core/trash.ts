@@ -8,6 +8,7 @@ import type Database from 'better-sqlite3';
 import { getAll } from '../db/sql.js';
 import type { TrashItem } from '@ttfolio/shared';
 import { AppError } from './errors.js';
+import { isInsideOrEqual } from './pathGuard.js';
 import * as fsx from './fsx.js';
 import { insertTrash, getTrashRow, deleteTrashRow } from '../db/repo/filesRepo.js';
 import type { TrashRow } from '../db/rowTypes.js';
@@ -118,6 +119,44 @@ export class TrashService {
       }
     }
     return out;
+  }
+
+  /**
+   * 只读读取条目内的单个文件文本（FR-13.9 / T-106b 副本对比用）。
+   * name 相对条目根（文件条目传其文件名，目录条目传条目内相对路径）。
+   * 仅文本 ≤5MB；二进制/超限/越界一律抛业务错误，绝不写盘。
+   */
+  readEntryFile(
+    db: Database.Database,
+    id: string,
+    name: string,
+  ): { content: string; encoding: string; size: number } {
+    const row = getTrashRow(db, id);
+    if (row === undefined) throw new AppError('NOT_FOUND', '回收站条目不存在');
+    // 孤儿行防护（体检 P1 同源）：rel_path 为空会让 join 得到回收站根
+    if (row.trash_rel_path === '') throw new AppError('PATH_OUT_OF_SCOPE', '回收站条目记录损坏');
+    const entryPath = path.join(this.trashDir, row.trash_rel_path);
+    if (!existsSync(entryPath)) throw new AppError('NOT_FOUND', '回收站内容已不存在');
+    // 文件条目的 rel_path 指向文件本身：对比根取其所在目录，name=文件名即命中本体
+    const rootDir = statSync(entryPath).isFile() ? path.dirname(entryPath) : entryPath;
+    const target = path.resolve(rootDir, name);
+    // 必须严格在条目根之内（C-02：包含判断走 path.relative，禁 startsWith）
+    if (target === rootDir || !isInsideOrEqual(rootDir, target)) {
+      throw new AppError('PATH_OUT_OF_SCOPE', '路径越界');
+    }
+    const st = fsx.statSafe(target);
+    if (st === null) throw new AppError('NOT_FOUND', '文件不存在');
+    if (st.isDir) throw new AppError('IS_DIRECTORY', '这是目录，不是文件');
+    const MAX_COMPARE_BYTES = 5 * 1024 * 1024;
+    if (st.size > MAX_COMPARE_BYTES) {
+      throw new AppError('BAD_REQUEST', '文件超过 5MB，不支持对比');
+    }
+    const buf = fsx.readFileSync(target);
+    if (fsx.looksBinary(buf.subarray(0, 8192))) {
+      throw new AppError('BAD_REQUEST', '二进制文件不支持对比');
+    }
+    const content = fsx.readTextFile(target, MAX_COMPARE_BYTES);
+    return { content: content.content, encoding: content.encoding, size: st.size };
   }
 
   /** 恢复到原路径；目标被占用时返回 'taken'。 */

@@ -18,6 +18,7 @@ import { Workbench } from '@/features/workbench/Workbench';
 import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
 import { ActivityPage } from '@/features/activity/ActivityPage';
+import { CompareView } from '@/features/compare/CompareView';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import {
@@ -332,6 +333,8 @@ function Shell(): React.JSX.Element {
                         <TrashPage />
                       ) : activeTab.kind === 'activity' ? (
                         <ActivityPage />
+                      ) : activeTab.kind === 'compare' ? (
+                        <CompareView specJson={activeTab.targetPath ?? ''} />
                       ) : activeTab.kind === 'settings' ? (
                         <SettingsPage anchor={activeTab.subTab} />
                       ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (
