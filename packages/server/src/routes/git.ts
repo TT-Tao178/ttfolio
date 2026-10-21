@@ -224,7 +224,8 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
         actor: currentActor().actor,
       });
       ctx.sse.publish('git.changed', { projectId });
-      ctx.sse.publish('fs.changed', { projectId, paths: [], kind: 'update' });
+      // 切分支会批量改工作区：只发刷新信号不落流水（避免一次 checkout 塞数千行）
+      ctx.changes.publish({ projectId, relPaths: [], kind: 'update', source: 'api' });
       return ok({ done: true });
     } catch (err) {
       return fail(...toApiErrorTuple(err));

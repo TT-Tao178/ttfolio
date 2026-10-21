@@ -24,7 +24,7 @@ import {
   purgeOldTaskRuns,
   failStaleRunningTaskRuns,
 } from './db/repo/taskRunRepo.js';
-import { recordSessionFileChanges } from './db/repo/agentSessionRepo.js';
+import { ChangeTracker, purgeChangeEvents } from './core/changes.js';
 import { enforceQuota } from './core/thumbs.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
@@ -156,11 +156,37 @@ async function main(): Promise<void> {
     runFinished: (id, status, error, finishedAt, done, total) =>
       finishTaskRun(store.get(), { id, status, error, finishedAt, done, total }),
   });
-  // 资源仓库沉淀（FR-13.3 / T-097）：flush 后把变更相对路径聚合进「记录中」的会话；
-  // 仓库内部自检活动会话，无会话时零成本跳过
-  const watcher = new WatcherManager(sse, logger, (projectId, relPaths) => {
-    recordSessionFileChanges(store.get(), projectId, relPaths, new Date().toISOString());
+  // 变更流水统一入口（FR-13.2 v2 / T-111）：watcher flush 与各路由的写操作都经它
+  // （落库 → 会话聚合 → SSE）；库句柄惰性取，库恢复重建后不悬空
+  const changes = new ChangeTracker(() => store.get(), sse, logger);
+  const watcher = new WatcherManager(sse, logger, (projectId, relPaths, kind) => {
+    changes.publish({
+      projectId,
+      relPaths,
+      kind: kind === 'create' || kind === 'delete' ? kind : 'update',
+      source: 'watcher',
+    });
   });
+  // 启动清理：变更流水热 7 天 + 全库 20 万行硬上限；每日滚动
+  try {
+    const removedChanges = purgeChangeEvents(store.get());
+    if (removedChanges > 0) {
+      logger.info({ mod: 'boot', msg: `change_event retention: removed ${removedChanges}` });
+    }
+  } catch {
+    /* 清理失败不阻断启动 */
+  }
+  const changeCleanupTimer = setInterval(
+    () => {
+      try {
+        purgeChangeEvents(store.get());
+      } catch {
+        /* 定时清理失败忽略 */
+      }
+    },
+    24 * 3600 * 1000,
+  );
+  changeCleanupTimer.unref();
   const trash = new TrashService(layout.trashDir);
   const webDistCandidates = [
     // 桌面版（Electron）由主进程注入 asar 内的产物路径；dev/生产 web 模式走 cwd 相对定位
@@ -178,6 +204,7 @@ async function main(): Promise<void> {
     tasks,
     watcher,
     trash,
+    changes,
     layout,
     store,
     db: () => store.get(),

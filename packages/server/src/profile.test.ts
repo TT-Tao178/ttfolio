@@ -12,6 +12,7 @@ import { SseHub } from './core/sse.js';
 import { TaskManager } from './core/tasks.js';
 import { WatcherManager } from './core/watcher.js';
 import { TrashService } from './core/trash.js';
+import { ChangeTracker } from './core/changes.js';
 import type { AppContext } from './context.js';
 import { currentActor, setDefaultActorName } from './core/actor.js';
 import { usedDays } from './routes/profile.js';
@@ -51,6 +52,7 @@ beforeAll(() => {
     tasks: new TaskManager(sse, logger),
     watcher: new WatcherManager(sse, logger),
     trash: new TrashService(trashDir),
+    changes: new ChangeTracker(() => db, sse, logger),
     layout: {
       dataDir: root,
       dbFile: path.join(root, 'library.db'),

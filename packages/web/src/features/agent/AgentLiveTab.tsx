@@ -1,18 +1,14 @@
-/** 动态页签（FR-13.2 / T-096）：左「变更文件流」（fs.changed 实时插入，会话级内存，
- * 窗口上限 500）+ 右「内容查看器」（文本只读 CodeMirror / 图片内嵌预览）。
- * 「记录」开启时以当前 git HEAD 为基线，条目可切「与基线 diff」（复用 diff 路由
- * 的 ref 参数与 DiffView）；非 git 项目诚实只显示当前内容。不新建表、不落库，
- * 刷新即失——持久化沉淀属 T-097 资源仓库。 */
-import { useEffect, useRef, useState } from 'react';
+/** 动态页签（FR-13.2 v2 / T-111）：变更流水落库可回读；左栏按 burst 分组 + 来源徽标，
+ *  右栏跟随最新 / 当前内容 / 与基线差异（基线 = 手动「设基线」时的 git HEAD）。 */
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, App, Button, Empty, Segmented, Tooltip } from 'antd';
+import { Alert, App, Button, Empty, Segmented, Switch, Tag, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   EditOutlined,
-  PauseCircleOutlined,
   PlayCircleOutlined,
   PlusOutlined,
-  ClearOutlined,
+  VerticalAlignBottomOutlined,
 } from '@ant-design/icons';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
@@ -24,11 +20,19 @@ import { ImagePreview } from '@/features/files/ImagePreview';
 import { DiffView } from '@/features/git/DiffView';
 import { useSettings } from '@/app/settings';
 import { useSettingsDark } from '@/features/files/useDark';
-import { subscribeSseEvents } from '@/app/sse';
 import { SEMANTIC } from '@/theme/tokens';
-import { applyFsChanged, changedRelPaths, type LiveEntry } from './liveStream';
+import { useLiveEvents, type ChangeEventInfo, type ChangeSource } from './liveStore';
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
+/** 「正在写入」窗口：最后一次变更在该窗口内时当前文件短轮询刷新。 */
+const WRITING_WINDOW_MS = 10_000;
+
+const SOURCE_META: Record<ChangeSource, { label: string; color: string | undefined }> = {
+  watcher: { label: '外部', color: 'default' },
+  api: { label: '本应用', color: 'processing' },
+  agent: { label: 'agent', color: 'purple' },
+  other: { label: '外部', color: 'default' },
+};
 
 function extOf(p: string): string {
   const base = p.slice(p.lastIndexOf('/') + 1);
@@ -36,10 +40,31 @@ function extOf(p: string): string {
   return dot >= 0 ? base.slice(dot + 1).toLowerCase() : '';
 }
 
-function timeOf(ms: number): string {
-  const d = new Date(ms);
+function timeOf(iso: string): string {
+  const d = new Date(iso);
   const p2 = (n: number): string => String(n).padStart(2, '0');
   return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
+
+interface Burst {
+  burstId: string;
+  items: ChangeEventInfo[];
+  lastAt: string;
+}
+
+/** 连续同 burstId 的事件归一组（升序输入）。 */
+export function groupBursts(events: ChangeEventInfo[]): Burst[] {
+  const out: Burst[] = [];
+  for (const e of events) {
+    const last = out[out.length - 1];
+    if (last !== undefined && last.burstId === e.burstId) {
+      last.items.push(e);
+      last.lastAt = e.lastAt;
+    } else {
+      out.push({ burstId: e.burstId, items: [e], lastAt: e.lastAt });
+    }
+  }
+  return out;
 }
 
 export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.Element {
@@ -49,47 +74,32 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
     queryKey: ['project', projectId],
     queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId}`),
   });
-  const dirPath = p?.dirPath ?? '';
   const isRepo = p?.gitIsRepo === true;
 
-  const [entries, setEntries] = useState<LiveEntry[]>([]);
-  const [selected, setSelected] = useState<LiveEntry | null>(null);
-  const [recording, setRecording] = useState(false);
+  const events = useLiveEvents(projectId);
+  const bursts = useMemo(() => groupBursts(events), [events]);
+  const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
+  const [follow, setFollow] = useState(true);
   const [baseline, setBaseline] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'content' | 'diff'>('content');
-  const [refreshTick, setRefreshTick] = useState(0);
-  const idRef = useRef(0);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 订阅 fs.changed：插入文件流 + 正在查看的文件再变更时防抖刷新（500ms）
+  const selected = useMemo(
+    () => (selectedSeq === null ? null : (events.find((e) => e.seq === selectedSeq) ?? null)),
+    [events, selectedSeq],
+  );
+  const latest = events[events.length - 1] ?? null;
+
+  // 跟随最新：贴着底部，新事件到达自动滚到底（手动点条目即钉住，不再抢焦点）
   useEffect(() => {
-    const off = subscribeSseEvents((evt) => {
-      if (evt.event !== 'fs.changed') return;
-      if (evt.data['projectId'] !== projectId) return;
-      setEntries((prev) => applyFsChanged(prev, evt.data, dirPath, Date.now(), () => ++idRef.current));
-      setSelected((cur) => {
-        if (cur !== null && changedRelPaths(evt.data, dirPath).has(cur.relPath)) {
-          if (refreshTimerRef.current !== null) clearTimeout(refreshTimerRef.current);
-          refreshTimerRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 500);
-        }
-        return cur;
-      });
-    });
-    return () => {
-      off();
-      if (refreshTimerRef.current !== null) clearTimeout(refreshTimerRef.current);
-    };
-  }, [projectId, dirPath]);
+    if (!follow) return;
+    const el = scrollRef.current;
+    if (el !== null) el.scrollTop = el.scrollHeight;
+  }, [follow, events.length]);
 
-  const toggleRecord = (): void => {
-    if (recording) {
-      setRecording(false);
-      setBaseline(null);
-      return;
-    }
-    setRecording(true);
+  const setBaselineToHead = (): void => {
     if (!isRepo) {
-      void message.info('非 git 项目：只记录文件流，无法建立 diff 基线');
+      void message.info('非 git 项目：可看当前内容，无法建立 diff 基线');
       return;
     }
     void api
@@ -97,47 +107,50 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
       .then((log) => {
         const head = log[0]?.hash ?? null;
         setBaseline(head);
-        if (head === null) void message.info('仓库还没有提交，暂无 diff 基线');
+        void message.success(head === null ? '仓库还没有提交，暂无基线' : `基线已设为 ${head.slice(0, 7)}`);
       })
-      .catch(() => {
-        /* 基线拿不到不影响流记录（诚实降级：diff 不可用） */
-      });
+      .catch(() => void message.error('读取 git HEAD 失败'));
   };
 
-  // 当前内容（删除的文件没有「当前」）
+  // 正在写入：当前文件最近变更在 10 秒窗口内 → 250ms 轮询刷新（其余走事件）
+  const writing =
+    selected !== null &&
+    Date.now() - Date.parse(selected.lastAt) < WRITING_WINDOW_MS &&
+    selected.kind !== 'delete';
+
   const fileQuery = useQuery({
-    queryKey: ['agent-live-file', projectId, selected?.relPath ?? '', refreshTick],
+    queryKey: ['agent-live-file', projectId, selected?.path ?? ''],
     queryFn: () =>
       api.get<FileContent>(
-        `/api/fs/file?projectId=${projectId}&path=${encodeURIComponent(selected?.relPath ?? '')}`,
+        `/api/fs/file?projectId=${projectId}&path=${encodeURIComponent(selected?.path ?? '')}`,
       ),
     enabled: selected !== null && selected.kind !== 'delete' && viewMode === 'content',
+    refetchInterval: writing ? 250 : false,
   });
-  // 与基线 diff（复用既有 diff 路由的 ref 参数）
   const diffQuery = useQuery({
-    queryKey: ['agent-live-diff', projectId, selected?.relPath ?? '', baseline],
+    queryKey: ['agent-live-diff', projectId, selected?.path ?? '', baseline],
     queryFn: () =>
       api.get<GitDiff>(
-        `/api/git/${projectId}/diff?path=${encodeURIComponent(selected?.relPath ?? '')}&ref=${baseline ?? ''}`,
+        `/api/git/${projectId}/diff?path=${encodeURIComponent(selected?.path ?? '')}&ref=${baseline ?? ''}`,
       ),
     enabled: selected !== null && isRepo && baseline !== null && viewMode === 'diff',
   });
 
-  const kindIcon = (e: LiveEntry): React.JSX.Element => {
+  const kindIcon = (e: ChangeEventInfo): React.JSX.Element => {
     if (e.kind === 'create') return <PlusOutlined style={{ color: '#52c41a' }} />;
     if (e.kind === 'delete') return <DeleteOutlined style={{ color: '#ff4d4f' }} />;
     return <EditOutlined style={{ color: '#1677ff' }} />;
   };
-  const kindText = (e: LiveEntry): string =>
+  const kindText = (e: ChangeEventInfo): string =>
     e.kind === 'create' ? '新增' : e.kind === 'delete' ? '删除' : '修改';
   const diffAvailable = isRepo && baseline !== null;
 
   return (
     <div style={{ display: 'flex', gap: 8, height: '100%', minHeight: 0 }} data-testid="agent-live">
-      {/* 左：变更文件流 */}
+      {/* 左：变更流水（库内回读 + 实时追加） */}
       <div
         style={{
-          width: 380,
+          width: 400,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -157,67 +170,100 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
         >
           <Button
             size="small"
-            type={recording ? 'primary' : 'default'}
-            icon={recording ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
-            onClick={toggleRecord}
-            data-testid="agent-live-record"
+            icon={<PlayCircleOutlined />}
+            onClick={setBaselineToHead}
+            disabled={!isRepo}
+            data-testid="agent-live-baseline"
           >
-            {recording ? '记录中' : '记录'}
+            设基线
           </Button>
-          <span style={{ fontSize: 12, opacity: 0.65 }}>{entries.length} 条 · 会话级（刷新即清）</span>
+          <span style={{ fontSize: 12, opacity: 0.65 }}>{events.length} 条 · 已落库（保留 7 天）</span>
           <span style={{ flex: 1 }} />
-          <Button
-            size="small"
-            icon={<ClearOutlined />}
-            disabled={entries.length === 0}
-            onClick={() => {
-              setEntries([]);
-              setSelected(null);
-            }}
-          />
+          <Tooltip title="跟随最新（点条目即钉住）">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+              <VerticalAlignBottomOutlined />
+              <Switch
+                size="small"
+                checked={follow}
+                onChange={(v) => setFollow(v)}
+                data-testid="agent-live-follow"
+              />
+            </span>
+          </Tooltip>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          {entries.length === 0 ? (
+        <div ref={scrollRef} style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {events.length === 0 ? (
             <div style={{ padding: 24 }}>
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="等待文件变更：在外部编辑器或 agent 改动该项目后，变更会实时出现在这里"
+                description="暂无变更：外部编辑器/终端改文件、或在 ttFolio 里新建改名删除后，都会记录在这里"
               />
             </div>
           ) : (
             <div data-testid="agent-live-stream">
-              {entries.map((e) => (
-                <div
-                  key={e.id}
-                  onClick={() => {
-                    setSelected(e);
-                    setViewMode('content');
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '4px 10px',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    background: selected?.id === e.id ? SEMANTIC.primaryBg : undefined,
-                  }}
-                >
-                  <Tooltip title={kindText(e)}>{kindIcon(e)}</Tooltip>
-                  <span
-                    className="tt-mono"
-                    style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    title={e.relPath}
-                  >
-                    {e.relPath}
-                  </span>
-                  {/* actor 预留列（FR-13.2）：fs.changed 暂无来源信息，诚实显示占位 */}
-                  <span style={{ opacity: 0.45 }} title="操作来源（预留）">
-                    —
-                  </span>
-                  <span style={{ opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>{timeOf(e.at)}</span>
-                </div>
-              ))}
+              {bursts.map((b) => {
+                const first = b.items[0];
+                const src = SOURCE_META[first?.source ?? 'other'];
+                return (
+                  <div key={b.burstId} style={{ borderBottom: '1px solid rgba(128,128,128,0.12)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 10px',
+                        fontSize: 11,
+                        opacity: 0.6,
+                      }}
+                    >
+                      <span>{timeOf(b.lastAt)}</span>
+                      <Tag style={{ fontSize: 10, marginInlineEnd: 0 }} color={src.color}>
+                        {src.label}
+                      </Tag>
+                      <span>{b.items.length} 个文件</span>
+                    </div>
+                    {b.items.map((e) => (
+                      <div
+                        key={e.seq}
+                        onClick={() => {
+                          setSelectedSeq(e.seq);
+                          setViewMode('content');
+                          setFollow(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '4px 10px 4px 18px',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          background: selectedSeq === e.seq ? SEMANTIC.primaryBg : undefined,
+                        }}
+                      >
+                        <Tooltip title={kindText(e)}>{kindIcon(e)}</Tooltip>
+                        <span
+                          className="tt-mono"
+                          style={{
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={e.path}
+                        >
+                          {e.path}
+                        </span>
+                        {e.changeCount > 1 && (
+                          <Tag style={{ fontSize: 10, marginInlineEnd: 0 }}>×{e.changeCount}</Tag>
+                        )}
+                        <span style={{ opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>
+                          {timeOf(e.lastAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -239,8 +285,21 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="点击左侧条目查看文件内容或与基线的差异"
+              description={
+                latest === null ? '等待文件变更' : '点左侧条目查看内容，或打开「跟随最新」并选中最新一条'
+              }
             />
+            {latest !== null && (
+              <Button
+                size="small"
+                onClick={() => {
+                  setSelectedSeq(latest.seq);
+                  setFollow(true);
+                }}
+              >
+                看最新一条
+              </Button>
+            )}
           </div>
         ) : (
           <>
@@ -255,11 +314,21 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
             >
               <span
                 className="tt-mono"
-                style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                title={selected.relPath}
+                style={{
+                  fontSize: 12,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={selected.path}
               >
-                {kindIcon(selected)} {selected.relPath}
+                {kindIcon(selected)} {selected.path}
               </span>
+              {writing && (
+                <Tag color="processing" style={{ fontSize: 10 }}>
+                  正在写入…
+                </Tag>
+              )}
               <span style={{ flex: 1 }} />
               <Segmented
                 size="small"
@@ -291,15 +360,15 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
                   style={{ margin: 16 }}
                   type="info"
                   showIcon
-                  message="需要 git 仓库与已记录的基线"
-                  description="点上方「记录」开启记录：将以当前 git HEAD 为 diff 基线；非 git 项目只能查看当前内容。"
+                  message="需要 git 仓库与基线"
+                  description="点上方「设基线」以当前 git HEAD 为 diff 基线；非 git 项目只能查看当前内容。"
                 />
               ) : selected.kind === 'delete' ? (
                 <Alert
                   style={{ margin: 16 }}
                   type="warning"
                   showIcon
-                  message="该文件已被删除"
+                  message="该文件已被删除（墓碑）"
                   description={diffAvailable ? '可切到「与基线 diff」查看删除前后的差异。' : undefined}
                 />
               ) : (
@@ -320,7 +389,7 @@ function LiveFileView({
   dark,
 }: {
   projectId: string;
-  entry: LiveEntry;
+  entry: ChangeEventInfo;
   query: { isLoading: boolean; data?: FileContent };
   dark: boolean;
 }): React.JSX.Element {
@@ -334,8 +403,8 @@ function LiveFileView({
     );
   }
   if (fc.isBinary) {
-    if (IMAGE_EXT.includes(extOf(entry.relPath))) {
-      return <ImagePreview projectId={projectId} path={entry.relPath} />;
+    if (IMAGE_EXT.includes(extOf(entry.path))) {
+      return <ImagePreview projectId={projectId} path={entry.path} />;
     }
     return (
       <Alert
@@ -352,7 +421,7 @@ function LiveFileView({
       {fc.truncated && (
         <Alert type="warning" message="文件过大，仅显示前一部分" style={{ margin: '8px 10px 0' }} />
       )}
-      <ReadOnlyCode path={entry.relPath} content={fc.content} dark={dark} />
+      <ReadOnlyCode path={entry.path} content={fc.content} dark={dark} />
     </>
   );
 }

@@ -65,6 +65,13 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
       return fail('BAD_REQUEST', '恢复目标目录必须是绝对路径');
     }
     try {
+      // 恢复前取条目归属（恢复后行被删；FR-13.2 v2：恢复事件缺 projectId 的旧问题一并修）
+      const before = ctx
+        .db()
+        .prepare<[string], { project_id: string | null; origin_path: string }>(
+          'SELECT project_id, origin_path FROM trash WHERE id = ?',
+        )
+        .get(b.id);
       const r = ctx.trash.restore(ctx.db(), b.id, b.targetDir, b.overwrite === true);
       if (r.status === 'taken') {
         return fail('TRASH_PATH_TAKEN', '原路径已被占用，可指定其他目录恢复', 409, { originPath: b.id });
@@ -76,7 +83,24 @@ export const miscRoutes: FastifyPluginAsync = async (app) => {
         actor: currentActor().actor,
       });
       ctx.sse.publish('trash.changed', {});
-      ctx.sse.publish('fs.changed', { paths: [r.restoredTo ?? ''], kind: 'create' });
+      // 恢复到项目内的文件进入变更流水（来源 api）；项目外恢复只发刷新信号
+      const restored = r.restoredTo ?? '';
+      const owner = before?.project_id ?? null;
+      if (owner !== null && restored !== '') {
+        const db = ctx.db();
+        const prow = db
+          .prepare<[string], { dir_path: string }>('SELECT dir_path FROM projects WHERE id = ?')
+          .get(owner);
+        const root = prow?.dir_path ?? '';
+        const rel = root === '' ? '' : path.relative(root, restored).split(path.sep).join('/');
+        if (rel !== '' && !rel.split('/').includes('..')) {
+          ctx.changes.publish({ projectId: owner, relPaths: [rel], kind: 'create', source: 'api' });
+        } else {
+          ctx.changes.publish({ projectId: owner, relPaths: [], kind: 'create', source: 'api' });
+        }
+      } else {
+        ctx.sse.publish('fs.changed', { paths: [restored], kind: 'create' });
+      }
       return ok(r);
     } catch (err) {
       return fail(...toApiErrorTuple(err));

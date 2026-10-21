@@ -5,6 +5,7 @@ import type { SseHub } from './core/sse.js';
 import type { TaskManager } from './core/tasks.js';
 import type { WatcherManager } from './core/watcher.js';
 import type { TrashService } from './core/trash.js';
+import type { ChangeTracker } from './core/changes.js';
 import type { DataDirLayout } from './config.js';
 import type { LibraryStore } from './db/index.js';
 
@@ -14,6 +15,8 @@ export interface AppContext {
   tasks: TaskManager;
   watcher: WatcherManager;
   trash: TrashService;
+  /** 变更流水统一广播入口（FR-13.2 v2 / T-111） */
+  changes: ChangeTracker;
   layout: DataDirLayout;
   store: LibraryStore;
   db(): Database.Database;

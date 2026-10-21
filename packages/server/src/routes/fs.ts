@@ -256,7 +256,12 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         targetPath: guarded.real,
         actor: currentActor().actor,
       });
-      ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [guarded.real], kind: 'create' });
+      ctx.changes.publish({
+        projectId: b.projectId,
+        relPaths: [guarded.relToRoot],
+        kind: 'create',
+        source: 'api',
+      });
       return ok({ path: guarded.relToRoot });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -290,12 +295,16 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         detail: { from: guarded.real, to: target, affectedFiles: before.files },
         actor: currentActor().actor,
       });
-      ctx.sse.publish('fs.changed', {
+      // 重命名 = 旧路径（删除语义）+ 新路径（创建语义）双条目；kind 取 update（FR-13.2 v2）
+      const relFrom = path.relative(guarded.projectRoot, guarded.real).split(path.sep).join('/');
+      const relTo = path.relative(guarded.projectRoot, target).split(path.sep).join('/');
+      ctx.changes.publish({
         projectId: b.projectId,
-        paths: [guarded.real, target],
-        kind: 'delete',
+        relPaths: [relFrom, relTo],
+        kind: 'update',
+        source: 'api',
       });
-      return ok({ path: path.relative(guarded.projectRoot, target).split(path.sep).join('/') });
+      return ok({ path: relTo });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }
@@ -352,7 +361,13 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         detail: { items: b.items, target: targetDir.real },
         actor: currentActor().actor,
       });
-      ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [targetDir.real], kind: 'create' });
+      // 移动/复制：目标目录内新增（逐条按 items 落流水；复制源不动）
+      ctx.changes.publish({
+        projectId: b.projectId,
+        relPaths: b.items.map((it) => String(it).replace(/\\/g, '/')),
+        kind: 'create',
+        source: 'api',
+      });
       return ok({ done: true });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
@@ -392,7 +407,12 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }
-    ctx.sse.publish('fs.changed', { projectId: b.projectId, paths: [], kind: 'delete' });
+    ctx.changes.publish({
+      projectId: b.projectId,
+      relPaths: b.paths.map((p) => String(p).replace(/\\/g, '/')),
+      kind: 'delete',
+      source: 'api',
+    });
     ctx.sse.publish('trash.changed', {});
     return ok({ trashIds: ids, affected });
   });

@@ -30,6 +30,7 @@ import { pathKey } from './db/repo/docsRepo.js';
 import { setArchiveViewSnapshot, getArchiveViewSnapshot } from './db/repo/docsRepo.js';
 import { renameTag, mergeTag, deleteTag, listTagsWithCount } from './db/repo/tagsRepo.js';
 import { buildProjectReport } from './routes/contract.js';
+import { ChangeTracker, listChanges, purgeChangeEvents, BATCH_SAMPLE_CAP } from './core/changes.js';
 import {
   insertTaskRun,
   finishTaskRun,
@@ -555,6 +556,64 @@ describe('项目报告与外链（FR-13.12 / T-110）', () => {
     // 坏 JSON 回落空数组，报告仍可生成
     patchProject(db, p.id, { external_links_json: '{bad' });
     expect(buildProjectReport(db, p.id)).not.toBeNull();
+  });
+});
+
+describe('变更流水（FR-13.2 v2 / T-111）', () => {
+  it('落库 + 5 秒内同路径合并 + since 回读 + 超批摘要 + 保留清理', () => {
+    const dirC = path.join(root, 'change 项目');
+    fs.mkdirSync(path.join(dirC, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(dirC, 'src', 'a.ts'), 'export const a = 1;\n');
+    const p = insertProject(db, {
+      dirPath: dirC,
+      dirPathKey: pathKey(dirC),
+      diskName: 'change 项目',
+      defaultArchDir: '架构图',
+    });
+    const sse = new SseHub();
+    const tracker = new ChangeTracker(() => db, sse, {
+      info: () => {},
+      warn: () => {},
+    } as unknown as import('./core/logger.js').Logger);
+
+    const first = tracker.publish({
+      projectId: p.id,
+      relPaths: ['src/a.ts'],
+      kind: 'update',
+      source: 'watcher',
+    });
+    expect(first).toHaveLength(1);
+    const seq1 = first[0]?.seq ?? 0;
+
+    // 5 秒内再改同一文件：合并为一条（新 seq、计数累加、firstAt 保持）
+    const second = tracker.publish({
+      projectId: p.id,
+      relPaths: ['src/a.ts'],
+      kind: 'update',
+      source: 'watcher',
+    });
+    expect(second[0]?.changeCount).toBe(2);
+    expect(second[0]?.firstAt).toBe(first[0]?.firstAt);
+    expect(second[0]?.seq).toBeGreaterThan(seq1);
+
+    const all = listChanges(db, p.id, { limit: 100 });
+    expect(all).toHaveLength(1);
+    expect(all[0]?.changeCount).toBe(2);
+
+    // since 增量：旧 seq 之后能读到合并后的新行
+    const inc = listChanges(db, p.id, { since: seq1, limit: 100 });
+    expect(inc).toHaveLength(1);
+    expect(inc[0]?.path).toBe('src/a.ts');
+
+    // 超批摘要：> BATCH_SAMPLE_CAP 只落样本，SSE 带 summarized
+    const many = Array.from({ length: BATCH_SAMPLE_CAP + 10 }, (_, i) => `src/f${i}.ts`);
+    const big = tracker.publish({ projectId: p.id, relPaths: many, kind: 'create', source: 'api' });
+    expect(big).toHaveLength(BATCH_SAMPLE_CAP);
+
+    // 保留清理：把 last_at 改旧后按天清理
+    db.prepare("UPDATE change_event SET last_at = '2020-01-01T00:00:00.000Z'").run();
+    expect(purgeChangeEvents(db, 7, 200000)).toBeGreaterThanOrEqual(BATCH_SAMPLE_CAP);
+    expect(listChanges(db, p.id, { limit: 10 })).toHaveLength(0);
   });
 });
 
