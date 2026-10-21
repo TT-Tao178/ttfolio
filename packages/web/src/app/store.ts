@@ -36,6 +36,8 @@ interface AppState {
   paletteOpen: boolean;
   /** 命令面板打开时的搜索作用域（「在当前项目内搜索」入口置 project，体检 P2） */
   paletteScope: 'all' | 'project';
+  /** 面板模式（FR-13.6）：search 搜索为主 / command 命令模式 */
+  paletteMode: 'search' | 'command';
   /** 已关闭标签栈（评审：缺「恢复已关闭」）——closeTab 压栈（上限 10），reopenLastClosed 弹出重开 */
   closedTabs: Array<{ loc: TabLocation; title: string }>;
 
@@ -53,7 +55,7 @@ interface AppState {
   setDetail: (v: boolean) => void;
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
-  setPalette: (v: boolean, opts?: { scope?: 'all' | 'project' }) => void;
+  setPalette: (v: boolean, opts?: { scope?: 'all' | 'project'; mode?: 'search' | 'command' }) => void;
   /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
   addProjectNonce: number;
   requestAddProject: () => void;
@@ -108,6 +110,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settingsPaletteOpen: false,
   paletteOpen: false,
   paletteScope: 'all',
+  paletteMode: 'search',
   closedTabs: [],
 
   openTab: (loc, title) => {
@@ -255,7 +258,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ dirty: m });
   },
   setPalette: (v, opts) =>
-    set({ paletteOpen: v, ...(opts?.scope !== undefined ? { paletteScope: opts.scope } : {}) }),
+    set({
+      paletteOpen: v,
+      ...(opts?.scope !== undefined ? { paletteScope: opts.scope } : {}),
+      ...(opts?.mode !== undefined ? { paletteMode: opts.mode } : {}),
+    }),
   addProjectNonce: 0,
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
   pendingAutoOpenProject: null,
