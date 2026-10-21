@@ -556,6 +556,43 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
             />
             {/* 手动检查更新（api.github.com 元数据 + 引导手动下载，评审 C10 轻方案） */}
             <UpdateCheck />
+            {/* Agent 接入说明（FR-13.1）：让外部 agent 的发现路径显式可查 */}
+            <div
+              style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SEMANTIC.split}` }}
+              data-testid="agent-access"
+            >
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Agent 接入</div>
+              <p style={{ fontSize: 12, opacity: 0.75, margin: '0 0 8px' }}>
+                外部 agent（如编码助手）可经本地接口发现并读取项目：服务地址与 token 记录在数据目录
+                runtime.json（含 agent 发现段）；读取项目清单与上下文无需额外配置；执行操作时请求头带
+                <code>x-ttfolio-actor: 名字</code> 即可在审计日志中与本人操作区分。所有接口仅监听 127.0.0.1
+                且必须携带 token，不会暴露到局域网。
+              </p>
+              <pre
+                style={{
+                  fontSize: 12,
+                  margin: 0,
+                  padding: '10px 12px',
+                  background: SEMANTIC.split,
+                  borderRadius: 8,
+                  overflowX: 'auto',
+                  lineHeight: 1.7,
+                }}
+              >
+                {`# 1) 发现服务（端口与 token 见数据目录 runtime.json）
+curl -H "x-ttfolio-token: <token>" http://127.0.0.1:7717/api/agent/manifest
+
+# 2) 读取某项目的上下文包（项目 id 取自 manifest）
+curl -H "x-ttfolio-token: <token>" \\
+  http://127.0.0.1:7717/api/agent/projects/<项目id>/context
+
+# 3) 受控操作示例（登记示例目录；声明 actor 便于审计区分）
+curl -X POST -H "x-ttfolio-token: <token>" -H "x-ttfolio-actor: my-agent" \\
+  -H "Content-Type: application/json" \\
+  -d "{\\"paths\\": [\\"D:\\\\demo\\\\my-project\\"]}" \\
+  http://127.0.0.1:7717/api/projects`}
+              </pre>
+            </div>
             {/* 支持作者（用户需求）：自愿请喝一杯，完全自愿，不影响任何功能 */}
             <div
               style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SEMANTIC.split}` }}
