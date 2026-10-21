@@ -1,6 +1,6 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
 import { Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
-import { PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { ExperimentOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
@@ -22,6 +22,7 @@ import { CompareView } from '@/features/compare/CompareView';
 import { DocLibraryPage } from '@/features/docs/DocLibraryPage';
 import { PluginsPage } from '@/features/plugins/PluginsPage';
 import { TerminalPanel } from '@/features/terminal/TerminalPanel';
+import { EmbedPanel } from '@/features/embed/EmbedPanel';
 import { toCommandDefs, type PluginContribution } from '@/features/plugins/pluginCommands';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
@@ -134,6 +135,7 @@ function Shell(): React.JSX.Element {
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);
   const terminalOpen = useAppStore((s) => s.terminalOpen);
+  const embedOpen = useAppStore((s) => s.embedOpen);
   const setTerminalOpen = useAppStore((s) => s.setTerminalOpen);
   const setDetail = useAppStore((s) => s.setDetail);
 
@@ -324,6 +326,14 @@ function Shell(): React.JSX.Element {
               导入
             </Button>
           </Tooltip>
+          <Tooltip title="窗口嵌入（实验性，只读监控）">
+            <Button
+              type={embedOpen ? 'primary' : 'text'}
+              icon={<ExperimentOutlined />}
+              onClick={() => useAppStore.getState().setEmbedOpen(!useAppStore.getState().embedOpen)}
+              data-testid="embed-toggle"
+            />
+          </Tooltip>
           <Tooltip title="设置 (Ctrl+,)">
             <Button
               type="text"
@@ -416,6 +426,7 @@ function Shell(): React.JSX.Element {
             }
           />
         </div>
+        {embedOpen && <EmbedPanel />}
       </div>
 
       {terminalOpen && <TerminalPanel />}

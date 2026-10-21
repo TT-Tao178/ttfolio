@@ -46,6 +46,8 @@ interface AppState {
   detailVisible: boolean;
   /** 集成终端底部面板（FR-14.2 / T-104） */
   terminalOpen: boolean;
+  /** 窗口嵌入面板（FR-14.3 / T-102，实验性） */
+  embedOpen: boolean;
   dirty: Map<string, true>;
   settingsPaletteOpen: boolean;
   paletteOpen: boolean;
@@ -69,6 +71,7 @@ interface AppState {
   setSidebar: (v: boolean) => void;
   setDetail: (v: boolean) => void;
   setTerminalOpen: (v: boolean) => void;
+  setEmbedOpen: (v: boolean) => void;
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
   setPalette: (v: boolean, opts?: { scope?: 'all' | 'project'; mode?: 'search' | 'command' }) => void;
@@ -128,6 +131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   detailVisible: true,
   terminalOpen: false,
+  embedOpen: false,
   dirty: new Map(),
   settingsPaletteOpen: false,
   paletteOpen: false,
@@ -274,6 +278,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebar: (v) => set({ sidebarCollapsed: v }),
   setDetail: (v) => set({ detailVisible: v }),
   setTerminalOpen: (v) => set({ terminalOpen: v }),
+  setEmbedOpen: (v) => set({ embedOpen: v }),
   markDirty: (key) => set({ dirty: new Map(get().dirty).set(key, true) }),
   clearDirty: (key) => {
     const m = new Map(get().dirty);

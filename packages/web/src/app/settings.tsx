@@ -67,6 +67,9 @@ export interface SettingsShape {
     docsListWidth?: number;
     /** 集成终端面板高度（FR-14.2） */
     terminalHeight?: number;
+    /** 窗口嵌入面板宽度与上次选择的窗口（FR-14.3） */
+    embedWidth?: number;
+    embedSource?: string;
   };
 }
 

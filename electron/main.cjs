@@ -408,6 +408,37 @@ function killAllTerminals() {
 
 app.on('before-quit', killAllTerminals);
 
+/**
+ * 窗口嵌入（FR-14.3 / T-102，T0 只读监控）：枚举可见顶层窗口供选择器使用，
+ * 返回小尺寸缩略图帮助辨认。捕获在渲染层经 getUserMedia（桌面源）进行——
+ * 只读展示，不注入输入、不落盘；T1 交互嵌入（SetParent）本版不提供。
+ */
+ipcMain.handle('tt:embed-windows', async () => {
+  try {
+    const { desktopCapturer } = require('electron');
+    const sources = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: { width: 160, height: 90 },
+      fetchWindowIcons: false,
+    });
+    const ownTitle = win && !win.isDestroyed() ? win.getTitle() : '';
+    return {
+      ok: true,
+      error: null,
+      windows: sources
+        // 排除自身窗口（嵌入自己会形成无限镜像）
+        .filter((s) => s.name !== ownTitle && s.name !== 'TT项目管理工作台')
+        .map((s) => ({
+          id: s.id,
+          name: s.name || '（无标题窗口）',
+          thumbnail: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : '',
+        })),
+    };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err), windows: [] };
+  }
+});
+
 app.on('second-instance', () => {
   if (win !== null) {
     if (win.isMinimized()) win.restore();

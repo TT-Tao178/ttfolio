@@ -36,4 +36,11 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
       return () => ipcRenderer.removeListener('tt:term-exit', h);
     },
   },
+  /**
+   * 窗口嵌入（FR-14.3 / T-102，T0 只读）：只提供窗口枚举；实际画面由渲染层
+   * 经 getUserMedia 桌面源读取并直接展示（不落盘、不注入输入）。
+   */
+  embed: {
+    windows: () => ipcRenderer.invoke('tt:embed-windows'),
+  },
 });
