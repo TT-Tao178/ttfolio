@@ -1,5 +1,25 @@
 # PROGRESS
 
+## 第 55 轮：v0.4.0 出包（T-109 + T-105 + T-106 批次随版本发布）
+
+- **版本收口（f518f01）**：0.4.0 三处同轮（package.json / server 版本常量 /
+  CHANGELOG）；CHANGELOG 列用户可感知五项（活动中心/未完成清单/Office
+  预览/文件对比/架构图变更明细）。用户点名批次版本 0.4.0（非 0.3.13）。
+- **出包**：`dist:win` 全链路一次通过（无 audit ECONNRESET、无 EBUSY），
+  自检 8 项全绿含 0.4.0 断言；产物 dist-electron/ttFolio-Setup-0.4.0.exe
+  （约 150MB）+ blockmap。rebuild better-sqlite3 翻回 Node ABI、门禁复跑
+  三绿（205 条）。tag v0.4.0；Release 页资产由用户手动拖传（对照清单已补
+  行）。**Release 页创建**：uploads/api 域限制下由脚本或用户手动——本轮经
+  API 创建 v0.4.0 Release 页（正文取自 CHANGELOG），资产待拖。
+- **手测提醒（随 0.4.0）**：活动中心三页签与收藏、总览未完成清单卡、
+  docx/xlsx 打开预览、两文件并排对比、回收站「对比」、架构图变更增减
+  清单，以及从 0.3.x 升级安装（迁移 0007 会自动执行）。
+- **Release 页**：经 api.github.com 创建（系统 curl.exe 走 Schannel 证书
+  ——Node fetch 在本机网络下报 UNABLE_TO_VERIFY_LEAF_SIGNATURE，历史教训
+  再应验；token 取自凭据管理器 git credential fill）：
+  https://github.com/TT-Tao178/ttfolio/releases/tag/v0.4.0 ，资产由用户
+  浏览器手动拖传。
+
 ## 第 54 轮：T-106 统一预览分发器 + 文件对比查看器 + 架构图变更明细（未出包）
 
 > 批内第三条（本批 = T-109 + T-105 + T-106，批后统一出 0.4.0）。
