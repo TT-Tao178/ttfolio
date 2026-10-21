@@ -93,6 +93,14 @@ export const agentSessionSummarySchema = z.object({
   summary: z.string().trim().min(1).max(8000),
 });
 
+// ---------- 媒体（FR-13.5 / T-099） ----------
+export const mediaThumbPostSchema = z.object({
+  /** 项目内相对路径（只进 sha1 哈希命名，不落文件系统路径） */
+  path: z.string().min(1).max(1024),
+  /** canvas.toDataURL('image/png') 产物 */
+  dataUrl: z.string().min(1),
+});
+
 export const relocateSchema = z.object({ dirPath: z.string().min(1) });
 
 export const renameDiskSchema = z.object({

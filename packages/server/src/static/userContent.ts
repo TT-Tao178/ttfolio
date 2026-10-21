@@ -1,4 +1,6 @@
-/** 用户内容静态代理（C-13 / 9.3）：独立端口、只读、防穿越、正确 Content-Type。 */
+/** 用户内容静态代理（C-13 / 9.3）：独立端口、只读、防穿越、正确 Content-Type。
+ * 媒体伺服（FR-13.5 / T-099）：/raw 支持 HTTP Range（音视频拖进度），补音视频
+ * MIME；/thumbs 供媒体页签读数据目录缩略图（文件名白名单 sha1.png）。 */
 import Fastify from 'fastify';
 import path from 'node:path';
 import { promises as fsp } from 'node:fs';
@@ -7,6 +9,7 @@ import { getProjectRow } from '../db/repo/projectsRepo.js';
 import { getArchive } from '../db/repo/docsRepo.js';
 import { guardPath } from '../core/pathGuard.js';
 import { AppError } from '../core/errors.js';
+import { parseRange } from './range.js';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -21,6 +24,8 @@ const MIME: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
@@ -30,7 +35,20 @@ const MIME: Record<string, string> = {
   '.md': 'text/plain; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   '.xml': 'application/xml',
+  // 音视频（媒体页签/内嵌播放，Range 生效的前提是 MIME 正确）
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.m4a': 'audio/mp4',
 };
+
+/** 缩略图文件名白名单：sha1 hex + .png（写入方 routes/media.ts 保证）。 */
+const THUMB_NAME = /^[0-9a-f]{40}\.png$/;
 
 export function startUserContentServer(ctx: AppContext): Promise<number> {
   const server = Fastify({ logger: false, disableRequestLogging: true });
@@ -99,7 +117,7 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
     return reply;
   });
 
-  // GET /raw/:projectId/*（图片/PDF 原始内容）
+  // GET /raw/:projectId/*（图片/PDF/音视频原始内容；音视频走 206 Range）
   server.get('/raw/:projectId/*', async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
     const relPath = (req.params as { '*': string })['*'] ?? '';
@@ -119,15 +137,67 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
         void reply.code(404).send('not a file');
         return reply;
       }
-      const buf = await fsp.readFile(guarded.real);
       const ext = path.extname(guarded.real).toLowerCase();
-      reply.header('Content-Type', MIME[ext] ?? 'application/octet-stream');
-      reply.header('Cache-Control', 'no-store');
-      reply.header('X-Content-Type-Options', 'nosniff');
-      void reply.send(buf);
+      const baseHeaders: Record<string, string> = {
+        'Content-Type': MIME[ext] ?? 'application/octet-stream',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Accept-Ranges': 'bytes',
+      };
+      const rangeHeader = req.headers.range;
+      if (typeof rangeHeader !== 'string' || rangeHeader === '') {
+        reply.headers(baseHeaders);
+        void reply.send(await fsp.readFile(guarded.real));
+        return reply;
+      }
+      const range = parseRange(rangeHeader, st.size);
+      if (range === 'invalid') {
+        void reply.code(416).header('Content-Range', `bytes */${st.size}`).send('range not satisfiable');
+        return reply;
+      }
+      if (range === null) {
+        reply.headers(baseHeaders);
+        void reply.send(await fsp.readFile(guarded.real));
+        return reply;
+      }
+      // 206 部分内容：打开句柄按区间读（音视频拖进度走这里）
+      const handle = await fsp.open(guarded.real, 'r');
+      try {
+        const length = range.end - range.start + 1;
+        const buf = Buffer.allocUnsafe(length);
+        await handle.read(buf, 0, length, range.start);
+        reply.code(206).headers({
+          ...baseHeaders,
+          'Content-Range': `bytes ${range.start}-${range.end}/${st.size}`,
+          'Content-Length': String(length),
+        });
+        void reply.send(buf);
+      } finally {
+        await handle.close();
+      }
     } catch (err) {
       const status = err instanceof AppError && err.code === 'PATH_OUT_OF_SCOPE' ? 403 : 404;
       void reply.code(status).send('not found');
+    }
+    return reply;
+  });
+
+  // GET /thumbs/:projectId/:name（数据目录缩略图；文件名白名单，防穿越）
+  server.get('/thumbs/:projectId/:name', async (req, reply) => {
+    const { projectId, name } = req.params as { projectId: string; name: string };
+    if (THUMB_NAME.test(name) === false || /^[0-9a-f-]{6,64}$/.test(projectId) === false) {
+      void reply.code(404).send('not found');
+      return reply;
+    }
+    const full = path.join(ctx.layout.thumbsDir, projectId, name);
+    try {
+      const buf = await fsp.readFile(full);
+      reply.header('Content-Type', 'image/png');
+      reply.header('Cache-Control', 'no-store');
+      reply.header('X-Content-Type-Options', 'nosniff');
+      void reply.send(buf);
+    } catch {
+      void reply.code(404).send('not found');
     }
     return reply;
   });

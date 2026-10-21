@@ -19,6 +19,8 @@ import { buildMatcher } from '../search.js';
 import type { SseHub } from '../sse.js';
 import { patchProject } from '../../db/repo/projectsRepo.js';
 import { upsertArchive } from '../../db/repo/docsRepo.js';
+import { mediaKindOf } from '../media.js';
+import { ulid } from '../ulid.js';
 
 const SCRIPT_EXTS = new Set(['ps1', 'sh', 'bat', 'cmd', 'py']);
 const ASSET_EXTS = new Set([
@@ -91,6 +93,12 @@ export async function analyzeProject(
   let hasIndexHtml = false;
   let backendFramework = false;
   let composeContent: string | null = null;
+  const mediaFiles: Array<{
+    rel: string;
+    kind: 'image' | 'video' | 'audio';
+    bytes: number;
+    mtime: string | null;
+  }> = [];
 
   // ---- 单次遍历 ----
   const root = project.dirPath;
@@ -122,8 +130,12 @@ export async function analyzeProject(
       }
       if (!e.isFile) continue;
       let size = 0;
+      let mtimeIso: string | null = null;
       try {
-        size = fsx.statSync(abs).size;
+        const st = fsx.statSync(abs);
+        size = st.size;
+        const mt = st.mtime instanceof Date ? st.mtime : new Date(st.mtime);
+        mtimeIso = Number.isNaN(mt.getTime()) ? null : mt.toISOString();
       } catch {
         partial = true;
         continue;
@@ -142,6 +154,10 @@ export async function analyzeProject(
       }
       if (SCRIPT_EXTS.has(ext)) scriptBytes += size;
       if (ASSET_EXTS.has(ext)) assetBytes += size;
+      const mediaKind = mediaKindOf(e.name);
+      if (mediaKind !== null) {
+        mediaFiles[mediaFiles.length] = { rel, kind: mediaKind, bytes: size, mtime: mtimeIso };
+      }
 
       const lower = e.name.toLowerCase();
       if (lower === 'readme.md' || lower === 'readme.txt' || lower === 'readme') hasDocs = true;
@@ -302,6 +318,11 @@ export async function analyzeProject(
       path_ok: 1,
       path_checked_at: finishedAt,
     });
+    db.prepare('DELETE FROM media_files WHERE project_id = ?').run(project.id);
+    const insMedia = db.prepare(
+      'INSERT INTO media_files (id, project_id, path, kind, bytes, mtime) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+    for (const m of mediaFiles) insMedia.run(ulid(), project.id, m.rel, m.kind, m.bytes, m.mtime);
     db.prepare('DELETE FROM language_stats WHERE project_id = ?').run(project.id);
     const insLang = db.prepare(
       'INSERT INTO language_stats (project_id, language, bytes, file_count) VALUES (?, ?, ?, ?)',

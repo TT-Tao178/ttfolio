@@ -24,6 +24,7 @@ import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
 import { analyzeProject } from './core/analyzer/index.js';
 import { diff, commit } from './core/git.js';
+import { listMedia } from './db/repo/mediaRepo.js';
 import { SseHub } from './core/sse.js';
 import { AppError } from './core/errors.js';
 
@@ -445,5 +446,62 @@ describe('Git 基线 ref diff（FR-13.2 动态页签的「与基线对照」锚�
     const reverted = await diff(projDir, 'diff-probe.txt', false, baseline);
     expect(reverted.additions).toBe(0);
     expect(reverted.deletions).toBe(0);
+  });
+});
+
+describe('媒体扫描与索引（FR-13.5 / T-099）', () => {
+  it('分析后图/音/视频入 media_files，重分析幂等；删除文件后从索引移除', async () => {
+    const sse2 = new SseHub();
+    // 用独立目录：projDir 在「失效项目」用例里已被软删除（dir_path_key 唯一约束）
+    const mediaDir = path.join(root, 'media-demo');
+    fs.mkdirSync(mediaDir, { recursive: true });
+    const id = insertProject(db, {
+      dirPath: mediaDir,
+      dirPathKey: pathKey(mediaDir),
+      diskName: 'media-demo',
+      defaultArchDir: '架构图',
+    }).id;
+    fs.writeFileSync(path.join(mediaDir, 'pic.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    fs.mkdirSync(path.join(mediaDir, 'assets'), { recursive: true });
+    fs.writeFileSync(path.join(mediaDir, 'assets', 'clip.mp4'), Buffer.alloc(1024, 1));
+    fs.writeFileSync(path.join(mediaDir, 'assets', 'bg.mp3'), Buffer.alloc(256, 2));
+    fs.writeFileSync(path.join(mediaDir, 'note.md'), '# x');
+
+    const r = await analyzeProject(
+      db,
+      { id, dirPath: mediaDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse2,
+      noopCtx,
+    );
+    expect(r.ok).toBe(true);
+    const items = listMedia(db, id);
+    const kinds = new Map(items.map((m) => [m.path, m.kind]));
+    expect(kinds.get('pic.png')).toBe('image');
+    expect(kinds.get('assets/clip.mp4')).toBe('video');
+    expect(kinds.get('assets/bg.mp3')).toBe('audio');
+    expect(kinds.has('note.md')).toBe(false);
+    expect(items.every((m) => m.bytes > 0)).toBe(true);
+    expect(items.every((m) => m.mtime !== null)).toBe(true);
+
+    // 重分析幂等（路径唯一约束 + 全量重写）
+    const r2 = await analyzeProject(
+      db,
+      { id, dirPath: mediaDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse2,
+      noopCtx,
+    );
+    expect(r2.ok).toBe(true);
+    expect(listMedia(db, id)).toHaveLength(items.length);
+
+    // 文件删除后重分析 → 索引移除
+    fs.rmSync(path.join(mediaDir, 'assets', 'bg.mp3'));
+    await analyzeProject(
+      db,
+      { id, dirPath: mediaDir, typeSource: 'analyzed', defaultArchDir: '架构图' },
+      sse2,
+      noopCtx,
+    );
+    const after = listMedia(db, id);
+    expect(after.some((m) => m.path === 'assets/bg.mp3')).toBe(false);
   });
 });

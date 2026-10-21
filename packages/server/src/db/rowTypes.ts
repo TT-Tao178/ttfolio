@@ -222,3 +222,16 @@ export interface AgentSessionFileRow {
   last_seen_at: string;
   change_count: number;
 }
+
+/** 媒体索引（0006 迁移 / FR-13.5；w/h/duration 预留）。 */
+export interface MediaFileRow {
+  id: string;
+  project_id: string;
+  path: string;
+  kind: string;
+  bytes: number;
+  mtime: string | null;
+  w: number | null;
+  h: number | null;
+  duration_ms: number | null;
+}

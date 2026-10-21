@@ -344,6 +344,18 @@ export interface AgentManifest {
   projects: AgentManifestProject[];
 }
 
+/** 媒体索引条目（FR-13.5，T-099）。w/h/durationMs 预留（前端探测，本版不回写）。 */
+import type { MediaKind } from './media.js';
+export interface MediaItem {
+  path: string;
+  kind: MediaKind;
+  bytes: number;
+  mtime: string | null;
+  w: number | null;
+  h: number | null;
+  durationMs: number | null;
+}
+
 /** 资源仓库会话（FR-13.3，T-097）。endedAt 为 null 表示记录中。 */
 export interface AgentRepoSession {
   id: string;
