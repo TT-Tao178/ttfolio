@@ -29,6 +29,7 @@ import {
 import { pathKey } from './db/repo/docsRepo.js';
 import { setArchiveViewSnapshot, getArchiveViewSnapshot } from './db/repo/docsRepo.js';
 import { renameTag, mergeTag, deleteTag, listTagsWithCount } from './db/repo/tagsRepo.js';
+import { buildProjectReport } from './routes/contract.js';
 import {
   insertTaskRun,
   finishTaskRun,
@@ -529,6 +530,31 @@ describe('任务历史（FR-13.11 / T-108）', () => {
     purgeOldTaskRuns(db, 30);
     expect(getTaskRun(db, 'tr-2')).toBeNull();
     expect(getTaskRun(db, 'tr-1')).not.toBeNull();
+  });
+});
+
+describe('项目报告与外链（FR-13.12 / T-110）', () => {
+  it('buildProjectReport 汇聚速览/外链/上下文包；外链 JSON 坏值回落空数组', () => {
+    const dirR = path.join(root, '报告项目');
+    fs.mkdirSync(dirR, { recursive: true });
+    const p = insertProject(db, {
+      dirPath: dirR,
+      dirPathKey: pathKey(dirR),
+      diskName: '报告项目',
+      defaultArchDir: '架构图',
+    });
+    patchProject(db, p.id, {
+      external_links_json: JSON.stringify([{ label: 'wiki', url: 'https://example.com/w' }]),
+    });
+    const md = buildProjectReport(db, p.id);
+    expect(md).not.toBeNull();
+    expect(md).toContain('# 报告项目 项目报告');
+    expect(md).toContain('https://example.com/w');
+    expect(md).toContain('项目上下文包');
+    expect(md).toContain('未完成清单');
+    // 坏 JSON 回落空数组，报告仍可生成
+    patchProject(db, p.id, { external_links_json: '{bad' });
+    expect(buildProjectReport(db, p.id)).not.toBeNull();
   });
 });
 

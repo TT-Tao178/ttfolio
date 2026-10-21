@@ -80,6 +80,34 @@ export function DetailPanel({ projectId }: { projectId: string | null }): React.
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存备注失败'),
   });
 
+  // ---- 外链收藏（FR-13.12 / T-110）：每行一条，`标签|URL` 或纯 URL；blur/回车整体保存 ----
+  const [linksText, setLinksText] = useState('');
+  useEffect(() => {
+    setLinksText(
+      (p?.externalLinks ?? []).map((l) => (l.label !== '' ? `${l.label}|${l.url}` : l.url)).join('\n'),
+    );
+  }, [p?.externalLinks]);
+  const saveLinks = useMutation({
+    mutationFn: () => {
+      if (p === undefined) return Promise.resolve();
+      const links = linksText
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s !== '')
+        .map((line) => {
+          const sep = line.indexOf('|');
+          if (sep > 0) return { label: line.slice(0, sep).trim(), url: line.slice(sep + 1).trim() };
+          return { label: line, url: line };
+        });
+      return api.patch(`/api/projects/${pid}`, { rev: p.rev, externalLinks: links });
+    },
+    onSuccess: () => {
+      void message.success('已保存外链');
+      void invalidate();
+    },
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存外链失败'),
+  });
+
   return (
     <div style={{ padding: 12, overflow: 'auto', height: '100%' }}>
       <Descriptions title="项目属性" column={1} size="small">
@@ -140,6 +168,47 @@ export function DetailPanel({ projectId }: { projectId: string | null }): React.
           disabled={p === undefined}
           data-testid="detail-notes"
         />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 4 }}>
+          外链收藏（每行一条：标签|URL 或纯 URL，失焦保存）
+        </div>
+        <Input.TextArea
+          rows={3}
+          size="small"
+          value={linksText}
+          placeholder={'wiki|https://example.com/wiki\nhttps://github.com/org/repo'}
+          onChange={(e) => setLinksText(e.target.value)}
+          onBlur={() => {
+            if (
+              p !== undefined &&
+              linksText !==
+                (p.externalLinks ?? [])
+                  .map((l) => (l.label !== '' ? `${l.label}|${l.url}` : l.url))
+                  .join('\n')
+            ) {
+              saveLinks.mutate();
+            }
+          }}
+          disabled={p === undefined}
+          data-testid="detail-links"
+        />
+        {(p?.externalLinks ?? []).length > 0 && (
+          <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {(p?.externalLinks ?? []).map((l) => (
+              <a
+                key={l.url + l.label}
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: 12 }}
+                className="tt-ellipsis"
+              >
+                {l.label !== '' ? `${l.label} · ${l.url}` : l.url}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

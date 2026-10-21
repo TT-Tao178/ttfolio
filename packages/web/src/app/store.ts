@@ -15,7 +15,8 @@ export type TabKind =
   | 'settings'
   | 'trash'
   | 'activity'
-  | 'compare';
+  | 'compare'
+  | 'doclib';
 
 export interface TabLocation {
   kind: TabKind;

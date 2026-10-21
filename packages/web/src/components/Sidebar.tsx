@@ -450,10 +450,12 @@ export function Sidebar(): React.JSX.Element {
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:archives`;
   } else if (domain === 'docs') {
+    items.push({ key: 'doclib', label: '文档库（跨项目浏览）' });
     items.push({ key: 'sep-projects', label: '项目文档' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:docs`;
+    else if (activeTab?.kind === 'doclib') selected = 'doclib';
   }
 
   const onClick = (e: { key: string }): void => {
@@ -482,6 +484,10 @@ export function Sidebar(): React.JSX.Element {
     }
     if (key === 'activity-hub') {
       openTab({ kind: 'activity', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '活动中心');
+      return;
+    }
+    if (key === 'doclib') {
+      openTab({ kind: 'doclib', projectId: null, targetPath: null, subTab: null, scroll: 0 }, '文档库');
       return;
     }
     if (key === 'search-all') {

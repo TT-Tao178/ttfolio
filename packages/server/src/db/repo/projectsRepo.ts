@@ -83,7 +83,28 @@ function mapSummary(
     languages,
     tags,
     collections,
+    externalLinks: parseExternalLinks(row.external_links_json),
   };
+}
+
+/** 外链 JSON 反序列化：坏值/类型不符回落空数组。 */
+export function parseExternalLinks(raw: string | null): Array<{ label: string; url: string }> {
+  if (raw === null || raw === '') return [];
+  try {
+    const v: unknown = JSON.parse(raw);
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter(
+        (x): x is { label: string; url: string } =>
+          typeof x === 'object' &&
+          x !== null &&
+          typeof (x as { label?: unknown }).label === 'string' &&
+          typeof (x as { url?: unknown }).url === 'string',
+      )
+      .map((x) => ({ label: x.label, url: x.url }));
+  } catch {
+    return [];
+  }
 }
 
 function loadExtras(

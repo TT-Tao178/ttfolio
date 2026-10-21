@@ -27,6 +27,7 @@ import { useSettings } from '@/app/settings';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
 import { TagHub } from './TagHub';
 import { HealthCard } from './HealthCard';
+import { SettingsTransfer } from './SettingsTransfer';
 import { UpdateCheck } from './UpdateCheck';
 import sponsorAlipay from '@/assets/sponsor/alipay.jpg';
 import sponsorWechat from '@/assets/sponsor/wechat.jpg';
@@ -575,6 +576,13 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                 />
               </div>
             )}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 6 }}>
+                设置迁移（换机器零重配：忽略规则 / 命令模板 / 文档根 / 外观与行为设置打成 一个 JSON
+                包；Token、项目清单、会话数据不入包）
+              </div>
+              <SettingsTransfer />
+            </div>
           </Card>
         </SectionAnchor>
 

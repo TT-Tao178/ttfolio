@@ -27,10 +27,13 @@ export function OfficePreview({
   projectId,
   path,
   mountId,
+  loader,
 }: {
-  projectId: string;
+  projectId?: string;
   path: string;
   mountId: string | null;
+  /** 自定义取数（FR-13.12 / T-110 文档库等非项目通道）；缺省走 /api/docs/raw */
+  loader?: () => Promise<ArrayBuffer>;
 }): React.JSX.Element {
   const kind = useMemo(() => kindOf(path), [path]);
   const [data, setData] = useState<Uint8Array | null>(null);
@@ -42,21 +45,21 @@ export function OfficePreview({
     setLoading(true);
     setError(null);
     setData(null);
-    fetchDocsRaw(projectId, path, mountId)
-      .then((buf) => {
-        if (!alive) return;
-        setData(new Uint8Array(buf));
-        setLoading(false);
-      })
-      .catch((e: unknown) => {
-        if (!alive) return;
-        setError(e instanceof Error ? e.message : String(e));
-        setLoading(false);
-      });
+    const p = loader !== undefined ? loader() : fetchDocsRaw(projectId ?? '', path, mountId);
+    p.then((buf) => {
+      if (!alive) return;
+      setData(new Uint8Array(buf));
+      setLoading(false);
+    }).catch((e: unknown) => {
+      if (!alive) return;
+      setError(e instanceof Error ? e.message : String(e));
+      setLoading(false);
+    });
     return () => {
       alive = false;
     };
-  }, [projectId, path, mountId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, path, mountId, loader]);
 
   if (loading) return <Spin style={{ margin: '48px auto', display: 'block' }} tip="正在加载文档…" />;
   if (error !== null)

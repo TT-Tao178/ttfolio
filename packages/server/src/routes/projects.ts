@@ -213,6 +213,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       fields['default_arch_dir'] = name;
     }
     if (b.agentRepoEnabled !== undefined) fields['agent_repo_enabled'] = b.agentRepoEnabled ? 1 : 0;
+    if (b.externalLinks !== undefined) fields['external_links_json'] = JSON.stringify(b.externalLinks);
     const rev = patchProject(db, id, fields);
     ctx.sse.publish('project.updated', { projectId: id });
     return ok({ id, rev });

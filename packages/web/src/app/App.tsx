@@ -19,6 +19,7 @@ import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
 import { ActivityPage } from '@/features/activity/ActivityPage';
 import { CompareView } from '@/features/compare/CompareView';
+import { DocLibraryPage } from '@/features/docs/DocLibraryPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
 import {
@@ -89,6 +90,7 @@ function Shell(): React.JSX.Element {
       doc: 'docs',
       search: 'search',
       activity: 'activity',
+      doclib: 'docs',
       settings: 'settings',
     };
     const target = activeTab !== null ? map[activeTab.kind] : undefined;
@@ -335,6 +337,8 @@ function Shell(): React.JSX.Element {
                         <ActivityPage />
                       ) : activeTab.kind === 'compare' ? (
                         <CompareView specJson={activeTab.targetPath ?? ''} />
+                      ) : activeTab.kind === 'doclib' ? (
+                        <DocLibraryPage />
                       ) : activeTab.kind === 'settings' ? (
                         <SettingsPage anchor={activeTab.subTab} />
                       ) : activeTab.kind === 'git' && activeTab.projectId !== null ? (

@@ -47,6 +47,74 @@ export function buildContextPacket(db: Database.Database, id: string): string | 
   return lines.join('\n');
 }
 
+/**
+ * 项目 Markdown 报告（FR-13.12 / T-110）：速览/语言占比/技术栈/Git 摘要/
+ * 标签集合备注/外链 + 上下文包与清单，给协作者与 agent 的便携摘要。
+ * 与 context-packet 同源数据，不同呈现；只读聚合，不写任何项目目录。
+ */
+export function buildProjectReport(db: Database.Database, id: string): string | null {
+  const p = getProjectSummary(db, id);
+  if (p === null) return null;
+  const packet = buildContextPacket(db, id) ?? '';
+  const todos = listTodos(db, { projectId: id, includeDone: false });
+  const mounts = listMounts(db, id);
+  const lines = [
+    `# ${p.alias ?? p.diskName} 项目报告`,
+    '',
+    `> 由 ttFolio 生成于 ${new Date().toLocaleString('zh-CN')}`,
+    '',
+    '## 速览',
+    '',
+    `- 路径：\`${p.dirPath}\``,
+    `- 类型：${p.type}${p.typeSource === 'manual' ? '（手动指定）' : ''}`,
+    `- 主语言：${p.primaryLanguage ?? '未分析'}`,
+    `- 规模：${p.fileCount} 个文件 · ${p.sizeBytes} 字节`,
+    `- 语言占比：${
+      p.languages
+        .slice(0, 8)
+        .map((l) => `${l.language} ${l.percent}%`)
+        .join(' / ') || '未分析'
+    }`,
+    `- 技术栈：${p.techStack.join('、') || '—'}`,
+    `- 标签：${p.tags.join('、') || '—'}`,
+    `- 集合：${p.collections.join('、') || '—'}`,
+    `- Git：${
+      p.gitIsRepo
+        ? `分支 \`${p.gitBranch ?? '?'}\`${p.gitDirty ? '（有未提交改动）' : '（干净）'}，最近提交 ${
+            p.gitLastCommitAt ?? '—'
+          }（${p.gitLastCommitAuthor ?? '—'}）`
+        : '非 git 仓库'
+    }`,
+    `- 分析：${p.analyzedAt ?? '未分析'}${p.analyzeMs !== null ? `（耗时 ${p.analyzeMs}ms）` : ''}${
+      p.analyzePartial ? '（部分成功）' : ''
+    }`,
+    ...(p.notes !== null && p.notes !== '' ? [`- 备注：${p.notes}`] : []),
+    ...(p.externalLinks.length > 0
+      ? ['', '## 相关链接', '', ...p.externalLinks.map((l) => `- [${l.label}](${l.url})`)]
+      : []),
+    '',
+    '## 未完成清单',
+    '',
+    ...(todos.length === 0
+      ? ['（无）']
+      : todos.map((t) => `- [ ] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`)),
+    '',
+    '## 文档挂载',
+    '',
+    ...(mounts.length === 0
+      ? ['（无）']
+      : mounts.map((m) => `- ${m.path}${m.existsOk ? '' : '（路径失效）'}`)),
+    '',
+    '## 附：项目上下文包',
+    '',
+    '```text',
+    packet,
+    '```',
+    '',
+  ];
+  return lines.join('\n');
+}
+
 export const contractRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
 
@@ -55,6 +123,22 @@ export const contractRoutes: FastifyPluginAsync = async (app) => {
     const packet = buildContextPacket(ctx.db(), id);
     if (packet === null) return fail('NOT_FOUND', '项目不存在', 404);
     return ok(packet);
+  });
+
+  // 项目 Markdown 报告（FR-13.12 / T-110）：直接回 markdown 附件（前端 blob 下载）
+  app.get('/api/projects/:id/report', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const md = buildProjectReport(ctx.db(), id);
+    if (md === null) return fail('NOT_FOUND', '项目不存在', 404);
+    logActivity(ctx.db(), {
+      kind: 'project.report_export',
+      level: 'L1',
+      projectId: id,
+      actor: currentActor().actor,
+    });
+    reply.header('content-type', 'text/markdown; charset=utf-8');
+    reply.header('content-disposition', 'attachment; filename="ttfolio-report.md"');
+    return reply.send(md);
   });
 
   app.post('/api/projects/:id/context-contract', async (req) => {

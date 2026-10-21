@@ -37,6 +37,7 @@ import type Database from 'better-sqlite3';
 import { listProjects } from '../db/repo/projectsRepo.js';
 import { rewatchAll } from './helpers.js';
 import { currentActor } from '../core/actor.js';
+import { listDocRoots, createDocRoot } from '../db/repo/docsRepo.js';
 
 /** 在册未删除项目（watcher 全量重建用）。 */
 function activeProjects(db: Database.Database): Array<{ id: string; dir_path: string }> {
@@ -205,6 +206,186 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       });
     }
     return ok({ saved: true, tokenSet: token !== '' });
+  });
+
+  // ---- 设置迁移（FR-13.12 / T-110）：导出 / 导入 / 恢复默认 ----
+  // github_token / 项目清单 / 会话 / 草稿 / ui_layout（机器相关）绝不入包。
+  const EXPORT_SETTING_KEYS = [
+    'theme',
+    'density',
+    'watch_enabled',
+    'watch_stability_ms',
+    'auto_save',
+    'card_sort',
+    'show_ignored',
+    'default_project_tab',
+    'syntax_scheme',
+    'keybindings_json',
+    'backup_keep_days',
+    'trash_retention_days',
+    'default_arch_dir_name',
+    'doc_root_blacklist_json',
+  ];
+
+  app.get('/api/settings/export', async () => {
+    const db = ctx.db();
+    const all = getAllSettings(db);
+    const settings: Record<string, string> = {};
+    for (const k of EXPORT_SETTING_KEYS) {
+      if (all[k] !== undefined && all[k] !== '') settings[k] = all[k];
+    }
+    return ok({
+      kind: 'ttfolio-settings',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings,
+      ignoreRules: listIgnoreRules(db)
+        .filter((r) => !r.isBuiltin)
+        .map((r) => ({ scope: r.scope, pattern: r.pattern, mode: r.mode, enabled: r.enabled })),
+      commandTemplates: listCommandTemplates(db)
+        .filter((t) => !t.isBuiltin)
+        .map((t) => ({
+          label: t.label,
+          executable: t.executable,
+          args: t.argsJson,
+          needsConfirm: t.needsConfirm,
+          platforms: t.platforms,
+          enabled: t.enabled,
+          sortOrder: t.sortOrder,
+        })),
+      docRoots: listDocRoots(db).map((r) => ({ path: r.path, label: r.label, enabled: r.enabled })),
+    });
+  });
+
+  app.post('/api/settings/import', async (req) => {
+    const b = (req.body ?? {}) as { data?: unknown; strategy?: string };
+    const strategy = b.strategy === 'overwrite' ? 'overwrite' : 'skip';
+    const d = b.data as {
+      kind?: unknown;
+      settings?: unknown;
+      ignoreRules?: unknown;
+      commandTemplates?: unknown;
+      docRoots?: unknown;
+    } | null;
+    if (typeof d !== 'object' || d === null || d.kind !== 'ttfolio-settings') {
+      return fail('BAD_REQUEST', '不是有效的 ttFolio 设置包');
+    }
+    const db = ctx.db();
+    let settingsApplied = 0;
+    let rulesCreated = 0;
+    let templatesCreated = 0;
+    let docRootsCreated = 0;
+    let skipped = 0;
+    if (typeof d.settings === 'object' && d.settings !== null) {
+      for (const [k, v] of Object.entries(d.settings as Record<string, string>)) {
+        if (!EXPORT_SETTING_KEYS.includes(k) || typeof v !== 'string') {
+          skipped++;
+          continue;
+        }
+        if (strategy === 'skip' && getSetting(db, k) !== null) {
+          skipped++;
+          continue;
+        }
+        setSetting(db, k, v);
+        settingsApplied++;
+      }
+    }
+    if (Array.isArray(d.ignoreRules)) {
+      const existing = new Set(listIgnoreRules(db).map((r) => `${r.scope}|${r.pattern}`));
+      for (const r of d.ignoreRules as Array<Record<string, unknown>>) {
+        const scope = r['scope'] === 'project' ? 'project' : 'global';
+        const pattern = typeof r['pattern'] === 'string' ? r['pattern'] : '';
+        if (pattern === '') {
+          skipped++;
+          continue;
+        }
+        if (strategy === 'skip' && existing.has(`${scope}|${pattern}`)) {
+          skipped++;
+          continue;
+        }
+        createIgnoreRule(db, {
+          scope,
+          projectId: null,
+          pattern,
+          mode: r['mode'] === 'analyze_only' ? 'analyze_only' : 'hide',
+          enabled: r['enabled'] !== false,
+        });
+        rulesCreated++;
+      }
+    }
+    if (Array.isArray(d.commandTemplates)) {
+      const existing = new Set(listCommandTemplates(db).map((t) => t.label));
+      for (const t of d.commandTemplates as Array<Record<string, unknown>>) {
+        const label = typeof t['label'] === 'string' ? t['label'] : '';
+        const executable = typeof t['executable'] === 'string' ? t['executable'] : '';
+        const args = Array.isArray(t['args'])
+          ? (t['args'] as unknown[]).filter((x): x is string => typeof x === 'string')
+          : [];
+        if (label === '' || executable === '') {
+          skipped++;
+          continue;
+        }
+        if (strategy === 'skip' && existing.has(label)) {
+          skipped++;
+          continue;
+        }
+        try {
+          validateTemplateArgs(args, false);
+          createCommandTemplate(db, {
+            label,
+            executable,
+            args,
+            needsConfirm: t['needsConfirm'] !== false,
+            platforms: typeof t['platforms'] === 'string' ? t['platforms'] : null,
+            enabled: t['enabled'] !== false,
+            sortOrder: Number.isFinite(Number(t['sortOrder'])) ? Math.round(Number(t['sortOrder'])) : 0,
+          });
+          templatesCreated++;
+        } catch {
+          skipped++;
+        }
+      }
+    }
+    if (Array.isArray(d.docRoots)) {
+      const existing = new Set(listDocRoots(db).map((r) => r.path.toLowerCase()));
+      for (const r of d.docRoots as Array<Record<string, unknown>>) {
+        const p = typeof r['path'] === 'string' ? r['path'] : '';
+        if (p === '' || (strategy === 'skip' && existing.has(p.toLowerCase()))) {
+          skipped++;
+          continue;
+        }
+        try {
+          createDocRoot(db, p, typeof r['label'] === 'string' ? r['label'] : null);
+          docRootsCreated++;
+        } catch {
+          skipped++;
+        }
+      }
+    }
+    logActivity(ctx.db(), {
+      kind: 'settings.import',
+      level: 'L2',
+      detail: { strategy, settingsApplied, rulesCreated, templatesCreated, docRootsCreated, skipped },
+      actor: currentActor().actor,
+    });
+    return ok({ settingsApplied, rulesCreated, templatesCreated, docRootsCreated, skipped });
+  });
+
+  // 恢复默认：删除外观/行为类白名单设置键（读取侧回落默认值）；不动数据类（忽略规则/模板/文档根）
+  app.post('/api/settings/reset-defaults', async () => {
+    const db = ctx.db();
+    let removed = 0;
+    for (const k of EXPORT_SETTING_KEYS) {
+      const r = db.prepare('DELETE FROM settings WHERE key = ?').run(k);
+      removed += r.changes;
+    }
+    logActivity(ctx.db(), {
+      kind: 'settings.reset',
+      level: 'L2',
+      detail: { removed },
+      actor: currentActor().actor,
+    });
+    return ok({ removed });
   });
 
   /**

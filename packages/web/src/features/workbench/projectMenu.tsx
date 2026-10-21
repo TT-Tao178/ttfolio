@@ -11,6 +11,7 @@ import { App as AntdApp } from 'antd';
 import {
   AimOutlined,
   AppstoreOutlined,
+  FileMarkdownOutlined,
   InboxOutlined,
   BranchesOutlined,
   CopyOutlined,
@@ -21,9 +22,15 @@ import {
   StarOutlined,
 } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, ApiClientError } from '@/lib/api';
+import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
+
+/** 导出 Markdown 报告（FR-13.12 / T-110）：blob 下载 + 成功/失败提示。 */
+export async function downloadProjectReport(p: ProjectSummary): Promise<string> {
+  await downloadWithToken(`/api/projects/${p.id}/report`, `${p.alias ?? p.diskName}-报告.md`);
+  return `${p.alias ?? p.diskName} 报告已导出`;
+}
 
 /**
  * 归档/取消归档（评审二.5：PATCH 与「已归档」视图都在，但没有任何入口，
@@ -74,6 +81,8 @@ export interface ProjectMenuHandlers {
   onUnregister: () => void;
   /** 移除并删除文件（消费方负责确认弹窗 + 请求） */
   onDelete: () => void;
+  /** 导出 Markdown 报告（FR-13.12 / T-110，可选：未注入则不显示菜单项） */
+  onReport?: () => void;
   message: { success: (msg: string) => void };
 }
 
@@ -104,6 +113,9 @@ export function buildProjectMenu(
     },
     { key: 'collections', label: '归属集合…', icon: <AppstoreOutlined /> },
     { key: 'archive', label: p.status === 'archived' ? '取消归档' : '归档…', icon: <InboxOutlined /> },
+    ...(h.onReport !== undefined
+      ? [{ key: 'report', label: '导出 Markdown 报告', icon: <FileMarkdownOutlined /> }]
+      : []),
     { type: 'divider' as const },
     { key: 'unregister', label: '仅从 ttFolio 移除登记' },
     { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false },
@@ -148,6 +160,9 @@ export function buildProjectMenu(
         break;
       case 'archive':
         h.onArchive();
+        break;
+      case 'report':
+        h.onReport?.();
         break;
       case 'unregister':
         h.onUnregister();

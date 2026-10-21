@@ -28,7 +28,7 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
-import { buildProjectMenu, useArchiveProject } from './projectMenu';
+import { buildProjectMenu, useArchiveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
 export { parseSubTab };
@@ -164,6 +164,11 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       onRelocate: () => setRelocateProject(p),
       onUnregister: () => confirmUnregister(p),
       onDelete: () => confirmDelete(p),
+      onReport: () => {
+        void downloadProjectReport(p)
+          .then((m) => void message.success(m))
+          .catch(() => void message.error('报告导出失败'));
+      },
       message,
     });
 

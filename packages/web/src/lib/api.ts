@@ -66,6 +66,17 @@ export async function fetchDocsRaw(
   url.searchParams.set('projectId', projectId);
   url.searchParams.set('path', path);
   if (mountId !== null) url.searchParams.set('mountId', mountId);
+  return fetchArrayBuffer(url);
+}
+
+/** 文档根内 Office 字节取回（FR-13.12 / T-110 文档库预览用）。 */
+export async function fetchDocRootRaw(rootId: string, rel: string): Promise<ArrayBuffer> {
+  const url = new URL(base() + `/api/doc-roots/${rootId}/raw`, window.location.origin);
+  url.searchParams.set('rel', rel);
+  return fetchArrayBuffer(url);
+}
+
+async function fetchArrayBuffer(url: URL | string): Promise<ArrayBuffer> {
   const res = await fetch(url.toString(), { headers: { 'x-ttfolio-token': token() } });
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as ApiResponse<never> | null;

@@ -36,6 +36,8 @@ export interface ProjectRow {
   owner_id: string | null;
   /** 0005 迁移新增：资源仓库开关（FR-13.3，默认 0 关闭）。 */
   agent_repo_enabled: number;
+  /** 0009 迁移新增：项目外链收藏（FR-13.12 / T-110），JSON 数组 [{label,url}]。 */
+  external_links_json: string | null;
   rev: number;
   created_at: string;
   updated_at: string;

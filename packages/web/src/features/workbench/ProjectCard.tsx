@@ -15,7 +15,7 @@ import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from '@/features/workbench/RelocateModal';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
-import { buildProjectMenu, useArchiveProject } from '@/features/workbench/projectMenu';
+import { buildProjectMenu, useArchiveProject, downloadProjectReport } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({
@@ -104,6 +104,11 @@ export function ProjectCard({
     onRelocate: () => setRelocateOpen(true),
     onUnregister: confirmUnregister,
     onDelete: confirmDelete,
+    onReport: () => {
+      void downloadProjectReport(p)
+        .then((m) => void message.success(m))
+        .catch(() => void message.error('报告导出失败'));
+    },
     message,
   });
 

@@ -66,6 +66,98 @@ export function matchScore(target: string, name: string): number {
 export const docsRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
 
+  // ---- 文档库浏览（FR-13.12 / T-110）：文档根下白名单文件清单与只读读取 ----
+  const DOC_LIB_OFFICE_EXTS = /\.(docx|pdf|xlsx|xls)$/i;
+
+  app.get('/api/doc-roots/:id/files', async (req) => {
+    const { id } = req.params as { id: string };
+    const db = ctx.db();
+    const root = listDocRoots(db).find((r) => r.id === id);
+    if (root === undefined) return fail('NOT_FOUND', '文档根不存在', 404);
+    const out: Array<{
+      rel: string;
+      name: string;
+      size: number;
+      mtime: string;
+      kind: 'text' | 'office';
+    }> = [];
+    const walk = (abs: string, rel: string, depth: number): void => {
+      if (out.length >= 500 || depth > 3) return;
+      let entries;
+      try {
+        entries = fsx.listEntries(abs);
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        if (out.length >= 500) return;
+        const childAbs = path.join(abs, e.name);
+        const childRel = rel === '' ? e.name : `${rel}/${e.name}`;
+        if (e.isDir) {
+          if (!e.isSymlink) walk(childAbs, childRel, depth + 1);
+          continue;
+        }
+        if (!/\.(md|markdown|txt|docx|pdf|xlsx|xls)$/i.test(e.name)) continue;
+        const st = fsx.statSafe(childAbs);
+        if (st === null) continue;
+        out.push({
+          rel: childRel,
+          name: e.name,
+          size: st.size,
+          mtime: st.mtimeIso,
+          kind: DOC_LIB_OFFICE_EXTS.test(e.name) ? 'office' : 'text',
+        });
+      }
+    };
+    walk(root.path, '', 0);
+    out.sort((a, b) => b.mtime.localeCompare(a.mtime));
+    return ok(out);
+  });
+
+  // 文档根内文本类只读读取（页内预览；防穿越 + 2MB 上限，绝不写盘）
+  app.get('/api/doc-roots/:id/file', async (req) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { rel?: string };
+    if (q.rel === undefined || q.rel === '') return fail('BAD_REQUEST', '缺少 rel');
+    const db = ctx.db();
+    const root = listDocRoots(db).find((r) => r.id === id);
+    if (root === undefined) return fail('NOT_FOUND', '文档根不存在', 404);
+    if (!/\.(md|markdown|txt|json)$/i.test(q.rel)) {
+      return fail('BAD_REQUEST', '仅支持文本类页内预览');
+    }
+    const rootAbs = path.resolve(root.path);
+    const abs = path.resolve(rootAbs, q.rel);
+    if (abs === rootAbs || !isInsideOrEqual(rootAbs, abs)) {
+      return fail('PATH_OUT_OF_SCOPE', '路径越界');
+    }
+    const st = fsx.statSafe(abs);
+    if (st === null || st.isDir) return fail('NOT_FOUND', '文件不存在', 404);
+    if (st.size > 2 * 1024 * 1024) return fail('BAD_REQUEST', '文本超过 2MB，不支持页内预览');
+    const content = fsx.readTextFile(abs, 2 * 1024 * 1024);
+    return ok({ content: content.content, encoding: content.encoding, mtime: st.mtimeIso });
+  });
+
+  // 文档根内 Office 字节只读读取（文档库 loader 用；白名单 + 50MB，绝不写盘）
+  app.get('/api/doc-roots/:id/raw', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { rel?: string };
+    if (q.rel === undefined || q.rel === '') return fail('BAD_REQUEST', '缺少 rel');
+    const db = ctx.db();
+    const root = listDocRoots(db).find((r) => r.id === id);
+    if (root === undefined) return fail('NOT_FOUND', '文档根不存在', 404);
+    if (!DOC_LIB_OFFICE_EXTS.test(q.rel)) return fail('BAD_REQUEST', '仅支持 Office 白名单格式');
+    const rootAbs = path.resolve(root.path);
+    const abs = path.resolve(rootAbs, q.rel);
+    if (abs === rootAbs || !isInsideOrEqual(rootAbs, abs)) {
+      return fail('PATH_OUT_OF_SCOPE', '路径越界');
+    }
+    const st = fsx.statSafe(abs);
+    if (st === null || st.isDir) return fail('NOT_FOUND', '文件不存在', 404);
+    if (st.size > 50 * 1024 * 1024) return fail('BAD_REQUEST', '文件超过 50MB 上限');
+    reply.header('content-type', 'application/octet-stream');
+    return reply.send(fsx.readFileSync(abs));
+  });
+
   // ---- 文档根 ----
   app.get('/api/doc-roots', async () => ok(listDocRoots(ctx.db())));
 
