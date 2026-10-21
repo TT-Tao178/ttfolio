@@ -6,6 +6,10 @@
 appId: com.tttao.ttfolio
 productName: TT项目管理工作台
 copyright: Copyright © 2026
+# 原生依赖由出包链的 electron-rebuild 步骤统一处理：better-sqlite3 重编为 Electron ABI，
+# node-pty 为 N-API 预编译二进制（免重建）。关闭 builder 自带的 npm rebuild，
+# 否则它会用 node-gyp 重编 node-pty 并因缺构建工具失败。
+npmRebuild: false
 directories:
   output: dist-electron
   buildResources: electron/build
