@@ -65,3 +65,69 @@ export function missingItems(
   }
   return out;
 }
+
+// ---------------- 媒体视图偏好（FR-13.5 v3，参考图工具条） ----------------
+
+export type MediaLayout = 'grid' | 'two' | 'one';
+export type MediaFit = 'cover' | 'contain';
+
+export interface MediaViewPrefs {
+  /** 网格档缩略图边长（px，拖动实时生效） */
+  size: number;
+  layout: MediaLayout;
+  /** cover=统一裁剪成方形；contain=保留原比例（letterbox） */
+  fit: MediaFit;
+}
+
+export const MEDIA_VIEW_KEY = 'ttfolio-media-view';
+export const MEDIA_SIZE_MIN = 96;
+export const MEDIA_SIZE_MAX = 320;
+
+export const DEFAULT_MEDIA_VIEW: MediaViewPrefs = { size: 168, layout: 'grid', fit: 'cover' };
+
+/** 解析持久化偏好（容错：坏值回落默认；size 钳到 96–320）。 */
+export function parseMediaView(raw: string | null): MediaViewPrefs {
+  if (raw === null || raw === '') return DEFAULT_MEDIA_VIEW;
+  try {
+    const v = JSON.parse(raw) as Partial<MediaViewPrefs>;
+    const size = Number(v.size);
+    const layout: MediaLayout =
+      v.layout === 'two' || v.layout === 'one' || v.layout === 'grid' ? v.layout : 'grid';
+    const fit: MediaFit = v.fit === 'contain' ? 'contain' : 'cover';
+    return {
+      size: Number.isFinite(size)
+        ? Math.min(MEDIA_SIZE_MAX, Math.max(MEDIA_SIZE_MIN, Math.round(size)))
+        : DEFAULT_MEDIA_VIEW.size,
+      layout,
+      fit,
+    };
+  } catch {
+    return DEFAULT_MEDIA_VIEW;
+  }
+}
+
+export interface MediaGeometry {
+  columns: number;
+  cellW: number;
+  cellH: number;
+}
+
+/**
+ * 布局几何：
+ * - grid：按滑条边长多列排布（方形单元）；
+ * - two：固定两列，单元填满列宽，4:3 横向；
+ * - one：单列大图，单元填满宽度，最高 480px。
+ */
+export function layoutGeometry(layout: MediaLayout, containerWidth: number, size: number): MediaGeometry {
+  const width = Math.max(0, containerWidth);
+  if (layout === 'one') {
+    const cellW = Math.max(120, width);
+    return { columns: 1, cellW, cellH: Math.min(480, Math.round(cellW * 0.56)) };
+  }
+  if (layout === 'two') {
+    const cellW = Math.max(120, Math.floor((width - 8) / 2));
+    return { columns: 2, cellW, cellH: Math.round(cellW * 0.75) };
+  }
+  const clamped = Math.min(MEDIA_SIZE_MAX, Math.max(MEDIA_SIZE_MIN, Math.round(size)));
+  return { columns: columnsFor(width, clamped), cellW: clamped, cellH: clamped };
+}

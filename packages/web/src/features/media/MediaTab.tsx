@@ -1,17 +1,38 @@
-/** 媒体页签（FR-13.5 / T-099 + T-113 v2）：分组网格（react-virtual 行虚拟化）+
+/** 媒体页签（FR-13.5 / T-099 + T-113 v2 + v3）：分组网格（react-virtual 行虚拟化）+
  * 灯箱（缩放平移/翻页/幻灯片/连播）+ 缩略图队列 v2（先查存在性索引直接出图，
  * 可视区优先生成两级 WebP；Electron 原生解码优先，失败诚实回退图标）。
+ * v3 工具条（用户参考图）：F11 全屏、实时尺寸滑条、网格/双列/单列、统一/原比例。
  * 文件树媒体点击经 mediaFocus 信号直达灯箱。 */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Button, Empty, Segmented, Spin } from 'antd';
-import { VideoCameraOutlined, SoundOutlined, FileImageOutlined } from '@ant-design/icons';
+import { Button, Empty, Segmented, Slider, Spin, Tooltip } from 'antd';
+import {
+  AppstoreOutlined,
+  BlockOutlined,
+  BorderOutlined,
+  FileImageOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
+  SoundOutlined,
+  VideoCameraOutlined,
+} from '@ant-design/icons';
 import { api, thumbUrl } from '@/lib/api';
 import { fmtBytes } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import type { MediaItem, ProjectDetail } from '@ttfolio/shared';
-import { DENSITY_PX, KIND_LABEL, columnsFor, groupByFolder, type DensityKey } from './mediaHelpers';
+import {
+  DEFAULT_MEDIA_VIEW,
+  KIND_LABEL,
+  MEDIA_SIZE_MAX,
+  MEDIA_SIZE_MIN,
+  MEDIA_VIEW_KEY,
+  groupByFolder,
+  layoutGeometry,
+  parseMediaView,
+  type MediaLayout,
+  type MediaViewPrefs,
+} from './mediaHelpers';
 import { useThumbQueue } from './useThumbQueue';
 import { Lightbox } from './Lightbox';
 import { AutoScrollControl } from './AutoScrollControl';
@@ -24,12 +45,51 @@ interface Row {
   items?: MediaItem[];
 }
 
+function readViewPrefs(): MediaViewPrefs {
+  try {
+    return parseMediaView(localStorage.getItem(MEDIA_VIEW_KEY));
+  } catch {
+    return DEFAULT_MEDIA_VIEW;
+  }
+}
+
 export function MediaTab({ projectId }: { projectId: string }): React.JSX.Element {
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
-  const [density, setDensity] = useState<DensityKey>('cozy');
+  const [view, setView] = useState<MediaViewPrefs>(readViewPrefs);
+  const [isFull, setIsFull] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // 视图偏好持久化（本地界面偏好，同自动滚动速度口径；不入索引库）
+  useEffect(() => {
+    try {
+      localStorage.setItem(MEDIA_VIEW_KEY, JSON.stringify(view));
+    } catch {
+      /* 存储不可用不影响浏览 */
+    }
+  }, [view]);
+
+  // F11 全屏（参考图工具条）：文档级全屏，Electron/浏览器一致
+  const toggleFull = (): void => {
+    if (document.fullscreenElement !== null) void document.exitFullscreen();
+    else void document.documentElement.requestFullscreen().catch(() => {});
+  };
+  useEffect(() => {
+    const onFsChange = (): void => setIsFull(document.fullscreenElement !== null);
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleFull();
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
 
   const mediaQuery = useQuery({
     queryKey: ['media', projectId],
@@ -45,18 +105,23 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
     return kindFilter === 'all' ? all : all.filter((m) => m.kind === kindFilter);
   }, [mediaQuery.data, kindFilter]);
 
+  // 布局几何：滑条/布局/容器宽度变化即时重排（拖动滑条实时生效）
+  const geo = useMemo(
+    () => layoutGeometry(view.layout, containerWidth, view.size),
+    [view.layout, view.size, containerWidth],
+  );
+
   const groups = useMemo(() => groupByFolder(items), [items]);
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const g of groups) {
       out.push({ type: 'header', dir: g.dir });
-      const cols = Math.max(1, columnsFor(containerWidth, DENSITY_PX[density]));
-      for (let i = 0; i < g.items.length; i += cols) {
-        out.push({ type: 'cells', dir: g.dir, items: g.items.slice(i, i + cols) });
+      for (let i = 0; i < g.items.length; i += geo.columns) {
+        out.push({ type: 'cells', dir: g.dir, items: g.items.slice(i, i + geo.columns) });
       }
     }
     return out;
-  }, [groups, containerWidth, density]);
+  }, [groups, geo.columns]);
 
   // 容器宽度（列数与虚拟化行高依赖它）
   useEffect(() => {
@@ -70,7 +135,7 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
     return () => ro.disconnect();
   }, []);
 
-  const rowHeight = DENSITY_PX[density] + 30;
+  const rowHeight = geo.cellH + 34;
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => containerRef.current,
@@ -103,18 +168,55 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaFocus?.nonce, projectId, items]);
 
-  const cellIcon = (kind: MediaItem['kind']): React.JSX.Element => {
-    if (kind === 'video') return <VideoCameraOutlined style={{ fontSize: 32, opacity: 0.45 }} />;
-    if (kind === 'audio') return <SoundOutlined style={{ fontSize: 32, opacity: 0.45 }} />;
-    return <FileImageOutlined style={{ fontSize: 32, opacity: 0.45 }} />;
+  const cellIcon = (kind: MediaItem['kind'], size: number): React.JSX.Element => {
+    const style = { fontSize: Math.max(20, Math.round(size / 4)), opacity: 0.45 };
+    if (kind === 'video') return <VideoCameraOutlined style={style} />;
+    if (kind === 'audio') return <SoundOutlined style={style} />;
+    return <FileImageOutlined style={style} />;
   };
+
+  const layoutOptions: Array<{ value: MediaLayout; label: React.ReactNode }> = [
+    {
+      value: 'grid',
+      label: (
+        <Tooltip title="网格">
+          <AppstoreOutlined />
+        </Tooltip>
+      ),
+    },
+    {
+      value: 'two',
+      label: (
+        <Tooltip title="双列">
+          <BlockOutlined />
+        </Tooltip>
+      ),
+    },
+    {
+      value: 'one',
+      label: (
+        <Tooltip title="单列">
+          <BorderOutlined />
+        </Tooltip>
+      ),
+    },
+  ];
 
   return (
     <div
       style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}
       data-testid="media-tab"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          paddingBottom: 8,
+          flexWrap: 'wrap',
+          rowGap: 6,
+        }}
+      >
         <Segmented
           size="small"
           value={kindFilter}
@@ -126,15 +228,48 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
             { label: '音频', value: 'audio' },
           ]}
         />
+        <Button
+          size="small"
+          type="dashed"
+          icon={isFull ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={toggleFull}
+          data-testid="media-fullscreen"
+        >
+          {isFull ? '退出全屏' : 'F11 全屏'}
+        </Button>
+        {/* 实时尺寸滑条（参考图）：拖动即改网格单元尺寸，不做防抖 */}
+        <Tooltip title={view.layout === 'grid' ? '缩略图大小' : '缩略图大小（网格布局生效）'}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <AppstoreOutlined style={{ opacity: 0.65 }} />
+            <Slider
+              min={MEDIA_SIZE_MIN}
+              max={MEDIA_SIZE_MAX}
+              step={4}
+              value={view.size}
+              disabled={view.layout !== 'grid'}
+              onChange={(v) => setView((prev) => ({ ...prev, size: v }))}
+              tooltip={{ formatter: (v) => `${v ?? ''}px` }}
+              style={{ width: 132, margin: '0 4px' }}
+              data-testid="media-size-slider"
+            />
+          </span>
+        </Tooltip>
         <Segmented
           size="small"
-          value={density}
-          onChange={(v) => setDensity(v as DensityKey)}
+          value={view.layout}
+          onChange={(v) => setView((prev) => ({ ...prev, layout: v as MediaLayout }))}
+          options={layoutOptions.map((o) => ({ value: o.value, label: o.label }))}
+          data-testid="media-layout"
+        />
+        <Segmented
+          size="small"
+          value={view.fit}
+          onChange={(v) => setView((prev) => ({ ...prev, fit: v as MediaViewPrefs['fit'] }))}
           options={[
-            { label: '紧凑', value: 'compact' },
-            { label: '标准', value: 'cozy' },
-            { label: '大图', value: 'large' },
+            { label: '统一', value: 'cover' },
+            { label: '原比例', value: 'contain' },
           ]}
+          data-testid="media-fit"
         />
         <AutoScrollControl targetRef={containerRef} />
         <span style={{ fontSize: 12, opacity: 0.6 }}>
@@ -191,8 +326,7 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                   </div>
                 );
               }
-              const cell = DENSITY_PX[density];
-              const cols = Math.max(1, columnsFor(containerWidth, cell));
+              const fill = view.layout !== 'grid';
               return (
                 <div
                   key={vi.key}
@@ -205,7 +339,9 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                     width: '100%',
                     transform: `translateY(${vi.start}px)`,
                     display: 'grid',
-                    gridTemplateColumns: `repeat(${cols}, ${cell}px)`,
+                    gridTemplateColumns: fill
+                      ? `repeat(${geo.columns}, minmax(0, 1fr))`
+                      : `repeat(${geo.columns}, ${geo.cellW}px)`,
                     gap: 8,
                   }}
                 >
@@ -225,13 +361,14 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                           background: 'transparent',
                           textAlign: 'left',
                           overflow: 'hidden',
+                          minWidth: 0,
                         }}
                         title={`${it.path}（${KIND_LABEL[it.kind]} · ${fmtBytes(it.bytes)}）`}
                       >
                         <div
                           style={{
-                            width: cell,
-                            height: cell,
+                            width: '100%',
+                            height: geo.cellH,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -244,10 +381,14 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
                               alt={it.path}
                               loading="lazy"
                               decoding="async"
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: view.fit === 'cover' ? 'cover' : 'contain',
+                              }}
                             />
                           ) : st?.status === 'failed' ? (
-                            cellIcon(it.kind)
+                            cellIcon(it.kind, geo.cellH)
                           ) : (
                             <Spin size="small" />
                           )}
