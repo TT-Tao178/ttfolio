@@ -10,7 +10,8 @@
  *    用 Electron 原生 dialog.showOpenDialog 弹出（替代 PowerShell + WinForms 的误报高危组合）。
  *  - 数据目录仍是 %APPDATA%\ttFolio（安装/卸载、升级、Web 模式三态共用同一份数据）。
  */
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, nativeImage } = require('electron');
+const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
 const crypto = require('node:crypto');
@@ -36,6 +37,45 @@ let win = null;
 ipcMain.on('tt:theme-changed', (_event, mode) => {
   const map = { light: 'light', dark: 'dark', oled: 'dark', cyberpunk: 'dark', sketch: 'light' };
   nativeTheme.themeSource = map[mode] ?? 'system';
+});
+
+/**
+ * 缩略图原生解码（FR-13.5 / T-113）：渲染层给出项目内文件的绝对路径与目标最长边，
+ * 主进程用 Electron 内置 nativeImage 解码并缩放（不新增原生依赖），返回 dataURL；
+ * 渲染层再统一编码 WebP 交服务端落盘。任何异常一律 null（诚实回退渲染层解码）。
+ * 约束：绝对路径、图片扩展名白名单、常规文件且 ≤80MB、最长边 64~4096。
+ */
+const THUMB_IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif', '.svg']);
+ipcMain.handle('tt:thumb-decode', async (_event, absPath, maxPx) => {
+  try {
+    if (typeof absPath !== 'string' || absPath.includes('\u0000') || !path.isAbsolute(absPath)) {
+      return null;
+    }
+    if (!THUMB_IMAGE_EXT.has(path.extname(absPath).toLowerCase())) return null;
+    const pxRaw = Number(maxPx);
+    const px = Number.isFinite(pxRaw) ? Math.max(64, Math.min(4096, Math.round(pxRaw))) : 640;
+    const st = fs.statSync(absPath);
+    if (!st.isFile() || st.size === 0 || st.size > 80 * 1024 * 1024) return null;
+    const img = nativeImage.createFromPath(absPath);
+    if (img.isEmpty()) return null;
+    const size = img.getSize();
+    const longest = Math.max(size.width, size.height);
+    const scale = longest > px ? px / longest : 1;
+    const resized =
+      scale < 1
+        ? img.resize({
+            width: Math.max(1, Math.round(size.width * scale)),
+            height: Math.max(1, Math.round(size.height * scale)),
+            quality: 'good',
+          })
+        : img;
+    // 网格档用 PNG 保清晰；大图档用 JPEG(88) 控制 IPC 体积（最终都会转 WebP）
+    return px <= 800
+      ? `data:image/png;base64,${resized.toPNG().toString('base64')}`
+      : `data:image/jpeg;base64,${resized.toJPEG(88).toString('base64')}`;
+  } catch {
+    return null;
+  }
 });
 
 function getFreePort() {

@@ -10,4 +10,9 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
   setTheme: (mode) => {
     ipcRenderer.send('tt:theme-changed', String(mode));
   },
+  /**
+   * 缩略图原生解码（FR-13.5 / T-113）：绝对路径 + 目标最长边 → dataURL | null。
+   * 主进程校验扩展名/大小并缩放；失败返回 null，渲染层自行解码兜底。
+   */
+  thumbDecode: (absPath, maxPx) => ipcRenderer.invoke('tt:thumb-decode', String(absPath), Number(maxPx)),
 });
