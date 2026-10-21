@@ -1,5 +1,24 @@
 # PROGRESS
 
+## 第 51 轮：媒体工具条（参考图）——实时尺寸滑条/三布局/统一与原比例/F11 全屏 → v0.3.12
+
+- **功能（af3c819）**：按用户参考图补齐媒体查看工具条。mediaHelpers 增
+  parseMediaView（坏值回落、size 钳 96–320）与 layoutGeometry（grid 多列
+  方形 / two 两列 4:3 / one 单列满宽高度封顶 480）；MediaTab 工具条重做：
+  F11 与按钮全屏（文档级，fullscreenchange 同步文案）、尺寸滑条（onChange
+  实时生效，仅网格布局可用）、三布局图标分段、统一/原比例（cover/contain）；
+  网格按几何渲染（1fr 填充 vs 固定 px），偏好存 localStorage（同自动滚动
+  速度口径，不入索引库）。原 density 三档由连续滑条取代（等效能力）。
+- **验证**：typecheck/lint/test 全绿（176 条，新增视图偏好与几何 2 条）；
+  npm run build 通过；拖动实时性与视觉按用户要求留待手测。
+- **出包（0d9bbea）**：0.3.12 三处同轮；`dist:win` 的 audit/build/server/
+  electron-rebuild 通过，electron-builder 再次 EBUSY 锁旧 win-unpacked 的
+  app.asar（系统扫描占用，与用户已装应用无关）→ 按预案换 `dist-electron-tmp2`
+  构建，`VERIFY_DIST` 自检 8 项全绿含 0.3.12 断言，安装包与 blockmap 移回
+  dist-electron；tmp2 的 app.asar 释放较慢，后台循环等待后清理。rebuild
+  better-sqlite3 翻回、门禁复跑三绿（176 条）。tag v0.3.12 与 main 推送；
+  Release 页资产由用户手动拖传（对照清单补行）。
+
 ## 第 50 轮：v0.3.11 出包（T-103 + T-114 + T-113 随版本发布）
 
 - **版本收口（c28905e）**：0.3.11 三处同轮；CHANGELOG 按用户可感知变化写
