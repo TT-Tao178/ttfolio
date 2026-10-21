@@ -45,6 +45,8 @@ export interface SettingsShape {
   defaultProjectTab: string;
   docRootBlacklist: string[];
   keybindings: Record<string, string>;
+  /** 代码语法配色（FR-13.4）：classic | warm | neon */
+  syntaxScheme: string;
   scanRootDirs: unknown[];
   /** 可拖拽面板尺寸（见 hooks/usePaneSize.ts） */
   uiLayout: {
@@ -69,6 +71,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   defaultProjectTab: 'files',
   docRootBlacklist: [],
   keybindings: {},
+  syntaxScheme: 'classic',
   scanRootDirs: [],
   uiLayout: {},
 };
@@ -91,6 +94,7 @@ const SERVER_KEY: Record<string, string> = {
   defaultProjectTab: 'default_project_tab',
   docRootBlacklist: 'doc_root_blacklist_json',
   keybindings: 'keybindings_json',
+  syntaxScheme: 'syntax_scheme',
   scanRootDirs: 'scan_root_dirs_json',
   uiLayout: 'ui_layout_json',
 };

@@ -23,6 +23,8 @@ import {
   GITHUB_REPO,
   GITHUB_RELEASES_URL,
   semverNewer,
+  isSyntaxScheme,
+  DEFAULT_SYNTAX_SCHEME,
 } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
@@ -87,6 +89,9 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       defaultProjectTab: all[SETTING_KEYS.defaultProjectTab] ?? 'files',
       docRootBlacklist:
         docBlacklist !== null && docBlacklist !== '' ? (JSON.parse(docBlacklist) as string[]) : [],
+      syntaxScheme: isSyntaxScheme(all[SETTING_KEYS.syntaxScheme])
+        ? all[SETTING_KEYS.syntaxScheme]
+        : DEFAULT_SYNTAX_SCHEME,
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
       scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
       uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}'),
@@ -118,6 +123,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       show_ignored: (v) => (v === true || v === 'true' ? '1' : '0'),
       default_project_tab: (v) => String(v),
       doc_root_blacklist_json: (v) => JSON.stringify(v),
+      syntax_scheme: (v) => (isSyntaxScheme(v) ? v : DEFAULT_SYNTAX_SCHEME),
       keybindings_json: (v) => JSON.stringify(v),
       scan_root_dirs_json: (v) => JSON.stringify(v),
       ui_layout_json: (v) => JSON.stringify(v),

@@ -50,6 +50,8 @@ export const SETTING_KEYS = {
   docRootBlacklist: 'doc_root_blacklist_json',
   scanRootDirs: 'scan_root_dirs_json', // FR-12.6 预留
   keybindings: 'keybindings_json', // FR-11.4
+  // 代码语法配色方案（FR-13.4 / T-098）：classic | warm | neon，独立于应用主题
+  syntaxScheme: 'syntax_scheme',
   lastBackupAt: 'last_backup_at',
   defaultProjectTab: 'default_project_tab', // files | overview
   // 可拖拽面板尺寸（纯 UI 偏好，但按 C-29 统一落服务端，不用 localStorage）：
@@ -163,3 +165,12 @@ export const INDEXABLE_EXTENSIONS = new Set([
   'hcl',
   'env.example',
 ]);
+
+/** 代码语法配色方案值域（FR-13.4）：classic 经典 / warm 暖纸 / neon 高对比霓虹。 */
+export const SYNTAX_SCHEMES = ['classic', 'warm', 'neon'] as const;
+export type SyntaxScheme = (typeof SYNTAX_SCHEMES)[number];
+export const DEFAULT_SYNTAX_SCHEME: SyntaxScheme = 'classic';
+
+export function isSyntaxScheme(v: unknown): v is SyntaxScheme {
+  return typeof v === 'string' && (SYNTAX_SCHEMES as readonly string[]).includes(v);
+}
