@@ -398,7 +398,9 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
             </Button>
             <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
               模板必须包含占位符 {'{path}'} / {'{file}'} / {'{project}'} / {'{paths}'} 之一；以「可执行文件 +
-              参数数组」执行，禁止 shell 拼接。
+              参数数组」执行，禁止 shell 拼接。语义：{'{path}'}=目标路径、{'{file}'}
+              =文件名（目标为目录时为空）、
+              {'{project}'}=项目目录名、{'{paths}'}=路径（多路径预留）。
             </p>
           </Card>
         </SectionAnchor>
