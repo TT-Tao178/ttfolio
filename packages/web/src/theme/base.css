@@ -165,3 +165,8 @@ body,
   background: color-mix(in srgb, currentColor 7%, transparent);
   transform: translateX(3px);
 }
+
+/* 媒体网格自动滚动控件：步进按钮常显（对齐参考图样式，结构规则不写色值） */
+.tt-autoscroll .ant-input-number-handler-wrap {
+  opacity: 1;
+}

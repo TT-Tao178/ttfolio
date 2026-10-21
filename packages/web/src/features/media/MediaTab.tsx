@@ -13,6 +13,7 @@ import type { MediaItem } from '@ttfolio/shared';
 import { DENSITY_PX, KIND_LABEL, columnsFor, groupByFolder, type DensityKey } from './mediaHelpers';
 import { useThumbQueue } from './useThumbQueue';
 import { Lightbox } from './Lightbox';
+import { AutoScrollControl } from './AutoScrollControl';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio';
 
@@ -116,6 +117,7 @@ export function MediaTab({ projectId }: { projectId: string }): React.JSX.Elemen
             { label: '大图', value: 'large' },
           ]}
         />
+        <AutoScrollControl targetRef={containerRef} />
         <span style={{ fontSize: 12, opacity: 0.6 }}>
           {items.length} 个媒体文件
           {mediaQuery.data !== undefined && mediaQuery.data.length > items.length
