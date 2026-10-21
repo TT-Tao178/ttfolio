@@ -69,6 +69,15 @@ export function buildApp(ctx: AppContext): FastifyInstance {
     }
   });
 
+  // 缩略图二进制上传（FR-13.5 / T-113）：渲染层 canvas.toBlob('image/webp') 产物直传
+  app.addContentTypeParser(
+    'image/webp',
+    { parseAs: 'buffer', bodyLimit: 8 * 1024 * 1024 },
+    (_req, body, done) => {
+      done(null, body);
+    },
+  );
+
   // 鉴权与防 DNS rebinding（C-09）：/api/health 免 token（仅回环 + Host 校验）
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const url = req.url ?? '';

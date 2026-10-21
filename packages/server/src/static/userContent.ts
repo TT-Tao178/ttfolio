@@ -10,6 +10,7 @@ import { getArchive } from '../db/repo/docsRepo.js';
 import { guardPath } from '../core/pathGuard.js';
 import { AppError } from '../core/errors.js';
 import { parseRange } from './range.js';
+import { THUMB_NAME_RE } from '../core/thumbs.js';
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -47,8 +48,8 @@ const MIME: Record<string, string> = {
   '.m4a': 'audio/mp4',
 };
 
-/** 缩略图文件名白名单：sha1 hex + .png（写入方 routes/media.ts 保证）。 */
-const THUMB_NAME = /^[0-9a-f]{40}\.png$/;
+/** 缩略图文件名白名单（两级 @g/@p.webp + 旧版 .png）：与 core/thumbs 同源。 */
+const THUMB_NAME = THUMB_NAME_RE;
 
 export function startUserContentServer(ctx: AppContext): Promise<number> {
   const server = Fastify({ logger: false, disableRequestLogging: true });
@@ -207,9 +208,18 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
     }
     const full = path.join(ctx.layout.thumbsDir, projectId, name);
     try {
+      const st = await fsp.stat(full);
+      // ETag 含 mtime：文件被重新生成时失效；前端 URL 另带 ?v=<源文件 mtime>，
+      // 因此文件名不变也不会把旧图长期钉在缓存里（immutable 仅对同一 URL 有效）。
+      const etag = `"${name}-${Math.round(st.mtimeMs)}-${st.size}"`;
+      if (req.headers['if-none-match'] === etag) {
+        void reply.code(304).header('ETag', etag).send();
+        return reply;
+      }
       const buf = await fsp.readFile(full);
-      reply.header('Content-Type', 'image/png');
-      reply.header('Cache-Control', 'no-store');
+      reply.header('Content-Type', name.endsWith('.webp') ? 'image/webp' : 'image/png');
+      reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+      reply.header('ETag', etag);
       reply.header('X-Content-Type-Options', 'nosniff');
       void reply.send(buf);
     } catch {

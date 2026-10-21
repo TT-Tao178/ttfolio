@@ -19,6 +19,7 @@ import { compileIgnore } from './core/ignore.js';
 import { createBackup } from './core/backup.js';
 import { getSetting, setSetting } from './db/repo/metaRepo.js';
 import { recordSessionFileChanges } from './db/repo/agentSessionRepo.js';
+import { enforceQuota } from './core/thumbs.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
@@ -72,6 +73,16 @@ async function main(): Promise<void> {
   const mig = runMigrations(db, layout.backupDir);
   if (mig.applied.length > 0) {
     logger.info({ mod: 'boot', msg: `migrations applied: ${mig.applied.map((m) => m.file).join(', ')}` });
+  }
+
+  // ---- 缩略图配额（FR-13.5 / T-113）：启动时按 LRU 收敛一次 ----
+  try {
+    const q = enforceQuota(layout.thumbsDir);
+    if (q.removed > 0) {
+      logger.info({ mod: 'boot', msg: `thumb quota: removed ${q.removed} files, freed ${q.freed} bytes` });
+    }
+  } catch {
+    /* 配额清理失败不阻断启动 */
   }
 
   // ---- 个人主页（FR-13.7）：审计 actor 默认取用户名 ----

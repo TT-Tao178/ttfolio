@@ -32,6 +32,7 @@ import {
 } from '../db/repo/projectsRepo.js';
 import { logActivity, recordRecentFile, listRecentFiles } from '../db/repo/metaRepo.js';
 import { getAgentRepoEnabled } from '../db/repo/agentSessionRepo.js';
+import { clearProjectThumbs } from '../core/thumbs.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
 import { listTodos } from '../db/repo/sessionRepo.js';
 import { pathKey } from '../db/repo/docsRepo.js';
@@ -225,6 +226,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       ctx.sse.publish('trash.changed', {});
     }
     softDeleteProject(db, id);
+    // 缩略图是派生数据：移除登记即级联清理（需重开项目时按需重建）
+    clearProjectThumbs(ctx.layout.thumbsDir, id);
     logActivity(db, {
       kind: mode === 'delete' ? 'project.remove_and_delete' : 'project.unregister',
       level: mode === 'delete' ? 'L3' : 'L1',
