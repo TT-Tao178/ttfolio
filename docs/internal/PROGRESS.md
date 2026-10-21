@@ -1,5 +1,42 @@
 # PROGRESS
 
+## 第 46 轮：第一批规划任务 T-095~T-097（Agent 协作三部曲，用户点名分批实施 → v0.3.9）
+
+> 2026-10-21 用户点名「实现 T-095~T-100，分两批：每批测试后打包」。第一批
+> T-095/T-096/T-097——批内依赖链 96 用 95 的 actor、97 用 96 的记录管道；
+> 设计文档先落 FR-13.1~13.6 收编（4.13 节 + 3.3 页签/快捷键 + 6.2 接口表 +
+> 7.2 目录）。批内 9 个提交，每提交门禁三绿。
+
+- **T-095 Agent 发现与受控接口（cd62733 / 20d7f93 / 41cdc32）**：core/actor.ts
+  换 FR-12.4 预留点——AsyncLocalStorage + x-ttfolio-actor 头（1~64 字符、
+  拒冒充 local，不合法 400 而非静默回落，防审计伪装），logActivity 默认取
+  当前链身份 → 全部既有审计点零改动自动带 agent 身份；runtime.json 加 agent
+  发现段；新 routes/agent.ts——GET /api/agent/manifest（清单含标签/集合名+
+  能力端点表，只列真实端点）+ GET /api/agent/projects/:id/context（复用从
+  contract.ts 抽出的 buildContextPacket，头部注入管理声明）；设置→关于新增
+  「Agent 接入」区块（curl 示例，路径 D:\demo 占位）。测试 12 条
+  （buildApp+inject 走临时数据目录）。
+- **T-096 动态页签（a50af14 / 6c9b111）**：**规划核减一处**——「与基线
+  diff」服务端已天然支持（0.3.5 引入的 diff ref 参数即 `git diff <ref> --
+  path`），不重复建设，补 integration 测试把管道钉死；web 侧 sse.ts 加
+  组件级事件总线 subscribeSseEvents（单订阅方异常不拖垮分发）+
+  liveStream.ts 纯函数 reducer（路径归一/500 条窗口/kind 归一）+
+  AgentLiveTab 双栏（变更文件流 + 只读 CodeMirror/ImagePreview，二进制与
+  删除诚实降级），记录=以 HEAD 为基线切 diff（复用 DiffView），查看中文件
+  再变更 500ms 防抖刷新；页签/快捷键 6/面包屑接入。
+- **T-097 资源仓库（d2a15e1 / 21b04e9 / 0a4d46f）**：迁移 0005
+  （agent_sessions/agent_session_files/projects.agent_repo_enabled，只增不
+  改）；agentSessionRepo（聚合 upsert：首见/末见/次数；stop 幂等；空串清
+  空）；WatcherManager 增 onFlush 可选注入钩子（try/catch 隔离，沉淀层异常
+  不影响 SSE 主链路），index.ts 接批量聚合；routes/agent.ts 五个会话端点
+  （start/stop/patch/agent POST summary/files，生命周期全落 L1 审计）+ 项目
+  PATCH 白名单加 agentRepoEnabled；RepoTab 三段式（记录控制/项目速览/时间线
+  +懒加载文件清单+编辑弹窗），概览项目属性加开关（关闭页签消失数据保留）。
+- **收口**：任务总表生成器改造——FR-13 域不进 FR 驱动序列（避免与 EXTRA
+  T-089~094 编号冲突），新增 PLANNED_DONE 组并重生成（规划 3✅/13⬜，门禁
+  计数刷 136，在册缺口刷 3 项）；KNOWN-GAPS 核对无新打折项（T-099 缩略图
+  管线拟改渲染层 canvas 统一生成，属第二批决策届时记录）。
+
 ## 第 45 轮：0.3.8 发布——KNOWN-GAPS #4/#9 补全（滚动持久化 + 集合排序，用户点名）
 
 - **T-003 滚动持久化（5abc577 + 71bb511）**：store setActiveTabScroll 写回活动
