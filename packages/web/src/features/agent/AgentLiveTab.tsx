@@ -22,6 +22,7 @@ import { cmTheme, cmHighlight } from '@/theme/codemirror';
 import { langExtension } from '@/features/files/langExt';
 import { ImagePreview } from '@/features/files/ImagePreview';
 import { DiffView } from '@/features/git/DiffView';
+import { useSettings } from '@/app/settings';
 import { useSettingsDark } from '@/features/files/useDark';
 import { subscribeSseEvents } from '@/app/sse';
 import { SEMANTIC } from '@/theme/tokens';
@@ -366,6 +367,8 @@ function ReadOnlyCode({
   content: string;
   dark: boolean;
 }): React.JSX.Element {
+  const { settings } = useSettings();
+  const scheme = settings.syntaxScheme;
   const hostRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (hostRef.current === null) return undefined;
@@ -374,7 +377,7 @@ function ReadOnlyCode({
       extensions: [
         langExtension(path),
         cmTheme(dark),
-        cmHighlight(dark),
+        cmHighlight(dark, scheme),
         EditorView.lineWrapping,
         EditorView.editable.of(false),
         EditorState.readOnly.of(true),
@@ -382,7 +385,7 @@ function ReadOnlyCode({
       parent: hostRef.current,
     });
     return () => view.destroy();
-  }, [path, content, dark]);
+  }, [path, content, dark, scheme]);
   return (
     <div
       ref={hostRef}

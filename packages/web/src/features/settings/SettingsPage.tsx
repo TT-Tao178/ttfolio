@@ -18,7 +18,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { CommandTemplate, IgnoreRule, CollectionInfo } from '@ttfolio/shared';
@@ -30,6 +30,11 @@ import sponsorAlipay from '@/assets/sponsor/alipay.jpg';
 import sponsorWechat from '@/assets/sponsor/wechat.jpg';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
+import { EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { cmTheme, cmHighlight } from '@/theme/codemirror';
+import { langExtension } from '@/features/files/langExt';
+import { useSettingsDark } from '@/features/files/useDark';
 
 /**
  * 默认架构图目录名输入：改为**受控 + 跟服务端值同步**。
@@ -79,6 +84,7 @@ function SectionAnchor({ id, children }: { id: string; children: React.ReactNode
 }
 
 export function SettingsPage({ anchor = null }: { anchor?: string | null }): React.JSX.Element {
+  const dark = useSettingsDark();
   const { settings, setSetting } = useSettings();
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
@@ -199,6 +205,18 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                   ]}
                 />
               </Form.Item>
+              <Form.Item label="代码配色">
+                <Segmented
+                  data-testid="set-syntax-scheme"
+                  value={settings.syntaxScheme}
+                  onChange={(v) => setSetting('syntaxScheme', v)}
+                  options={[
+                    { label: '经典（默认）', value: 'classic' },
+                    { label: '暖纸', value: 'warm' },
+                    { label: '高对比霓虹', value: 'neon' },
+                  ]}
+                />
+              </Form.Item>
               <Form.Item label="项目页默认落点">
                 <Select
                   data-testid="set-default-tab"
@@ -213,8 +231,10 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
               </Form.Item>
             </Form>
             <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
-              卡片列数自适应窗口宽度；快捷键表见「?」帮助（Ctrl+, 打开本页）。
+              卡片列数自适应窗口宽度；代码配色独立于主题（编辑器 / 文档代码块 /
+              动态视图三处一致）；快捷键表见「?」帮助（Ctrl+, 打开本页）。
             </p>
+            <SchemePreview dark={dark} scheme={settings.syntaxScheme} />
           </Card>
         </SectionAnchor>
 
@@ -801,5 +821,57 @@ function NewTemplateModal({
         </Form.Item>
       </Form>
     </Modal>
+  );
+}
+
+/** 代码配色实时代码预览（FR-13.4）：切方案即时重渲染，覆盖七类 token 的示例。 */
+const SCHEME_SAMPLE = [
+  '// 注释：代码配色预览（编辑器 / 文档 / 动态视图三处一致）',
+  "import { helper } from './utils';",
+  '',
+  'const limit: number = 42;',
+  'export function calc(items: string[]): boolean {',
+  '  let total = 0;',
+  '  for (const it of items) {',
+  '    total += helper(it) ?? 0;',
+  '  }',
+  '  return total < limit;',
+  '}',
+  '',
+  '<div className="demo">tag</div>',
+].join('\n');
+
+function SchemePreview({ dark, scheme }: { dark: boolean; scheme: string }): React.JSX.Element {
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hostRef.current === null) return undefined;
+    const view = new EditorView({
+      doc: SCHEME_SAMPLE,
+      extensions: [
+        langExtension('sample.ts'),
+        cmTheme(dark),
+        cmHighlight(dark, scheme),
+        EditorView.lineWrapping,
+        EditorView.editable.of(false),
+        EditorState.readOnly.of(true),
+      ],
+      parent: hostRef.current,
+    });
+    return () => view.destroy();
+  }, [dark, scheme]);
+  return (
+    <div
+      ref={hostRef}
+      className="tt-mono"
+      style={{
+        border: `1px solid ${SEMANTIC.border}`,
+        borderRadius: 6,
+        marginTop: 8,
+        maxHeight: 220,
+        overflow: 'auto',
+        fontSize: 12,
+      }}
+      data-testid="scheme-preview"
+    />
   );
 }

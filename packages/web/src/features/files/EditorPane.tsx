@@ -406,7 +406,12 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
           height="100%"
           theme={dark ? 'dark' : 'light'}
           editable={editMode}
-          extensions={[langExtension(path), cmTheme(dark), cmHighlight(dark), EditorView.lineWrapping]}
+          extensions={[
+            langExtension(path),
+            cmTheme(dark),
+            cmHighlight(dark, settings.syntaxScheme),
+            EditorView.lineWrapping,
+          ]}
           onChange={onChange}
           basicSetup={{ foldGutter: true, autocompletion: false }}
         />

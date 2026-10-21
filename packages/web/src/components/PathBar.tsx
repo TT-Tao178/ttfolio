@@ -3,6 +3,7 @@ import { Breadcrumb, Button, Dropdown, Space, Tooltip } from 'antd';
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  HighlightOutlined,
   ReloadOutlined,
   SkinOutlined,
   ColumnWidthOutlined,
@@ -90,6 +91,17 @@ export function PathBar(): React.JSX.Element {
     selectedKeys: [settings.density],
     onClick: (e: { key: string }) => setSetting('density', e.key),
   };
+  // 代码配色菜单（FR-13.4）：与密度菜单同级，「做在主题旁边」
+  const schemeMenu = {
+    items: [
+      { key: 'classic', label: '经典（默认）' },
+      { key: 'warm', label: '暖纸' },
+      { key: 'neon', label: '高对比霓虹' },
+    ],
+    selectable: true,
+    selectedKeys: [settings.syntaxScheme],
+    onClick: (e: { key: string }) => setSetting('syntaxScheme', e.key),
+  };
 
   return (
     <div
@@ -147,6 +159,15 @@ export function PathBar(): React.JSX.Element {
       <Breadcrumb items={crumbs} style={{ flex: 1 }} data-testid="pathbar-crumbs" />
       <Dropdown menu={themeMenu}>
         <Button size="small" type="text" icon={<SkinOutlined />} title="主题" />
+      </Dropdown>
+      <Dropdown menu={schemeMenu}>
+        <Button
+          size="small"
+          type="text"
+          icon={<HighlightOutlined />}
+          title="代码配色"
+          data-testid="scheme-menu"
+        />
       </Dropdown>
       <Dropdown menu={densityMenu}>
         <Button size="small" type="text" icon={<ColumnWidthOutlined />} />
