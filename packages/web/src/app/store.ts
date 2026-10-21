@@ -63,6 +63,9 @@ interface AppState {
   /** 面包屑目录段点击的定位请求（第 26 轮）：FilesTab 监听 nonce 变化，展开树到该目录并选中 */
   treeLocate: { projectId: string; path: string; nonce: number } | null;
   setTreeLocate: (loc: { projectId: string; path: string }) => void;
+  /** 媒体联动信号（FR-13.5）：文件树点击媒体文件 → 跳媒体页签并开灯箱 */
+  mediaFocus: { projectId: string; path: string; nonce: number } | null;
+  setMediaFocus: (loc: { projectId: string; path: string }) => void;
   /** 写回活动标签的内容区滚动位置（0.3.8 补 KNOWN-GAPS #4：滚动随会话持久化） */
   setActiveTabScroll: (scroll: number) => void;
   syncFromServer: (
@@ -259,6 +262,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
   treeLocate: null,
   setTreeLocate: (loc) => set({ treeLocate: { ...loc, nonce: Date.now() } }),
+  mediaFocus: null,
+  setMediaFocus: (loc) => set({ mediaFocus: { ...loc, nonce: Date.now() } }),
   setActiveTabScroll: (scroll) => {
     const { tabs, activeTabId } = get();
     if (activeTabId === null) return;

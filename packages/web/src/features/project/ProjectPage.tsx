@@ -37,6 +37,7 @@ import { DocsTab } from '@/features/docs/DocsTab';
 import { TodoList } from '@/features/todos/TodoList';
 import { AgentLiveTab } from '@/features/agent/AgentLiveTab';
 import { RepoTab } from '@/features/agent/RepoTab';
+import { MediaTab } from '@/features/media/MediaTab';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectPage({
@@ -163,6 +164,7 @@ export function ProjectPage({
           { key: 'docs', label: p?.hasDocs === true ? '文档 ✓' : '文档' },
           { key: 'live', label: '动态' },
           ...(p?.agentRepoEnabled === true ? [{ key: 'repo', label: '仓库' }] : []),
+          { key: 'media', label: '媒体' },
         ]}
       />
       <div
@@ -284,6 +286,8 @@ export function ProjectPage({
             <DocsTab projectId={projectId} />
           ) : active === 'live' ? (
             <AgentLiveTab projectId={projectId} />
+          ) : active === 'media' ? (
+            <MediaTab projectId={projectId} />
           ) : active === 'repo' ? (
             p?.agentRepoEnabled === true ? (
               <RepoTab projectId={projectId} />

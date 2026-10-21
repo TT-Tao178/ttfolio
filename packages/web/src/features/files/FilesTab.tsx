@@ -29,6 +29,7 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError, rawUrl } from '@/lib/api';
+import { mediaKindOf } from '@ttfolio/shared';
 import type { ProjectDetail, TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
@@ -459,8 +460,15 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                     const resolved = typeof key === 'string' ? key : selectedPath;
                     if (resolved === null) return;
                     const kind = findKind(treeData, resolved);
-                    if (kind === 'file')
-                      useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
+                    if (kind === 'file') {
+                      // FR-13.5 联动：媒体文件直接进「媒体」页签灯箱；其余照旧右栏打开
+                      if (mediaKindOf(resolved) !== null) {
+                        useAppStore.getState().updateActiveLocation({ subTab: 'media' }, true);
+                        useAppStore.getState().setMediaFocus({ projectId, path: resolved });
+                      } else {
+                        useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
+                      }
+                    }
                     setSelectedPath(kind === 'file' ? resolved : typeof key === 'string' ? key : null);
                   }}
                 />

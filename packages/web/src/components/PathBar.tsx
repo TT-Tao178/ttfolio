@@ -303,6 +303,8 @@ function subTabLabel(sub: string): string {
       return '动态';
     case 'repo':
       return '仓库';
+    case 'media':
+      return '媒体';
     default:
       return sub;
   }
