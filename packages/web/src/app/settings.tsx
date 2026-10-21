@@ -47,6 +47,8 @@ export interface SettingsShape {
   agentRepoSnapshots: boolean;
   /** 首次进入仓库的确认标记 */
   agentRepoConfirmed: boolean;
+  /** 集成终端默认 shell（FR-14.2 / T-104）：pwsh | powershell | cmd */
+  terminalShell: string;
   defaultArchDirName: string;
   cardSort: string;
   showIgnored: boolean;
@@ -63,6 +65,8 @@ export interface SettingsShape {
     treeWidth?: number;
     gitListWidth?: number;
     docsListWidth?: number;
+    /** 集成终端面板高度（FR-14.2） */
+    terminalHeight?: number;
   };
 }
 
@@ -77,6 +81,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   agentRepoMode: 'on',
   agentRepoSnapshots: false,
   agentRepoConfirmed: false,
+  terminalShell: 'powershell',
   defaultArchDirName: '架构图',
   cardSort: 'last_opened',
   showIgnored: false,
@@ -104,6 +109,7 @@ const SERVER_KEY: Record<string, string> = {
   agentRepoMode: 'agent_repo_mode',
   agentRepoSnapshots: 'agent_repo_snapshots',
   agentRepoConfirmed: 'agent_repo_confirmed',
+  terminalShell: 'terminal_shell',
   defaultArchDirName: 'default_arch_dir_name',
   cardSort: 'card_sort',
   showIgnored: 'show_ignored',

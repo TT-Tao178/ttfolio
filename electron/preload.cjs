@@ -15,4 +15,25 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
    * 主进程校验扩展名/大小并缩放；失败返回 null，渲染层自行解码兜底。
    */
   thumbDecode: (absPath, maxPx) => ipcRenderer.invoke('tt:thumb-decode', String(absPath), Number(maxPx)),
+  /**
+   * 集成终端（FR-14.2 / T-104）：伪终端跑在主进程，这里只做受控收发。
+   * 只暴露 create/write/resize/kill 与两个订阅；不暴露任意进程执行能力。
+   */
+  terminal: {
+    shells: () => ipcRenderer.invoke('tt:term-shells'),
+    create: (opts) => ipcRenderer.invoke('tt:term-create', opts),
+    write: (id, data) => ipcRenderer.send('tt:term-write', String(id), String(data)),
+    resize: (id, cols, rows) => ipcRenderer.send('tt:term-resize', String(id), Number(cols), Number(rows)),
+    kill: (id) => ipcRenderer.send('tt:term-kill', String(id)),
+    onData: (cb) => {
+      const h = (_e, id, data) => cb(String(id), String(data));
+      ipcRenderer.on('tt:term-data', h);
+      return () => ipcRenderer.removeListener('tt:term-data', h);
+    },
+    onExit: (cb) => {
+      const h = (_e, id, code) => cb(String(id), Number(code));
+      ipcRenderer.on('tt:term-exit', h);
+      return () => ipcRenderer.removeListener('tt:term-exit', h);
+    },
+  },
 });

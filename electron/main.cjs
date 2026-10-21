@@ -275,6 +275,139 @@ function rememberWindowBounds(win) {
   }
 }
 
+/**
+ * 集成终端（FR-14.2 / T-104）：node-pty 伪终端跑在主进程，渲染层只经 preload 桥
+ * 收发数据（contextIsolation + sandbox 不变）。约束：
+ *  - 只允许白名单 shell（pwsh / Windows PowerShell / cmd），cwd 必须是存在的绝对目录；
+ *  - 不自动执行任何命令；输入不落日志；终端进程不跨重启存活（重启后如实为空）；
+ *  - node-pty 加载失败（缺原生模块）只让面板显示「不可用」，绝不影响应用启动。
+ */
+let nodePty = null;
+let nodePtyError = null;
+try {
+  nodePty = require('node-pty');
+} catch (err) {
+  nodePtyError = err && err.message ? err.message : String(err);
+}
+
+const terminals = new Map(); // id -> { pty, ownerId }
+
+function detectShells() {
+  const list = [];
+  try {
+    const { execFileSync } = require('node:child_process');
+    execFileSync('where', ['pwsh'], { windowsHide: true, stdio: 'ignore' });
+    list.push({ id: 'pwsh', label: 'PowerShell 7 (pwsh)' });
+  } catch {
+    /* 未安装 pwsh */
+  }
+  const sysRoot = process.env['SystemRoot'] || 'C:\\Windows';
+  const psPath = path.join(sysRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  if (fs.existsSync(psPath)) list.push({ id: 'powershell', label: 'Windows PowerShell' });
+  list.push({ id: 'cmd', label: '命令提示符 (cmd)' });
+  return list;
+}
+
+function shellPathOf(id) {
+  if (id === 'pwsh') return 'pwsh';
+  if (id === 'powershell') {
+    const sysRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    return path.join(sysRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  }
+  return process.env['ComSpec'] || 'cmd.exe';
+}
+
+ipcMain.handle('tt:term-shells', async () => ({
+  available: nodePty !== null,
+  error: nodePtyError,
+  shells: detectShells(),
+  home: require('node:os').homedir(),
+  defaultShell: detectShells().some((s) => s.id === 'pwsh') ? 'pwsh' : 'powershell',
+}));
+
+ipcMain.handle('tt:term-create', async (event, opts) => {
+  if (nodePty === null) return { ok: false, error: nodePtyError ?? 'node-pty 不可用' };
+  const shellId = opts && typeof opts.shell === 'string' ? opts.shell : 'powershell';
+  const allowed = new Set(['pwsh', 'powershell', 'cmd']);
+  if (!allowed.has(shellId)) return { ok: false, error: '不支持的 shell' };
+  const cwd = opts && typeof opts.cwd === 'string' ? opts.cwd : '';
+  if (cwd === '' || !path.isAbsolute(cwd) || !fs.existsSync(cwd)) {
+    return { ok: false, error: '起始目录不存在' };
+  }
+  try {
+    const id = crypto.randomUUID();
+    const file = shellPathOf(shellId);
+    const args = shellId === 'cmd' ? [] : ['-NoLogo'];
+    const ptyProc = nodePty.spawn(file, args, {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd,
+      env: { ...process.env, TERM: 'xterm-256color' },
+      useConpty: true,
+    });
+    const ownerId = event.sender.id;
+    terminals.set(id, { pty: ptyProc, ownerId });
+    ptyProc.onData((data) => {
+      if (!event.sender.isDestroyed()) event.sender.send('tt:term-data', id, data);
+    });
+    ptyProc.onExit(({ exitCode }) => {
+      terminals.delete(id);
+      if (!event.sender.isDestroyed()) event.sender.send('tt:term-exit', id, exitCode);
+    });
+    return { ok: true, id, shell: shellId, title: shellId === 'cmd' ? 'cmd' : 'PowerShell' };
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+ipcMain.on('tt:term-write', (event, id, data) => {
+  const t = terminals.get(String(id));
+  if (t === undefined || t.ownerId !== event.sender.id) return;
+  if (typeof data !== 'string' || data.length > 100_000) return;
+  try {
+    t.pty.write(data);
+  } catch {
+    /* 进程已退出 */
+  }
+});
+
+ipcMain.on('tt:term-resize', (event, id, cols, rows) => {
+  const t = terminals.get(String(id));
+  if (t === undefined || t.ownerId !== event.sender.id) return;
+  const c = Math.max(2, Math.min(500, Math.round(Number(cols) || 80)));
+  const r = Math.max(1, Math.min(300, Math.round(Number(rows) || 24)));
+  try {
+    t.pty.resize(c, r);
+  } catch {
+    /* 忽略 */
+  }
+});
+
+ipcMain.on('tt:term-kill', (event, id) => {
+  const t = terminals.get(String(id));
+  if (t === undefined || t.ownerId !== event.sender.id) return;
+  try {
+    t.pty.kill();
+  } catch {
+    /* 已退出 */
+  }
+  terminals.delete(String(id));
+});
+
+function killAllTerminals() {
+  for (const { pty: p } of terminals.values()) {
+    try {
+      p.kill();
+    } catch {
+      /* 忽略 */
+    }
+  }
+  terminals.clear();
+}
+
+app.on('before-quit', killAllTerminals);
+
 app.on('second-instance', () => {
   if (win !== null) {
     if (win.isMinimized()) win.restore();

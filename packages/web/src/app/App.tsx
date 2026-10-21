@@ -21,6 +21,7 @@ import { ActivityPage } from '@/features/activity/ActivityPage';
 import { CompareView } from '@/features/compare/CompareView';
 import { DocLibraryPage } from '@/features/docs/DocLibraryPage';
 import { PluginsPage } from '@/features/plugins/PluginsPage';
+import { TerminalPanel } from '@/features/terminal/TerminalPanel';
 import { toCommandDefs, type PluginContribution } from '@/features/plugins/pluginCommands';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { CommandPalette } from '@/features/search/CommandPalette';
@@ -132,6 +133,8 @@ function Shell(): React.JSX.Element {
   // 右栏开关必须是响应式选择器：原先在渲染里读 useAppStore.getState().detailVisible，
   // 切换后不会触发重渲染（开关"没反应"）。
   const detailVisible = useAppStore((s) => s.detailVisible);
+  const terminalOpen = useAppStore((s) => s.terminalOpen);
+  const setTerminalOpen = useAppStore((s) => s.setTerminalOpen);
   const setDetail = useAppStore((s) => s.setDetail);
 
   const onSseState = useCallback((s: SseState) => setSseState(s), []);
@@ -249,10 +252,26 @@ function Shell(): React.JSX.Element {
         }
         return;
       }
+      // 集成终端开关（FR-14.2 / T-104）：Ctrl+` 在终端聚焦时也要生效
+      // （xterm 的 attachCustomKeyEventHandler 已把该组合交还宿主）
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        setTerminalOpen(!useAppStore.getState().terminalOpen);
+        return;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [paletteOpen, setPalette, activeTab, updateActiveLocation, message, settings.keybindings, commandCtx]);
+  }, [
+    paletteOpen,
+    setPalette,
+    activeTab,
+    updateActiveLocation,
+    message,
+    settings.keybindings,
+    commandCtx,
+    setTerminalOpen,
+  ]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -399,6 +418,7 @@ function Shell(): React.JSX.Element {
         </div>
       </div>
 
+      {terminalOpen && <TerminalPanel />}
       <StatusBar sseState={sseState} />
       <CommandPalette />
       <span

@@ -50,7 +50,8 @@
   },
   "allowScripts": {
     "electron@44.4.3": true,
-    "better-sqlite3@12.11.1": true
+    "better-sqlite3@12.11.1": true,
+    "node-pty@1.1.0": true
   },
   "main": "electron/main.cjs",
   "dependencies": {
@@ -58,6 +59,7 @@
     "bindings": "^1.5.0",
     "docx-preview": "^0.4.1",
     "file-uri-to-path": "^2.0.0",
+    "node-pty": "^1.1.0",
     "pdfjs-dist": "^6.4.299",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },

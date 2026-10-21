@@ -92,6 +92,19 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
     run: (ctx) => openStoreTab(ctx.store, 'overview', '工作台'),
   },
   {
+    id: 'terminal.toggle',
+    title: '打开 / 收起集成终端',
+    category: '视图',
+    keys: 'Ctrl+`',
+    run: (ctx) => ctx.store.setTerminalOpen(!ctx.store.terminalOpen),
+  },
+  {
+    id: 'view.plugins',
+    title: '打开插件广场',
+    category: '视图',
+    run: (ctx) => openStoreTab(ctx.store, 'plugins', '插件广场'),
+  },
+  {
     id: 'palette.search',
     title: '全局搜索',
     category: '视图',

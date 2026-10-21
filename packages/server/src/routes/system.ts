@@ -104,6 +104,9 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       agentRepoMode: all['agent_repo_mode'] === 'off' ? 'off' : 'on',
       agentRepoSnapshots: all['agent_repo_snapshots'] === '1',
       agentRepoConfirmed: all['agent_repo_confirmed'] === '1',
+      terminalShell: ['pwsh', 'powershell', 'cmd'].includes(all['terminal_shell'] ?? '')
+        ? all['terminal_shell']
+        : 'powershell',
       defaultArchDirName: all[SETTING_KEYS.defaultArchDirName] ?? '架构图',
       cardSort: all[SETTING_KEYS.cardSort] ?? 'last_opened',
       showIgnored: (all[SETTING_KEYS.showIgnored] ?? '0') === '1',
@@ -142,6 +145,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       agent_repo_mode: (v) => (v === 'off' ? 'off' : 'on'),
       agent_repo_snapshots: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
       agent_repo_confirmed: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
+      terminal_shell: (v) => (v === 'pwsh' || v === 'cmd' ? v : 'powershell'),
       backup_keep_days: (v) => {
         // 0 = 沿用智能保留（最近 10 份 + 每周 1 份）；>0 = 按天清理过期快照
         const n = Number(v);
