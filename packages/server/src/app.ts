@@ -11,6 +11,7 @@ import type { AppContext } from './context.js';
 import { toApiError } from './routes/helpers.js';
 import { defaultHttpStatus, AppError } from './core/errors.js';
 import type { ErrorCode } from '@ttfolio/shared';
+import { normalizeActorHeader, enterActor } from './core/actor.js';
 import { systemRoutes } from './routes/system.js';
 import { eventsRoute } from './routes/events.js';
 import { projectsRoutes } from './routes/projects.js';
@@ -91,6 +92,21 @@ export function buildApp(ctx: AppContext): FastifyInstance {
       if (token !== ctx.token) {
         void reply.code(401).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'token 无效' } });
         return;
+      }
+      // agent 身份声明（FR-13.1）：持有效 token 才允许携带 x-ttfolio-actor；
+      // 声明不合法直接拒绝（不静默回落 local，防审计身份被伪装成用户）。
+      const actorHeaderRaw = req.headers['x-ttfolio-actor'];
+      const actorHeader = Array.isArray(actorHeaderRaw) ? actorHeaderRaw[0] : actorHeaderRaw;
+      if (actorHeader !== undefined) {
+        const actor = normalizeActorHeader(actorHeader);
+        if (actor === null) {
+          void reply.code(400).send({
+            ok: false,
+            error: { code: 'BAD_REQUEST', message: 'x-ttfolio-actor 头不合法（1~64 字符，且不得为 local）' },
+          });
+          return;
+        }
+        enterActor(actor);
       }
       // 非 GET：Origin 必须是本机
       if (req.method !== 'GET' && req.method !== 'HEAD') {

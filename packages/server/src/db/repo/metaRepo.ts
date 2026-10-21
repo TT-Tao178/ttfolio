@@ -3,6 +3,7 @@ import type { ActivityEntry } from '@ttfolio/shared';
 import type Database from 'better-sqlite3';
 import { getAll, getOne, run } from '../sql.js';
 import type { ActivityRow } from '../rowTypes.js';
+import { currentActor } from '../../core/actor.js';
 
 export function getSetting(db: Database.Database, key: string): string | null {
   const row = getOne<{ value: string | null }>(db, 'SELECT value FROM settings WHERE key = ?', [key]);
@@ -47,7 +48,8 @@ export function logActivity(
       entry.projectId ?? null,
       entry.targetPath ?? null,
       entry.detail === undefined ? null : JSON.stringify(entry.detail),
-      entry.actor ?? 'local',
+      // 未显式传 actor 时取当前异步链身份（FR-13.1：agent 携 actor 头调用时自动落 agent 身份）
+      entry.actor ?? currentActor().actor,
     ],
   );
 }
