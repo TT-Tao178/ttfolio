@@ -41,6 +41,12 @@ export interface SettingsShape {
   trashRetentionDays: number;
   /** 备份快照保留天数（FR-13.11 / T-108）；0 = 智能保留 */
   backupKeepDays: number;
+  /** 资源仓库全局记录（FR-13.3 v2 / T-112）：on 默认 / off */
+  agentRepoMode: 'on' | 'off';
+  /** 可选快照层（默认关） */
+  agentRepoSnapshots: boolean;
+  /** 首次进入仓库的确认标记 */
+  agentRepoConfirmed: boolean;
   defaultArchDirName: string;
   cardSort: string;
   showIgnored: boolean;
@@ -68,6 +74,9 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   autoSave: false,
   trashRetentionDays: 30,
   backupKeepDays: 0,
+  agentRepoMode: 'on',
+  agentRepoSnapshots: false,
+  agentRepoConfirmed: false,
   defaultArchDirName: '架构图',
   cardSort: 'last_opened',
   showIgnored: false,
@@ -92,6 +101,9 @@ const SERVER_KEY: Record<string, string> = {
   autoSave: 'auto_save',
   trashRetentionDays: 'trash_retention_days',
   backupKeepDays: 'backup_keep_days',
+  agentRepoMode: 'agent_repo_mode',
+  agentRepoSnapshots: 'agent_repo_snapshots',
+  agentRepoConfirmed: 'agent_repo_confirmed',
   defaultArchDirName: 'default_arch_dir_name',
   cardSort: 'card_sort',
   showIgnored: 'show_ignored',

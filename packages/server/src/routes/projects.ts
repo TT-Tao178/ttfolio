@@ -41,7 +41,12 @@ import {
   getSetting,
   setSetting,
 } from '../db/repo/metaRepo.js';
-import { getAgentRepoEnabled } from '../db/repo/agentSessionRepo.js';
+import {
+  getAgentRepoEnabled,
+  getProjectRepoMode,
+  getGlobalRepoMode,
+  setAgentRepoMode,
+} from '../db/repo/agentSessionRepo.js';
 import { clearProjectThumbs } from '../core/thumbs.js';
 import { listMounts, listArchives, toArchiveInfo } from '../db/repo/docsRepo.js';
 import { listTodos } from '../db/repo/sessionRepo.js';
@@ -181,6 +186,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       ...summary,
       defaultArchDir: getProjectRow(db, id)?.default_arch_dir ?? '架构图',
       agentRepoEnabled: getAgentRepoEnabled(db, id),
+      agentRepoMode: getProjectRepoMode(db, id),
+      globalRepoMode: getGlobalRepoMode(db),
       mounts: listMounts(db, id),
       archives,
       todoOpenCount: listTodos(db, { projectId: id, includeDone: false }).length,
@@ -212,7 +219,15 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       const name = assertSafeName(b.defaultArchDir);
       fields['default_arch_dir'] = name;
     }
-    if (b.agentRepoEnabled !== undefined) fields['agent_repo_enabled'] = b.agentRepoEnabled ? 1 : 0;
+    if (b.agentRepoEnabled !== undefined) setAgentRepoMode(db, id, b.agentRepoEnabled ? 'on' : 'off');
+    // 三态（FR-13.3 v2）：follow → 写 NULL（跟随全局）
+    if (b.agentRepoMode !== undefined) {
+      setAgentRepoMode(
+        db,
+        id,
+        b.agentRepoMode === null || b.agentRepoMode === 'follow' ? null : b.agentRepoMode,
+      );
+    }
     if (b.externalLinks !== undefined) fields['external_links_json'] = JSON.stringify(b.externalLinks);
     const rev = patchProject(db, id, fields);
     ctx.sse.publish('project.updated', { projectId: id });

@@ -25,6 +25,8 @@ import {
   failStaleRunningTaskRuns,
 } from './db/repo/taskRunRepo.js';
 import { ChangeTracker, purgeChangeEvents } from './core/changes.js';
+import { pruneSnapshots } from './core/snapshots.js';
+import { autoCloseSessions, closeAutoSessionsOnExit } from './core/sessionSummary.js';
 import { enforceQuota } from './core/thumbs.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
@@ -157,8 +159,10 @@ async function main(): Promise<void> {
       finishTaskRun(store.get(), { id, status, error, finishedAt, done, total }),
   });
   // 变更流水统一入口（FR-13.2 v2 / T-111）：watcher flush 与各路由的写操作都经它
-  // （落库 → 会话聚合 → SSE）；库句柄惰性取，库恢复重建后不悬空
-  const changes = new ChangeTracker(() => store.get(), sse, logger);
+  // （落库 → 会话聚合 → SSE）；库句柄惰性取，库恢复重建后不悬空。
+  // 快照根启用可选快照层（FR-13.3 v2，默认关：settings.agent_repo_snapshots=1）
+  const snapshotsRoot = path.join(layout.dataDir, 'snapshots');
+  const changes = new ChangeTracker(() => store.get(), sse, logger, snapshotsRoot);
   const watcher = new WatcherManager(sse, logger, (projectId, relPaths, kind) => {
     changes.publish({
       projectId,
@@ -180,6 +184,7 @@ async function main(): Promise<void> {
     () => {
       try {
         purgeChangeEvents(store.get());
+        pruneSnapshots(snapshotsRoot);
       } catch {
         /* 定时清理失败忽略 */
       }
@@ -187,6 +192,28 @@ async function main(): Promise<void> {
     24 * 3600 * 1000,
   );
   changeCleanupTimer.unref();
+
+  // 自动会话收尾（FR-13.3 v2 / T-112）：每分钟检查空闲 15 分钟/跨自然日的 auto 会话，
+  // 结束并生成自动摘要（不调 AI）；手动「结束本段」保留为里程碑语义
+  const sessionCloseTimer = setInterval(() => {
+    void autoCloseSessions(store.get(), logger).catch(() => {
+      /* 单轮失败忽略，下一分钟再试 */
+    });
+  }, 60_000);
+  sessionCloseTimer.unref();
+  // 应用退出：尽力结束 auto 会话（生成摘要）；失败不阻塞退出
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(sig, () => {
+      void closeAutoSessionsOnExit(store.get()).finally(() => process.exit(0));
+    });
+  }
+  // 启动即清一次过期快照
+  try {
+    const pruned = pruneSnapshots(snapshotsRoot);
+    if (pruned > 0) logger.info({ mod: 'boot', msg: `snapshots pruned: ${pruned}` });
+  } catch {
+    /* 忽略 */
+  }
   const trash = new TrashService(layout.trashDir);
   const webDistCandidates = [
     // 桌面版（Electron）由主进程注入 asar 内的产物路径；dev/生产 web 模式走 cwd 相对定位

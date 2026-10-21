@@ -82,6 +82,8 @@ export const projectPatchSchema = z.object({
   defaultArchDir: z.string().max(100).optional(),
   /** 资源仓库开关（FR-13.3，默认关；关闭只隐藏页签，数据保留） */
   agentRepoEnabled: z.boolean().optional(),
+  /** 资源仓库三态（FR-13.3 v2）：null/follow=跟随全局 */
+  agentRepoMode: z.enum(['follow', 'on', 'off']).nullish(),
   /** 项目外链收藏（FR-13.12 / T-110）：wiki/仓库/文档站 */
   externalLinks: z
     .array(z.object({ label: z.string().min(1).max(50), url: z.string().url().max(500) }))

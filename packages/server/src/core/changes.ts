@@ -19,6 +19,7 @@ import { ulid } from './ulid.js';
 import { getAll, getOne, run } from '../db/sql.js';
 import { currentActor } from './actor.js';
 import { recordSessionFileChanges } from '../db/repo/agentSessionRepo.js';
+import { storeSnapshot } from './snapshots.js';
 import * as fsx from './fsx.js';
 
 export type ChangeSource = 'watcher' | 'api' | 'agent';
@@ -66,12 +67,45 @@ export class ChangeTracker {
     private readonly getDb: () => Database.Database,
     private readonly sse: SseHub,
     private readonly logger: Logger,
+    /** 可选快照层根（dataDir/snapshots）；缺省 = 快照功能关闭 */
+    private readonly snapshotsRoot: string | null = null,
   ) {}
 
   /** 项目根缓存失效（登记/重定位/移除时调用）。 */
   invalidateRoot(projectId?: string): void {
     if (projectId === undefined) this.roots.clear();
     else this.roots.delete(projectId);
+  }
+
+  /** 快照开关（settings.agent_repo_snapshots，默认关；每次读库，改设置立即生效）。 */
+  private snapshotEnabled(): boolean {
+    const row = getOne<{ value: string | null }>(
+      this.getDb(),
+      "SELECT value FROM settings WHERE key = 'agent_repo_snapshots'",
+    );
+    return row?.value === '1';
+  }
+
+  /** 自动会话的起点 HEAD 异步补记（首个变更开启会话时 HEAD 尚未取到）。 */
+  private captureStartHead(projectId: string, sessionId: string): void {
+    const row = getOne<{ git_is_repo: number; dir_path: string }>(
+      this.getDb(),
+      'SELECT git_is_repo, dir_path FROM projects WHERE id = ?',
+      [projectId],
+    );
+    if (row?.git_is_repo !== 1) return;
+    void import('./git.js')
+      .then((m) => m.headHash(row.dir_path))
+      .then((head) => {
+        if (head === null) return;
+        run(this.getDb(), 'UPDATE agent_sessions SET start_head = ? WHERE id = ? AND start_head IS NULL', [
+          head,
+          sessionId,
+        ]);
+      })
+      .catch(() => {
+        /* 基线取不到不影响记录（摘要诚实降级） */
+      });
   }
 
   private rootOf(projectId: string): string {
@@ -152,9 +186,31 @@ export class ChangeTracker {
           msg: `record failed: ${err instanceof Error ? err.message : String(err)}`,
         });
       }
-      // 会话聚合（资源仓库）：与落库同源，内部自检活动会话
+      // 会话聚合（资源仓库）：与落库同源；无活动会话时按项目开关自动开启一段
       try {
-        recordSessionFileChanges(db, input.projectId, sample, nowIso);
+        const before = getOne<{ id: string }>(
+          db,
+          'SELECT id FROM agent_sessions WHERE project_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
+          [input.projectId],
+        );
+        // 可选快照层（默认关）：开启时抓变更后的内容（文本 ≤512KB），失败诚实跳过
+        let snapshots: Map<string, string> | undefined;
+        if (this.snapshotsRoot !== null && this.snapshotEnabled()) {
+          snapshots = new Map<string, string>();
+          for (const rel of sample) {
+            const got = storeSnapshot(this.snapshotsRoot, input.projectId, path.join(root, rel));
+            if (got !== null) snapshots.set(rel, got.sha);
+          }
+        }
+        recordSessionFileChanges(db, input.projectId, sample, nowIso, snapshots);
+        const after = getOne<{ id: string; start_head: string | null }>(
+          db,
+          'SELECT id, start_head FROM agent_sessions WHERE project_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
+          [input.projectId],
+        );
+        if (before === undefined && after !== undefined && after.start_head === null) {
+          this.captureStartHead(input.projectId, after.id);
+        }
       } catch (err) {
         this.logger.warn({
           mod: 'changes',

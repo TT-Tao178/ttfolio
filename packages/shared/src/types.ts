@@ -71,8 +71,12 @@ export interface ProjectDetail extends ProjectSummary {
   mounts: MountInfo[];
   archives: ArchiveInfo[];
   todoOpenCount: number;
-  /** 资源仓库开关（FR-13.3，默认关；关闭时「仓库」页签不渲染，数据保留） */
+  /** 资源仓库有效开关（FR-13.3 v2：项目三态 × 全局模式求值） */
   agentRepoEnabled: boolean;
+  /** 项目三态（follow 跟随全局） */
+  agentRepoMode: AgentRepoMode;
+  /** 全局记录模式 */
+  globalRepoMode: 'on' | 'off';
 }
 
 export interface MountInfo {
@@ -386,6 +390,11 @@ export interface AgentRepoSession {
   startedAt: string;
   endedAt: string | null;
   summary: string | null;
+  /** 摘要来源（FR-13.3 v2）：auto 自动生成 / user 用户编辑过 / agent 由 agent 写入 */
+  summarySource?: 'auto' | 'user' | 'agent' | null;
+  /** 自动开启的会话（空闲 15 分钟 / 跨自然日 / 退出时自动结束） */
+  auto?: boolean;
+  startHead?: string | null;
   fileCount: number;
 }
 
@@ -395,7 +404,14 @@ export interface AgentRepoSessionFile {
   firstSeenAt: string;
   lastSeenAt: string;
   changeCount: number;
+  /** 可选快照层（默认关）：首/末快照内容寻址 sha 与大小 */
+  firstSha?: string | null;
+  latestSha?: string | null;
+  bytes?: number | null;
 }
+
+/** 项目资源仓库记录开关三态（FR-13.3 v2）：follow 跟随全局 */
+export type AgentRepoMode = 'follow' | 'on' | 'off';
 
 /** 个人主页（FR-13.7，T-103）：本地单人身份卡。 */
 export interface ProfileInfo {

@@ -100,6 +100,10 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       autoSave: (all[SETTING_KEYS.autoSave] ?? '0') === '1',
       trashRetentionDays: Number(all[SETTING_KEYS.trashRetentionDays] ?? String(TRASH_RETENTION_DAYS)),
       backupKeepDays: Number(all['backup_keep_days'] ?? '0'),
+      // 资源仓库（FR-13.3 v2 / T-112）：全局默认记录 + 可选快照层 + 首次确认标记
+      agentRepoMode: all['agent_repo_mode'] === 'off' ? 'off' : 'on',
+      agentRepoSnapshots: all['agent_repo_snapshots'] === '1',
+      agentRepoConfirmed: all['agent_repo_confirmed'] === '1',
       defaultArchDirName: all[SETTING_KEYS.defaultArchDirName] ?? '架构图',
       cardSort: all[SETTING_KEYS.cardSort] ?? 'last_opened',
       showIgnored: (all[SETTING_KEYS.showIgnored] ?? '0') === '1',
@@ -135,6 +139,9 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
         const n = Number(v);
         return String(Number.isFinite(n) && n >= 1 ? Math.round(n) : 30);
       },
+      agent_repo_mode: (v) => (v === 'off' ? 'off' : 'on'),
+      agent_repo_snapshots: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
+      agent_repo_confirmed: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
       backup_keep_days: (v) => {
         // 0 = 沿用智能保留（最近 10 份 + 每周 1 份）；>0 = 按天清理过期快照
         const n = Number(v);

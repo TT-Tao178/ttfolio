@@ -214,6 +214,12 @@ export interface AgentSessionRow {
   started_at: string;
   ended_at: string | null;
   summary: string | null;
+  /** 0011：自动开启（空闲 15 分钟 / 跨自然日 / 退出时自动结束） */
+  auto: number;
+  /** 0011：摘要来源 auto | user | agent */
+  summary_source: string | null;
+  /** 0011：会话起点 git HEAD */
+  start_head: string | null;
 }
 
 /** 会话修改过的文件（首见/末见/次数即天然时间段；只记路径不快照内容）。 */
@@ -223,6 +229,9 @@ export interface AgentSessionFileRow {
   first_seen_at: string;
   last_seen_at: string;
   change_count: number;
+  /** 0011：可选快照层的内容寻址 sha（首/末） */
+  first_sha: string | null;
+  latest_sha: string | null;
 }
 
 /** 媒体索引（0006 迁移 / FR-13.5；w/h/duration 预留）。 */

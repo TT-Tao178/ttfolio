@@ -7,8 +7,8 @@ import {
   Input,
   Modal,
   Progress,
+  Segmented,
   Space,
-  Switch,
   Tabs,
   Tag,
   App,
@@ -210,15 +210,22 @@ export function ProjectPage({
                   </Descriptions.Item>
                   <Descriptions.Item label="路径">{p.dirPath}</Descriptions.Item>
                   <Descriptions.Item label="资源仓库" data-testid="repo-toggle-cell">
-                    <Switch
+                    <Segmented
                       size="small"
-                      checked={p.agentRepoEnabled}
-                      onChange={(v) => patch.mutate({ agentRepoEnabled: v })}
-                      data-testid="repo-toggle"
+                      value={p.agentRepoMode}
+                      onChange={(v) => patch.mutate({ agentRepoMode: v })}
+                      options={[
+                        { label: '跟随全局', value: 'follow' },
+                        { label: '强制开', value: 'on' },
+                        { label: '强制关', value: 'off' },
+                      ]}
+                      data-testid="repo-mode"
                     />
-                    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.65 }}>
-                      启用后项目页出现「仓库」页签（编辑会话沉淀，只记路径不复制内容）
-                    </span>
+                    <div style={{ marginTop: 4, fontSize: 12, opacity: 0.65 }}>
+                      当前{p.agentRepoEnabled ? '开启' : '关闭'}（全局默认：
+                      {p.globalRepoMode === 'on' ? '开' : '关'}）。开启后变更自动按会话沉淀，
+                      只记路径与时间；关闭时页签隐藏、历史保留
+                    </div>
                   </Descriptions.Item>
                 </Descriptions>
                 <div style={{ marginTop: 16 }}>

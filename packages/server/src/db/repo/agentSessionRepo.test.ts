@@ -11,10 +11,12 @@ import {
   getActiveSession,
   getAgentRepoEnabled,
   getAgentSession,
+  getProjectRepoMode,
   listAgentSessionFiles,
   listAgentSessions,
   patchAgentSession,
   recordSessionFileChange,
+  setAgentRepoMode,
   setAgentRepoEnabled,
   startAgentSession,
   stopAgentSession,
@@ -45,18 +47,25 @@ afterAll(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-describe('资源仓库开关（projects.agent_repo_enabled，默认关）', () => {
-  it('新项目默认关闭，可开启/关闭；关闭后数据保留', () => {
-    expect(getAgentRepoEnabled(db, pid)).toBe(false);
-    setAgentRepoEnabled(db, pid, true);
+describe('资源仓库开关三态（FR-13.3 v2：follow/on/off，默认跟随全局=开）', () => {
+  it('默认 follow（跟随全局 on → 开启）；强制开/关生效，恢复 follow 后回到全局值', () => {
+    expect(getProjectRepoMode(db, pid)).toBe('follow');
     expect(getAgentRepoEnabled(db, pid)).toBe(true);
-    setAgentRepoEnabled(db, pid, false);
+    setAgentRepoMode(db, pid, 'off');
     expect(getAgentRepoEnabled(db, pid)).toBe(false);
+    setAgentRepoMode(db, pid, 'on');
+    expect(getAgentRepoEnabled(db, pid)).toBe(true);
+    // 旧布尔入口映射为强制开/关
+    setAgentRepoEnabled(db, pid, false);
+    expect(getProjectRepoMode(db, pid)).toBe('off');
+    setAgentRepoMode(db, pid, null);
+    expect(getProjectRepoMode(db, pid)).toBe('follow');
+    expect(getAgentRepoEnabled(db, pid)).toBe(true);
   });
 });
 
 describe('会话生命周期与文件聚合', () => {
-  it('start → 记录文件变更（首见插入/再见累加）→ stop 写 ended_at；关仓时静默不记', () => {
+  it('start → 记录文件变更（首见插入/再见累加）→ stop 写 ended_at；关仓时不自动开场', () => {
     setAgentRepoEnabled(db, pid, true);
     const s = startAgentSession(db, pid, 'claude-code');
     expect(s.endedAt).toBeNull();
@@ -78,23 +87,26 @@ describe('会话生命周期与文件聚合', () => {
     // 幂等：重复结束不改动
     expect(stopAgentSession(db, s.id)?.endedAt).toBe(stopped?.endedAt);
 
-    // 会话结束后不再有「活动会话」→ 新变更静默跳过
+    // 关仓后：无活动会话时不再自动开场（静默不记）
+    setAgentRepoMode(db, pid, 'off');
     recordSessionFileChange(db, pid, 'src/c.ts', t2);
     expect(listAgentSessionFiles(db, s.id)).toHaveLength(2);
+    expect(getActiveSession(db, pid)).toBeNull();
   });
 
-  it('未开启仓库时 start 出的会话仍可记录（开关只管页签可见性），但无会话时不记', () => {
-    setAgentRepoEnabled(db, pid, false);
-    // 无活动会话：静默
+  it('开启记录且无会话时：首个变更自动开 auto 会话并记为文件（FR-13.3 v2）', () => {
+    setAgentRepoMode(db, pid, 'on');
+    // 上一条已结束、且处于 off 时不自动开；恢复 on 后自动开
     recordSessionFileChange(db, pid, 'x.ts', '2026-10-21T11:00:00.000Z');
-    expect(listAgentSessions(db, pid).every((s) => s.fileCount === 2)).toBe(true);
-
-    setAgentRepoEnabled(db, pid, true);
-    const s = startAgentSession(db, pid, null);
-    recordSessionFileChange(db, pid, 'x.ts', '2026-10-21T11:01:00.000Z');
-    expect(getActiveSession(db, pid)?.id).toBe(s.id);
-    expect(listAgentSessionFiles(db, s.id)).toHaveLength(1);
-    stopAgentSession(db, s.id);
+    const active = getActiveSession(db, pid);
+    expect(active).not.toBeNull();
+    expect(active?.auto).toBe(true);
+    expect(listAgentSessionFiles(db, active?.id ?? '')).toHaveLength(1);
+    // 已有活动会话：再次变更复用同一会话，不重复开
+    recordSessionFileChange(db, pid, 'y.ts', '2026-10-21T11:01:00.000Z');
+    expect(getActiveSession(db, pid)?.id).toBe(active?.id);
+    expect(listAgentSessionFiles(db, active?.id ?? '')).toHaveLength(2);
+    stopAgentSession(db, active?.id ?? '');
     expect(getActiveSession(db, pid)).toBeNull();
   });
 

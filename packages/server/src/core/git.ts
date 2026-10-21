@@ -255,6 +255,69 @@ export async function diff(dir: string, relPath: string, staged: boolean, ref?: 
   };
 }
 
+/** 当前 HEAD 完整 hash；无提交/非仓库返回 null（不抛错——摘要场景需诚实降级）。 */
+export async function headHash(dir: string): Promise<string | null> {
+  try {
+    const out = (await git(dir, ['rev-parse', 'HEAD'])).trim();
+    return out === '' ? null : out;
+  } catch {
+    return null;
+  }
+}
+
+/** 相对某基线的增删行合计（FR-13.3 v2 自动摘要用；失败返回 null）。 */
+export async function numstatSince(
+  dir: string,
+  ref: string,
+  paths: string[],
+): Promise<{ added: number; deleted: number; files: number } | null> {
+  try {
+    const out =
+      paths.length > 0
+        ? await git(dir, ['diff', '--numstat', '--no-color', ref, '--', ...paths])
+        : await git(dir, ['diff', '--numstat', '--no-color', ref]);
+    let added = 0;
+    let deleted = 0;
+    let files = 0;
+    for (const line of out.split('\n')) {
+      if (line.trim() === '') continue;
+      const parts = line.split('\t');
+      files++;
+      const a = Number(parts[0]);
+      const d = Number(parts[1]);
+      if (Number.isFinite(a)) added += a;
+      if (Number.isFinite(d)) deleted += d;
+    }
+    return { added, deleted, files };
+  } catch {
+    return null;
+  }
+}
+
+/** 时间段内的提交主题（FR-13.3 v2 自动摘要用；失败返回空数组）。 */
+export async function commitSubjectsBetween(
+  dir: string,
+  sinceIso: string,
+  untilIso: string,
+  limit = 10,
+): Promise<string[]> {
+  try {
+    const out = await git(dir, [
+      'log',
+      `--since=${sinceIso}`,
+      `--until=${untilIso}`,
+      `--max-count=${limit}`,
+      '--pretty=format:%h %s',
+    ]);
+    return out
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+  } catch {
+    return [];
+  }
+}
+
 export async function stage(dir: string, paths: string[] | null): Promise<void> {
   await assertGitAvailable();
   if (paths === null) {
