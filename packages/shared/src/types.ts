@@ -95,6 +95,8 @@ export interface ArchiveInfo {
   imageFiles: ArchiveEntryFile[];
   /** 文本类文件（第 26 轮）：md/txt/json 说明与源文件，只读文本预览 */
   textFiles: ArchiveEntryFile[];
+  /** 上次查看快照（FR-13.9 ③ / T-106c，迁移 0007）：变更提示据此给出文件增减明细；无记录为 null */
+  viewSnapshot?: { viewedAt: string; files: string[] } | null;
   sourceJsonFiles: string[];
 }
 

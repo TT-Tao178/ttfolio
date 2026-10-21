@@ -12,6 +12,8 @@ import {
   patchArchive,
   deleteArchive,
   setArchiveViewed,
+  setArchiveViewSnapshot,
+  getArchiveViewSnapshot,
   toArchiveInfo,
 } from '../db/repo/docsRepo.js';
 import { getProjectRow } from '../db/repo/projectsRepo.js';
@@ -39,8 +41,10 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
           const seen = a.last_seen_at;
           return hit !== undefined && seen !== null && hit.mtime > seen;
         })();
-      infos.push(
-        toArchiveInfo(
+      // 上次查看快照（FR-13.9 ③ / T-106c）：变更提示据此列文件增减
+      const snap = getArchiveViewSnapshot(db, a.id);
+      infos.push({
+        ...toArchiveInfo(
           a,
           meta.htmlFiles,
           meta.htmlFiles
@@ -50,7 +54,8 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
           meta.imageFiles,
           meta.textFiles,
         ),
-      );
+        viewSnapshot: snap === null ? null : { viewedAt: snap.viewedAt, files: snap.files },
+      });
     }
     return ok(infos);
   });
@@ -121,7 +126,21 @@ export const archivesRoutes: FastifyPluginAsync = async (app) => {
 
   app.post('/api/archives/:id/viewed', async (req) => {
     const { id } = req.params as { id: string };
-    setArchiveViewed(ctx.db(), id);
+    const db = ctx.db();
+    setArchiveViewed(db, id);
+    // 落「上次查看」清单快照（FR-13.9 ③ / T-106c）：变更提示据此给出增减明细。
+    // 图集目录不存在时如实跳过（此时没有可对照的现在清单）。
+    const pid = getArchiveProjectId(db, id);
+    const row = pid !== null ? listArchives(db, pid).find((a) => a.id === id) : undefined;
+    if (row !== undefined) {
+      const meta = computeArchiveMeta(row.dir_path, row.entry_source === 'manual' ? row.entry_rel : null);
+      setArchiveViewSnapshot(
+        db,
+        id,
+        meta.htmlFiles.map((f) => f.rel),
+        new Date().toISOString(),
+      );
+    }
     return ok({ done: true });
   });
 

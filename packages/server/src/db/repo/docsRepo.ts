@@ -226,6 +226,45 @@ export function setArchiveViewed(db: Database.Database, id: string): void {
   run(db, 'UPDATE archives SET last_viewed_at = ? WHERE id = ?', [new Date().toISOString(), id]);
 }
 
+/** 打开图集时落「上次查看」的 HTML 清单快照（FR-13.9 ③ / T-106c；迁移 0007）。 */
+export function setArchiveViewSnapshot(
+  db: Database.Database,
+  archiveId: string,
+  htmlRels: string[],
+  viewedAt: string,
+): void {
+  run(
+    db,
+    `INSERT INTO archive_view_snapshots (archive_id, viewed_at, html_files_json) VALUES (?, ?, ?)
+     ON CONFLICT(archive_id) DO UPDATE SET viewed_at = excluded.viewed_at, html_files_json = excluded.html_files_json`,
+    [archiveId, viewedAt, JSON.stringify(htmlRels)],
+  );
+}
+
+export interface ArchiveViewSnapshot {
+  viewedAt: string;
+  files: string[];
+}
+
+/** 读上次查看快照；无记录或 JSON 损坏返回 null（前端按「暂无快照」诚实降级）。 */
+export function getArchiveViewSnapshot(db: Database.Database, archiveId: string): ArchiveViewSnapshot | null {
+  const row = getOne<{ viewed_at: string; html_files_json: string }>(
+    db,
+    'SELECT viewed_at, html_files_json FROM archive_view_snapshots WHERE archive_id = ?',
+    [archiveId],
+  );
+  if (row === undefined) return null;
+  try {
+    const v: unknown = JSON.parse(row.html_files_json);
+    return {
+      viewedAt: row.viewed_at,
+      files: Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function toArchiveInfo(
   row: ArchiveRow,
   htmlFiles: ArchiveEntryFile[],

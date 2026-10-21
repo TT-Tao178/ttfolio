@@ -27,6 +27,7 @@ import {
   setSetting,
 } from './db/repo/metaRepo.js';
 import { pathKey } from './db/repo/docsRepo.js';
+import { setArchiveViewSnapshot, getArchiveViewSnapshot } from './db/repo/docsRepo.js';
 import { readTextFile, atomicWriteText, hashFile, movePath, measureTree } from './core/fsx.js';
 import { buildProjectIndex } from './core/search.js';
 import { queryContent, clearProjectIndex } from './core/search.js';
@@ -415,6 +416,35 @@ describe('回收站副本只读读取（FR-13.9 / T-106b）', () => {
     expect(() => svc.readEntryFile(db, did, '../x.txt')).toThrow(/越界/);
     expect(() => svc.readEntryFile(db, did, 'missing.txt')).toThrow(/不存在/);
     expect(() => svc.readEntryFile(db, 'nope', 'x.txt')).toThrow(/不存在/);
+  });
+});
+
+describe('架构图查看快照（FR-13.9 ③ / T-106c）', () => {
+  it('迁移 0007 就位；快照写读往返、坏 JSON 降级 null', () => {
+    expect(db.pragma('user_version', { simple: true })).toBe(7);
+    // 快照表外键指向 archives，须先插一条真实图集行
+    const dirA = path.join(root, 'snap-arch');
+    fs.mkdirSync(dirA, { recursive: true });
+    const p = insertProject(db, {
+      dirPath: dirA,
+      dirPathKey: pathKey(dirA),
+      diskName: 'snap-arch',
+      defaultArchDir: '架构图',
+    });
+    db.prepare(
+      'INSERT INTO archives (id, project_id, dir_path, dir_path_key, entry_source, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run('arch-x', p.id, dirA, pathKey(dirA), 'list', new Date().toISOString());
+
+    setArchiveViewSnapshot(db, 'arch-x', ['index.html', 'b.html'], '2026-10-21T00:00:00.000Z');
+    expect(getArchiveViewSnapshot(db, 'arch-x')).toEqual({
+      viewedAt: '2026-10-21T00:00:00.000Z',
+      files: ['index.html', 'b.html'],
+    });
+    db.prepare(
+      "UPDATE archive_view_snapshots SET html_files_json = '{bad' WHERE archive_id = 'arch-x'",
+    ).run();
+    expect(getArchiveViewSnapshot(db, 'arch-x')).toBeNull();
+    expect(getArchiveViewSnapshot(db, 'arch-none')).toBeNull();
   });
 });
 

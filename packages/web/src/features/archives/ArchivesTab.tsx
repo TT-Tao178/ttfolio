@@ -19,6 +19,7 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { StateView } from '@/components/StateView';
 import { PaneSplit } from '@/components/PaneSplit';
 import { SEMANTIC } from '@/theme/tokens';
+import { capList, computeViewDiff } from './viewDiff';
 
 interface ArchFile {
   rel: string;
@@ -216,6 +217,43 @@ export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Ele
           showIcon
           message="架构图已更新（文件数或入口内容有变化）"
           style={{ padding: '4px 12px' }}
+          description={(() => {
+            // FR-13.9 ③：变更提示附「上次查看 → 现在」的文件增减明细
+            const vd = computeViewDiff(current);
+            if (!vd.hasSnapshot) {
+              return (
+                <span style={{ fontSize: 12 }}>
+                  暂无上次查看快照——本次打开后将记录当前清单，下次变更即可看到增减明细。
+                </span>
+              );
+            }
+            const add = capList(vd.added, 8);
+            const rem = capList(vd.removed, 8);
+            if (vd.added.length === 0 && vd.removed.length === 0) {
+              return (
+                <span style={{ fontSize: 12 }}>
+                  文件清单无增减（入口内容或体积有变化）· 上次查看 {relTime(vd.viewedAt)}
+                </span>
+              );
+            }
+            return (
+              <div style={{ fontSize: 12 }} data-testid="arch-view-diff">
+                {vd.added.length > 0 && (
+                  <div>
+                    新增 {vd.added.length} 个：{add.shown.join('、')}
+                    {add.rest > 0 ? ` 等（还有 ${add.rest} 个）` : ''}
+                  </div>
+                )}
+                {vd.removed.length > 0 && (
+                  <div>
+                    移除 {vd.removed.length} 个：{rem.shown.join('、')}
+                    {rem.rest > 0 ? ` 等（还有 ${rem.rest} 个）` : ''}
+                  </div>
+                )}
+                <div style={{ opacity: 0.6 }}>对照快照：上次查看 {relTime(vd.viewedAt)}</div>
+              </div>
+            );
+          })()}
         />
       )}
       <div style={{ fontSize: 12, opacity: 0.75 }}>
