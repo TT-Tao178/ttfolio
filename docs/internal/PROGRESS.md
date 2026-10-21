@@ -1,5 +1,36 @@
 # PROGRESS
 
+## 第 49 轮：T-113 缩略图管线 v2（清晰度与缓存，用户点名单条实施，未出包）
+
+> 批前基线：另一会话已在本仓库提交 T-114（3915f75 媒体网格自动滚动）并更新
+> 任务总表/设计文档 v2 修订；本轮在其之上实现 T-113，三个提交（服务端 /
+> web / Electron），每提交门禁三绿。
+
+- **服务端（a36a15d）**：新 core/thumbs.ts——两级命名
+  `<sha1(relPath)>@g.webp`（640）/`@p.webp`（1920）、旧版 .png 白名单兼容、
+  原子落盘、webp 魔数、按项目统计、2GB 配额按 mtime LRU、移除级联清理、
+  启动收敛；routes/media.ts 增 GET thumb-index、POST /thumb/:tier
+  （image/webp 原始字节，tier/魔数/体积校验，每 25 次写查一次配额）、
+  GET /api/thumbs/stats；app.ts 注册 image/webp buffer 解析器；
+  userContent /thumbs 改 ETag（mtime+size）+ If-None-Match 304 + private
+  immutable（前端 URL 带源文件 mtime 作版本，避免旧图钉缓存）；项目移除
+  级联删缩略图。项目目录零写入不变。
+- **web（a0921ae）**：thumbNameOf 两级 + missingItems 纯函数；thumbGen
+  （Electron 原生解码优先 / Web 解码兜底；视频取帧 8s→3s；canvas WebP
+  q82/q85 二进制直传）；useThumbQueue v2（索引先行命中即出图、可视区+
+  overscan 优先生成、滚动增量补、失败 5 分钟 TTL、p 档按需）；MediaTab
+  传 dirPath/可视集合，网格 URL 带 mtime；Lightbox 先出 p 档并可切原图；
+  useThumbBackfill 挂 App（analyzed 后补建 ≤200/并发 2、状态栏进度可取消）。
+  **自查时序坑**：名称（sha1）异步晚于索引到达时命中项不转 ready——索引
+  effect 依赖补 names 后修复（否则已缓存条目会永远转圈）。
+- **Electron（2f8c924）**：nativeImage 解码 IPC（绝对路径 + 扩展名白名单 +
+  ≤80MB + 最长边 64~4096，g 用 PNG/p 用 JPEG(88) 返回 dataURL，异常 null 由
+  渲染层兜底）；preload 暴露 thumbDecode。**写码坑**：heredoc 里的 NUL 转义写法被二次转义成真 NUL 字节落盘（Read/静态扫描均判为 binary），改用 Unicode 转义字面量后恢复文本。
+- **验收锚点**：thumbs.test 5 条（命名/魔数/落盘索引级联/统计/配额 LRU）、
+  media.test 3 条（索引-两级上传-项目目录零写入/非法输入 400/404）、
+  mediaHelpers.test 增缺口计划 2 条；门禁 174 条全绿、构建通过。缓存命中
+  时延与原生解码清晰度需安装版手测（Web 模式无原生桥）。
+
 ## 第 48 轮：T-103 个人主页（本地单人身份卡，用户点名单条实施，未出包）
 
 > 用户手测 0.3.10 前点名实现 T-103。设计文档先收编 FR-13.7（4.13 节），
