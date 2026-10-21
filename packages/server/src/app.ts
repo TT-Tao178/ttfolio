@@ -22,6 +22,7 @@ import { archivesRoutes } from './routes/archives.js';
 import { searchRoutes } from './routes/search.js';
 import { miscRoutes } from './routes/misc.js';
 import { contractRoutes } from './routes/contract.js';
+import { agentRoutes } from './routes/agent.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -159,6 +160,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   app.register(searchRoutes);
   app.register(miscRoutes);
   app.register(contractRoutes);
+  app.register(agentRoutes);
 
   // 静态托管 web/dist（token 注入 index.html）
   app.get('/', async (_req, reply) => {

@@ -1,6 +1,7 @@
 /** Agent 交接（FR-12.1）：上下文契约导出 + 上下文包。 */
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
+import type Database from 'better-sqlite3';
 import type { AppContext } from '../context.js';
 import { ok, fail } from './helpers.js';
 import { getProjectSummary } from '../db/repo/projectsRepo.js';
@@ -11,44 +12,49 @@ import * as fsx from '../core/fsx.js';
 import { logActivity } from '../db/repo/metaRepo.js';
 import { currentActor } from '../core/actor.js';
 
+/** 构建上下文包纯文本（FR-12.1 / FR-13.1 共用）；项目不存在返回 null。 */
+export function buildContextPacket(db: Database.Database, id: string): string | null {
+  const p = getProjectSummary(db, id);
+  if (p === null) return null;
+  const mounts = listMounts(db, id);
+  const archives = listArchives(db, id).map((a) => toArchiveInfo(a, [], [], false));
+  const todos = listTodos(db, { projectId: id, includeDone: false });
+  const lines = [
+    `# 项目上下文包`,
+    ``,
+    `- 项目名：${p.alias ?? p.diskName}${p.alias !== null ? `（磁盘目录：${p.diskName}）` : ''}`,
+    `- 路径：${p.dirPath}`,
+    `- 类型：${p.type}`,
+    `- 主语言：${p.primaryLanguage ?? '未分析'}`,
+    `- 语言占比：${
+      p.languages
+        .slice(0, 5)
+        .map((l) => `${l.language} ${l.percent}%`)
+        .join(' / ') || '未分析'
+    }`,
+    `- 技术栈：${p.techStack.join('、') || '—'}`,
+    `- Git：${p.gitIsRepo ? `分支 ${p.gitBranch ?? '?'}${p.gitDirty ? '（有未提交改动）' : '（干净）'}` : '非 git 仓库'}`,
+    `- 文档挂载：${mounts.length === 0 ? '无' : ''}`,
+    ...mounts.map(
+      (m) => `  - [${m.source === 'manual' ? '手动' : '自动'}] ${m.path}${m.existsOk ? '' : '（路径失效）'}`,
+    ),
+    `- 架构图：${archives.length === 0 ? '未登记' : archives.map((a) => a.dirPath).join('、')}`,
+    `- 未完成清单：${todos.length === 0 ? '无' : ''}`,
+    ...todos
+      .slice(0, 20)
+      .map((t) => `  - [${t.done ? 'x' : ' '}] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`),
+  ];
+  return lines.join('\n');
+}
+
 export const contractRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
 
   app.get('/api/projects/:id/context-packet', async (req) => {
     const { id } = req.params as { id: string };
-    const db = ctx.db();
-    const p = getProjectSummary(db, id);
-    if (p === null) return fail('NOT_FOUND', '项目不存在', 404);
-    const mounts = listMounts(db, id);
-    const archives = listArchives(db, id).map((a) => toArchiveInfo(a, [], [], false));
-    const todos = listTodos(db, { projectId: id, includeDone: false });
-    const lines = [
-      `# 项目上下文包`,
-      ``,
-      `- 项目名：${p.alias ?? p.diskName}${p.alias !== null ? `（磁盘目录：${p.diskName}）` : ''}`,
-      `- 路径：${p.dirPath}`,
-      `- 类型：${p.type}`,
-      `- 主语言：${p.primaryLanguage ?? '未分析'}`,
-      `- 语言占比：${
-        p.languages
-          .slice(0, 5)
-          .map((l) => `${l.language} ${l.percent}%`)
-          .join(' / ') || '未分析'
-      }`,
-      `- 技术栈：${p.techStack.join('、') || '—'}`,
-      `- Git：${p.gitIsRepo ? `分支 ${p.gitBranch ?? '?'}${p.gitDirty ? '（有未提交改动）' : '（干净）'}` : '非 git 仓库'}`,
-      `- 文档挂载：${mounts.length === 0 ? '无' : ''}`,
-      ...mounts.map(
-        (m) =>
-          `  - [${m.source === 'manual' ? '手动' : '自动'}] ${m.path}${m.existsOk ? '' : '（路径失效）'}`,
-      ),
-      `- 架构图：${archives.length === 0 ? '未登记' : archives.map((a) => a.dirPath).join('、')}`,
-      `- 未完成清单：${todos.length === 0 ? '无' : ''}`,
-      ...todos
-        .slice(0, 20)
-        .map((t) => `  - [${t.done ? 'x' : ' '}] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`),
-    ];
-    return ok(lines.join('\n'));
+    const packet = buildContextPacket(ctx.db(), id);
+    if (packet === null) return fail('NOT_FOUND', '项目不存在', 404);
+    return ok(packet);
   });
 
   app.post('/api/projects/:id/context-contract', async (req) => {

@@ -157,6 +157,12 @@ async function main(): Promise<void> {
     token,
     version,
     startedAt: new Date().toISOString(),
+    // Agent 发现段（FR-13.1 / T-095）：外部 agent 只凭本文件即可找到服务并列出项目
+    agent: {
+      protocolVersion: 1,
+      apiBase: `http://127.0.0.1:${port}`,
+      manifest: '/api/agent/manifest',
+    },
   });
 
   // ---- 路径失效检测（启动一次） ----

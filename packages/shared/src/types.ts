@@ -319,6 +319,29 @@ export interface HealthInfo {
   logDir: string;
 }
 
+/** Agent 发现清单（FR-13.1，T-095） */
+export interface AgentManifestProject {
+  id: string;
+  /** 别名优先；无别名用磁盘目录名 */
+  name: string;
+  alias: string | null;
+  diskName: string;
+  dirPath: string;
+  tags: string[];
+  /** 集合名（非 id，外部可直接阅读） */
+  collections: string[];
+}
+
+export interface AgentManifest {
+  service: 'ttFolio';
+  version: string;
+  protocolVersion: number;
+  apiBase: string;
+  /** 能力名 → 端点模板（{id}/{path} 占位） */
+  capabilities: Record<string, string>;
+  projects: AgentManifestProject[];
+}
+
 /** 忽略规则 */
 export interface IgnoreRule {
   id: string;
