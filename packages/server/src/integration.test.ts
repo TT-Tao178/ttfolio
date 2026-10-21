@@ -429,3 +429,21 @@ describe('错误码（ERR-1）', () => {
     expect(e.httpStatus).toBe(400);
   });
 });
+
+describe('Git 基线 ref diff（FR-13.2 动态页签的「与基线对照」锚点）', () => {
+  it('diff 指定 ref 时返回「基线 → 工作区」的单文件差异', async () => {
+    git(projDir, ['add', '.']);
+    git(projDir, ['commit', '-q', '-m', 'baseline for ref diff', '--allow-empty']);
+    const baseline = git(projDir, ['rev-parse', 'HEAD']).trim();
+    // 工作区相对基线多一行
+    fs.writeFileSync(path.join(projDir, 'diff-probe.txt'), 'line1\nline2\nline3\n');
+    const changed = await diff(projDir, 'diff-probe.txt', false, baseline);
+    expect(changed.additions).toBe(1);
+    expect(changed.patch).toContain('+line3');
+    // 工作区回到基线内容 → 无差异
+    fs.writeFileSync(path.join(projDir, 'diff-probe.txt'), 'line1\nline2\n');
+    const reverted = await diff(projDir, 'diff-probe.txt', false, baseline);
+    expect(reverted.additions).toBe(0);
+    expect(reverted.deletions).toBe(0);
+  });
+});
