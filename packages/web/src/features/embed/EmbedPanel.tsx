@@ -72,7 +72,7 @@ export function EmbedPanel(): React.JSX.Element {
           audio: false,
           video: {
             // Electron 桌面捕获的 legacy 约束（只读使用，不请求音频）
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
             mandatory: {
               chromeMediaSource: 'desktop',
               chromeMediaSourceId: selected,

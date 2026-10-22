@@ -58,7 +58,6 @@ export function OfficePreview({
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, path, mountId, loader]);
 
   if (loading) return <Spin style={{ margin: '48px auto', display: 'block' }} tip="正在加载文档…" />;
