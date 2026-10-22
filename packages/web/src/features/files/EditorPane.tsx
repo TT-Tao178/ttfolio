@@ -351,6 +351,8 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
               borderRadius: 4,
               background: SEMANTIC.warning,
               display: 'inline-block',
+              // flex 子项会被长路径挤压到 0 宽（e2e 解冻轮实测：未保存圆点完全不可见）
+              flexShrink: 0,
             }}
           />
         )}
