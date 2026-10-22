@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gotoWorkbench } from './helpers';
 
 const FIXTURE = path.resolve(process.cwd(), '.tmp-test', 'e2e-fixture-c');
 const FILE = 'draft.txt';
@@ -19,7 +20,7 @@ test.afterAll(() => {
 });
 
 test('编辑未保存 → 草稿落库 → 刷新页面后草稿仍在', async ({ page }) => {
-  await page.goto('/');
+  await gotoWorkbench(page);
   await page.locator('[data-testid="add-project-btn"]').click();
   await page.locator('[data-testid="paste-paths"]').fill(FIXTURE);
   await page.locator('[data-testid="paste-add-btn"]').click();
@@ -28,18 +29,20 @@ test('编辑未保存 → 草稿落库 → 刷新页面后草稿仍在', async (
   await card.click();
   await expect(page.locator('[data-testid="project-subtab"]')).toHaveAttribute('data-active', 'files');
 
-  // 打开文件，编辑（不保存）→ 草稿 1s 防抖落库
+  // 打开文件，进入编辑态，编辑（不保存）→ 草稿 1s 防抖落库
   await page.locator('[data-testid="file-tree"] .ant-tree-title', { hasText: FILE }).first().click();
   await expect(page.locator('[data-testid="editor-pane"]')).toBeVisible();
+  await page.locator('[data-testid="edit-btn"]').click();
   await page.locator('[data-testid="editor-pane"] .cm-content').click();
   await page.keyboard.press('Control+a');
   await page.keyboard.type('这是未保存的草稿内容 DRAFT-99');
   await expect(page.locator('[data-testid="dirty-dot"]')).toBeVisible();
   await page.waitForTimeout(2000); // 等草稿防抖写入
 
-  // 刷新页面（模拟崩溃/重启后回到页面）
+  // 刷新页面（模拟崩溃/重启后回到页面）；会话恢复后活动标签未必是总览，先回工作台
   await page.reload();
   await page.waitForTimeout(2500);
+  await gotoWorkbench(page);
   await page.locator('[data-testid="project-card"]', { hasText: 'e2e-fixture-c' }).first().click();
   await page.locator('[data-testid="file-tree"] .ant-tree-title', { hasText: FILE }).first().click();
   await expect(page.locator('[data-testid="editor-pane"]')).toBeVisible({ timeout: 10000 });
@@ -47,8 +50,7 @@ test('编辑未保存 → 草稿落库 → 刷新页面后草稿仍在', async (
 });
 
 test('会话恢复：标签集合在页面重载后还原', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForTimeout(1500);
+  await gotoWorkbench(page);
   const card = page.locator('[data-testid="project-card"]', { hasText: 'e2e-fixture-c' }).first();
   await card.click();
   await page.waitForTimeout(1800); // 等会话防抖保存

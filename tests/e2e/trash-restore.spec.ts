@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gotoWorkbench } from './helpers';
 
 const FIXTURE = path.resolve(process.cwd(), '.tmp-test', 'e2e-fixture-b');
 const TARGET = 'doomed.txt';
@@ -19,7 +20,7 @@ test.afterAll(() => {
 });
 
 test('删除进回收站 → 恢复到原路径 → 内容一致', async ({ page }) => {
-  await page.goto('/');
+  await gotoWorkbench(page);
   await page.locator('[data-testid="add-project-btn"]').click();
   await page.locator('[data-testid="paste-paths"]').fill(FIXTURE);
   await page.locator('[data-testid="paste-add-btn"]').click();

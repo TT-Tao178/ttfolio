@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { gotoWorkbench } from './helpers';
 
 const FIXTURE = path.resolve(process.cwd(), '.tmp-test', 'e2e-fixture-a');
 
@@ -29,7 +30,7 @@ test.afterAll(() => {
 
 test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', async ({ page }) => {
   // 1) 粘贴路径登记
-  await page.goto('/');
+  await gotoWorkbench(page);
   await page.locator('[data-testid="add-project-btn"]').click();
   await expect(page.locator('[data-testid="paste-paths"]')).toBeVisible({ timeout: 10000 });
   await page.locator('[data-testid="paste-paths"]').fill(FIXTURE);
@@ -48,6 +49,8 @@ test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', asyn
   // 4) 打开 notes.md → 编辑器出现
   await page.locator('[data-testid="file-tree"] .ant-tree-title', { hasText: 'notes.md' }).first().click();
   await expect(page.locator('[data-testid="editor-pane"]')).toBeVisible({ timeout: 10000 });
+  // 编辑器默认只读（FR-4.3，T-028）：先进编辑态
+  await page.locator('[data-testid="edit-btn"]').click();
 
   // 5) 编辑 + Ctrl+S 保存（未保存圆点出现再消失）
   await page.locator('[data-testid="editor-pane"] .cm-content').click();
@@ -58,7 +61,8 @@ test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', asyn
   expect(fs.readFileSync(path.join(FIXTURE, 'notes.md'), 'utf8')).toContain('新增行 by e2e');
 
   // 6) Git 页签：只有 notes.md 未暂存 → 暂存 → 提交
-  await page.keyboard.press('3'); // 快捷键 3 = Git 页签
+  // 页签改点选：编辑器聚焦时数字快捷键会被全局键处理器跳过
+  await page.locator('[data-testid="project-tabs"] .ant-tabs-tab', { hasText: 'Git' }).click();
   await page.waitForTimeout(800);
   await page.locator('[data-testid="commit-message"]').fill('feat: e2e 提交（只包含暂存文件）');
   // 暂存 notes.md
