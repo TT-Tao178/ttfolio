@@ -61,6 +61,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/api/projects', async (req) => {
     const q = req.query as Record<string, string | undefined>;
+    // stale 天数放宽为 1..3650（FR-4.11 自定义视图需要任意 N；原硬编码只认 '30'）
+    const staleN = q.stale === undefined || q.stale === '' ? NaN : Number(q.stale);
     const filters: ListFilters = {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
       type: q.type as ListFilters['type'],
@@ -76,7 +78,10 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       hasArch: q.hasArch === '1' ? true : q.hasArch === '0' ? false : undefined,
       pathOk: q.pathOk === '0' ? false : undefined,
       analyzed: q.analyzed === '0' ? false : undefined,
-      staleDays: q.stale === '30' ? 30 : undefined,
+      staleDays: Number.isInteger(staleN) && staleN >= 1 && staleN <= 3650 ? staleN : undefined,
+      lang: q.lang,
+      stack: q.stack,
+      git: q.git === 'dirty' || q.git === 'clean' || q.git === 'nogit' ? q.git : undefined,
       q: q.q,
       sort: q.sort as ListFilters['sort'],
     };

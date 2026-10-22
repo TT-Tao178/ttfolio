@@ -656,6 +656,44 @@ describe('失效项目：检测 → 重新定位 → 移除登记', () => {
   });
 });
 
+describe('listProjects 自定义视图过滤参数（FR-4.11，第 62 轮）', () => {
+  it('lang 等值 / stack 子串 / git 三态 / stale 任意天数', () => {
+    // 独立夹具目录（projDir 已被首个用例登记，且分析器可能已写入语言/技术栈）
+    const dirV = path.join(root, '视图夹具项目');
+    fs.mkdirSync(dirV, { recursive: true });
+    const id = insertProject(db, {
+      dirPath: dirV,
+      dirPathKey: pathKey(dirV),
+      diskName: '视图夹具项目',
+      defaultArchDir: '架构图',
+    }).id;
+    const setCols = db.prepare(
+      "UPDATE projects SET primary_language = ?, tech_stack = ?, git_is_repo = ?, git_dirty = ?, last_opened_at = datetime('now', ?) WHERE id = ?",
+    );
+    setCols.run('TypeScript', '["React","Vite"]', 1, 1, '-40 days', id);
+
+    expect(listProjects(db, { status: 'all', lang: 'typescript' }).some((p) => p.id === id)).toBe(true);
+    expect(listProjects(db, { status: 'all', lang: 'python' }).some((p) => p.id === id)).toBe(false);
+    expect(listProjects(db, { status: 'all', stack: 'react' }).some((p) => p.id === id)).toBe(true);
+    expect(listProjects(db, { status: 'all', stack: 'vue' }).some((p) => p.id === id)).toBe(false);
+
+    // 40 天没打开：stale=30 命中、stale=60 不命中（天数参数化，原硬编码只认 30）
+    expect(listProjects(db, { status: 'all', staleDays: 30 }).some((p) => p.id === id)).toBe(true);
+    expect(listProjects(db, { status: 'all', staleDays: 60 }).some((p) => p.id === id)).toBe(false);
+
+    // git 三态
+    expect(listProjects(db, { status: 'all', git: 'dirty' }).some((p) => p.id === id)).toBe(true);
+    expect(listProjects(db, { status: 'all', git: 'clean' }).some((p) => p.id === id)).toBe(false);
+    db.prepare('UPDATE projects SET git_dirty = 0 WHERE id = ?').run(id);
+    expect(listProjects(db, { status: 'all', git: 'clean' }).some((p) => p.id === id)).toBe(true);
+    expect(listProjects(db, { status: 'all', git: 'dirty' }).some((p) => p.id === id)).toBe(false);
+    db.prepare('UPDATE projects SET git_is_repo = 0 WHERE id = ?').run(id);
+    expect(listProjects(db, { status: 'all', git: 'nogit' }).some((p) => p.id === id)).toBe(true);
+    softDeleteProject(db, id);
+    fs.rmSync(dirV, { recursive: true, force: true });
+  });
+});
+
 describe('会话恢复：活动标签（FR-1.4）', () => {
   it('PUT 的 activeTabId 被记住，GET 原样返回（不再恒等于第一个标签）', () => {
     const tabs = [

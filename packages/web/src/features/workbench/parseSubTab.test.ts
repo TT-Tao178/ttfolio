@@ -38,6 +38,25 @@ describe('parseSubTab', () => {
     expect(parseSubTab('{"status":"archived","q":"demo"}')).toEqual({ status: 'archived', q: 'demo' });
   });
 
+  it('view:custom:<id> 查自定义视图表得 filters（第 62 轮 KNOWN-GAPS #5）', () => {
+    const views: Array<{ id: string; filters: Record<string, string> }> = [
+      { id: 'view01', filters: { status: 'active', type: 'frontend', stale: '14' } },
+      { id: 'view02', filters: { status: 'archived' } },
+    ];
+    expect(parseSubTab('view:custom:view01', views)).toEqual({
+      status: 'active',
+      type: 'frontend',
+      stale: '14',
+    });
+    // filters 自带 status（如已归档视图）覆盖默认值
+    expect(parseSubTab('view:custom:view02', views)).toEqual({ status: 'archived' });
+  });
+
+  it('view:custom:<id>：无表 / id 不存在 → 回落 active（视图删除后旧标签不炸）', () => {
+    expect(parseSubTab('view:custom:gone')).toEqual({ status: 'active' });
+    expect(parseSubTab('view:custom:gone', [])).toEqual({ status: 'active' });
+  });
+
   it('非法 JSON 回落默认', () => {
     expect(parseSubTab('{broken')).toEqual({ status: 'active' });
   });

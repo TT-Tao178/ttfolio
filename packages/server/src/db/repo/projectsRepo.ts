@@ -24,6 +24,12 @@ export interface ListFilters {
   pathOk?: boolean;
   analyzed?: boolean;
   staleDays?: number;
+  /** 主语言等值过滤（FR-4.11 自定义视图）：lower(primary_language) = lower(?) */
+  lang?: string;
+  /** 技术栈子串过滤：tech_stack 为 JSON 数组列，LIKE 即子串命中 */
+  stack?: string;
+  /** Git 状态过滤：dirty=有未提交改动 / clean=仓库干净 / nogit=非 Git 仓库 */
+  git?: 'dirty' | 'clean' | 'nogit';
 }
 
 function mapSummary(
@@ -188,8 +194,23 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
     else where.push('analyzed_at IS NULL');
   }
   if (filters.staleDays !== undefined) {
-    where.push('(last_opened_at IS NULL OR last_opened_at < datetime("now", ?))');
+    // 修复（第 62 轮测试抓到的真实缺陷）：better-sqlite3 12.x 关闭了双引号字符串
+    //（DQS=0），datetime("now") 会报 no such column——必须用单引号字面量
+    where.push("(last_opened_at IS NULL OR last_opened_at < datetime('now', ?))");
     params.push(`-${filters.staleDays} days`);
+  }
+  if (filters.lang !== undefined && filters.lang !== '') {
+    where.push('lower(primary_language) = ?');
+    params.push(filters.lang.toLowerCase());
+  }
+  if (filters.stack !== undefined && filters.stack !== '') {
+    where.push('lower(tech_stack) LIKE ?');
+    params.push(`%${filters.stack.toLowerCase()}%`);
+  }
+  if (filters.git !== undefined) {
+    if (filters.git === 'dirty') where.push('(git_is_repo = 1 AND git_dirty = 1)');
+    else if (filters.git === 'clean') where.push('(git_is_repo = 1 AND git_dirty = 0)');
+    else where.push('git_is_repo = 0');
   }
   if (filters.q !== undefined && filters.q !== '') {
     const like = `%${filters.q.toLowerCase()}%`;

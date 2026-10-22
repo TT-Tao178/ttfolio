@@ -31,6 +31,7 @@ import {
 } from '@/theme/tokens';
 import { api, ApiClientError } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CustomView } from '@ttfolio/shared';
 
 export interface SettingsShape {
   theme: ThemeMode;
@@ -71,6 +72,8 @@ export interface SettingsShape {
     embedWidth?: number;
     embedSource?: string;
   };
+  /** 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5） */
+  customViews: CustomView[];
 }
 
 export const DEFAULT_SETTINGS: SettingsShape = {
@@ -94,6 +97,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   syntaxScheme: 'classic',
   scanRootDirs: [],
   uiLayout: {},
+  customViews: [],
 };
 
 /**
@@ -122,6 +126,7 @@ const SERVER_KEY: Record<string, string> = {
   syntaxScheme: 'syntax_scheme',
   scanRootDirs: 'scan_root_dirs_json',
   uiLayout: 'ui_layout_json',
+  customViews: 'custom_views_json',
 };
 
 export type SettingKey = keyof SettingsShape;

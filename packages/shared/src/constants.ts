@@ -62,6 +62,8 @@ export const SETTING_KEYS = {
   uiLayout: 'ui_layout_json',
   // GitHub 访问令牌（仓库当前为私有，查 Releases 需要能读该仓库的 Token；只写不读回显）
   githubToken: 'github_token',
+  // 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5）：CustomView[] JSON
+  customViews: 'custom_views_json',
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];

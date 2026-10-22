@@ -3,7 +3,7 @@
  * 新增用户可见操作：先登记为命令，再在面板/快捷键里引用，禁止各处各写一份。
  * 预留插件命令贡献点（T-101 插件声明 commands 即自动入表）。 */
 import type { ReactNode } from 'react';
-import type { CommandTemplate } from '@ttfolio/shared';
+import type { CommandTemplate, CustomView } from '@ttfolio/shared';
 import type { useAppStore } from '@/app/store';
 import type { SettingKey, SettingsShape } from '@/app/settings';
 
@@ -324,9 +324,30 @@ export function templateCommands(templates: CommandTemplate[], hasProject: boole
     }));
 }
 
-/** 全部命令（内置 + 插件贡献 + 模板）。 */
-export function allCommands(templates: CommandTemplate[], hasProject: boolean): CommandDef[] {
-  return [...BUILTIN_COMMANDS, ...pluginCommandContributions, ...templateCommands(templates, hasProject)];
+/** 全部命令（内置 + 插件贡献 + 模板 + 自定义视图，FR-4.11）。 */
+export function allCommands(
+  templates: CommandTemplate[],
+  hasProject: boolean,
+  customViews: CustomView[] = [],
+): CommandDef[] {
+  return [
+    ...BUILTIN_COMMANDS,
+    ...pluginCommandContributions,
+    ...templateCommands(templates, hasProject),
+    ...customViewCommands(customViews),
+  ];
+}
+
+/** 自定义「我的视图」→ 打开命令（FR-4.11 / KNOWN-GAPS #5）：每视图一条。 */
+export function customViewCommands(views: CustomView[]): CommandDef[] {
+  return views.map((v) => ({
+    id: `view.custom.${v.id}`,
+    title: `打开视图：${v.name}`,
+    category: '视图' as const,
+    run: (ctx: CommandContext) => {
+      openStoreTab(ctx.store, 'overview', v.name, `view:custom:${v.id}`);
+    },
+  }));
 }
 
 // ---------------- 模糊匹配 ----------------

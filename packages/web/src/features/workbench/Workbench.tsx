@@ -72,7 +72,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const pinnedOnly = subTab === 'view:pinned';
-  const filters = parseSubTab(subTab);
+  const filters = parseSubTab(subTab, settings.customViews);
   // 集合视图标识：传给「添加项目」弹窗，登记成功后项目随即加入该集合（0.3.5 修复）
   const collectionId = filters['collection'] ?? null;
   const {

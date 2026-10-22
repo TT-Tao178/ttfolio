@@ -96,6 +96,54 @@ export const agentSessionPatchSchema = z.object({
   title: z.string().trim().max(200).nullish(),
   summary: z.string().max(8000).nullish(),
 });
+
+// ---------- 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5） ----------
+/** 视图 filters 允许的键（与服务端 /api/projects 过滤参数一一对应）。 */
+export const CUSTOM_VIEW_FILTER_KEYS = [
+  'status',
+  'type',
+  'lang',
+  'stack',
+  'collection',
+  'tag',
+  'git',
+  'dirty',
+  'hasDocs',
+  'hasArch',
+  'analyzed',
+  'pathOk',
+  'stale',
+] as const;
+
+const customViewFiltersSchema = z
+  .record(z.string(), z.string().max(200))
+  .refine(
+    (r) =>
+      Object.keys(r).length <= 12 &&
+      Object.keys(r).every((k) => (CUSTOM_VIEW_FILTER_KEYS as readonly string[]).includes(k)),
+    '包含不支持的筛选键或超出数量上限',
+  )
+  .refine(
+    (r) => r['status'] === undefined || ['active', 'archived', 'all'].includes(r['status']),
+    'status 取值不合法',
+  )
+  .refine((r) => r['git'] === undefined || ['dirty', 'clean', 'nogit'].includes(r['git']), 'git 取值不合法')
+  .refine(
+    (r) =>
+      r['stale'] === undefined ||
+      (/^\d{1,4}$/.test(r['stale']) && Number(r['stale']) >= 1 && Number(r['stale']) <= 3650),
+    'stale 必须是 1..3650 的天数',
+  );
+
+export const customViewSchema = z.object({
+  // 前端 ulidLike() 生成（含连字符）；仅作标识字符串比较，无注入面
+  id: z.string().regex(/^[A-Za-z0-9-]{10,40}$/),
+  name: z.string().trim().min(1).max(50),
+  filters: customViewFiltersSchema,
+  createdAt: z.string().min(1).max(40),
+});
+export const customViewsSchema = z.array(customViewSchema).max(30);
+
 export const agentSessionSummarySchema = z.object({
   summary: z.string().trim().min(1).max(8000),
 });

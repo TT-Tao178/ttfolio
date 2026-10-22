@@ -100,10 +100,10 @@ export function CommandPalette(): React.JSX.Element {
 
   const commands = useMemo(() => {
     const hasProject = activeProjectId !== null;
-    const list = allCommands(templates ?? [], hasProject);
+    const list = allCommands(templates ?? [], hasProject, settings.customViews);
     const mru = readMru();
     return sortByMru(filterCommands(list, mode === 'command' ? qEff : ''), mru);
-  }, [templates, activeProjectId, qEff, mode]);
+  }, [templates, activeProjectId, qEff, mode, settings.customViews]);
 
   const runCommand = (cmd: CommandDef, values: { projectIds?: string[] } = {}): void => {
     if (cmd.needsProject && activeProjectId === null) {
@@ -152,8 +152,8 @@ export function CommandPalette(): React.JSX.Element {
     disabled?: boolean;
   }
   const searchModeCommands = useMemo(
-    () => filterCommands(allCommands(templates ?? [], activeProjectId !== null), q),
-    [templates, activeProjectId, q],
+    () => filterCommands(allCommands(templates ?? [], activeProjectId !== null, settings.customViews), q),
+    [templates, activeProjectId, q, settings.customViews],
   );
   const rows: Row[] =
     mode === 'command'

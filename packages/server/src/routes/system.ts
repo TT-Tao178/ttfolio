@@ -27,6 +27,8 @@ import {
   semverNewer,
   isSyntaxScheme,
   DEFAULT_SYNTAX_SCHEME,
+  customViewsSchema,
+  type CustomView,
 } from '@ttfolio/shared';
 import { statSafe, existsSync, readFileSync } from '../core/fsx.js';
 import { runCommand } from '../core/exec.js';
@@ -119,6 +121,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
       scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
       uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}'),
+      customViews: parseCustomViews(all[SETTING_KEYS.customViews]),
     });
   });
 
@@ -160,7 +163,13 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       keybindings_json: (v) => JSON.stringify(v),
       scan_root_dirs_json: (v) => JSON.stringify(v),
       ui_layout_json: (v) => JSON.stringify(v),
+      custom_views_json: (v) => JSON.stringify(v),
     };
+    // 自定义视图（FR-4.11）：入参 zod 全量校验，坏值明确 400 而不是静默丢弃
+    if (body['custom_views_json'] !== undefined) {
+      const parsed = customViewsSchema.safeParse(body['custom_views_json']);
+      if (!parsed.success) return fail('BAD_REQUEST', '视图定义不合法');
+    }
     for (const [k, v] of Object.entries(body)) {
       const fn = allowed[k];
       if (fn !== undefined) setSetting(db, k, fn(v));
@@ -947,6 +956,13 @@ function safeJson(s: string): unknown {
   } catch {
     return {};
   }
+}
+
+/** 自定义视图（FR-4.11）：坏值回落空数组，绝不因手改库炸接口。 */
+function parseCustomViews(raw: string | undefined): CustomView[] {
+  if (raw === undefined || raw === '') return [];
+  const parsed = customViewsSchema.safeParse(safeJson(raw));
+  return parsed.success ? parsed.data : [];
 }
 
 export { readFileSync, AppError };

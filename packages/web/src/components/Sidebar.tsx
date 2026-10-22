@@ -18,10 +18,12 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore, type TabLocation } from '@/app/store';
 import { api, ApiClientError } from '@/lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
+import type { CollectionInfo, CustomView, ProjectSummary } from '@ttfolio/shared';
+import { useSettings } from '@/app/settings';
 import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
+import { CustomViewModal } from '@/features/workbench/CustomViewModal';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
@@ -42,6 +44,7 @@ export function Sidebar(): React.JSX.Element {
   const activeTabId = useAppStore((s) => s.activeTabId);
   const queryClient = useQueryClient();
   const { message, modal } = AntdApp.useApp();
+  const { settings, setSetting } = useSettings();
 
   const { data: projects } = useQuery({
     queryKey: ['projects', 'sidebar'],
@@ -82,9 +85,13 @@ export function Sidebar(): React.JSX.Element {
   };
 
   const openView = (key: string): void => {
+    // 自定义视图（FR-4.11）：标题取视图名；查不到（已删除）回落内置映射
+    const custom = key.startsWith('custom:')
+      ? settings.customViews.find((v) => v.id === key.slice(7))
+      : undefined;
     openTab(
       { kind: 'overview', projectId: null, targetPath: null, subTab: `view:${key}`, scroll: 0 },
-      viewTitle(key),
+      custom?.name ?? viewTitle(key),
     );
   };
 
@@ -95,13 +102,15 @@ export function Sidebar(): React.JSX.Element {
   const [ctxMenu, setCtxMenu] = useState<{
     x: number;
     y: number;
-    kind: 'project' | 'collection';
+    kind: 'project' | 'collection' | 'view';
     id: string;
   } | null>(null);
   // 归属集合弹窗：条件渲染 + key=项目 id，每次打开全新挂载（勾选态取打开瞬间快照）
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
   // 集合编辑弹窗（重命名/备注）
   const [editingCol, setEditingCol] = useState<CollectionEditTarget | null>(null);
+  // 自定义视图编辑弹窗（FR-4.11）：initial=null 为新建
+  const [viewEditor, setViewEditor] = useState<{ initial: CustomView | null } | null>(null);
   const pin = useMutation({
     mutationFn: (p: ProjectSummary) =>
       api.patch(`/api/projects/${p.id}`, { rev: p.rev, isPinned: !p.isPinned }),
@@ -136,11 +145,24 @@ export function Sidebar(): React.JSX.Element {
             t.closest('.ant-menu-submenu-title')?.querySelector('[data-collection-id]') ??
             null)
           : null;
-      if (projEl === null && colEl === null) return;
+      // 自定义视图条目（FR-4.11）：label 带 data-view-id
+      const viewEl =
+        projEl === null && colEl === null
+          ? (t.closest('[data-view-id]') ??
+            t.closest('.ant-menu-item')?.querySelector('[data-view-id]') ??
+            null)
+          : null;
+      if (projEl === null && colEl === null && viewEl === null) return;
       e.preventDefault();
-      const kind = projEl !== null ? 'project' : 'collection';
-      const id =
-        (projEl ?? colEl)?.getAttribute(kind === 'project' ? 'data-project-id' : 'data-collection-id') ?? '';
+      const kind = projEl !== null ? 'project' : colEl !== null ? 'collection' : 'view';
+      const el = projEl ?? colEl ?? viewEl;
+      const attr =
+        kind === 'project'
+          ? 'data-project-id'
+          : kind === 'collection'
+            ? 'data-collection-id'
+            : 'data-view-id';
+      const id = el?.getAttribute(attr) ?? '';
       // 10 行菜单（8 项 + 2 分隔）：贴右边留菜单宽度、贴底下留菜单高度，小窗口保底 8px
       setCtxMenu({
         x: Math.min(e.clientX, window.innerWidth - 232),
@@ -176,6 +198,8 @@ export function Sidebar(): React.JSX.Element {
     ctxMenu?.kind === 'project' ? (projects ?? []).find((x) => x.id === ctxMenu.id) : undefined;
   const ctxCollection =
     ctxMenu?.kind === 'collection' ? (collections ?? []).find((c) => c.id === ctxMenu.id) : undefined;
+  const ctxView =
+    ctxMenu?.kind === 'view' ? settings.customViews.find((v) => v.id === ctxMenu.id) : undefined;
   const ctxItems: MenuProps['items'] =
     ctxProject !== undefined
       ? [
@@ -217,7 +241,13 @@ export function Sidebar(): React.JSX.Element {
             { key: 'editcol', label: '编辑名称 / 备注…', icon: <EditOutlined /> },
             { key: 'delcol', label: '删除集合…', icon: <DeleteOutlined />, danger: true },
           ]
-        : [];
+        : ctxView !== undefined
+          ? [
+              { key: 'openview', label: '打开视图', icon: <FolderOpenOutlined /> },
+              { key: 'editview', label: '编辑视图…', icon: <EditOutlined /> },
+              { key: 'delview', label: '删除视图…', icon: <DeleteOutlined />, danger: true },
+            ]
+          : [];
   const openCollectionView = (cid: string): void => {
     const col = (collections ?? []).find((c) => c.id === cid);
     void queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -247,10 +277,41 @@ export function Sidebar(): React.JSX.Element {
       },
     });
   };
+  const confirmDeleteView = (v: CustomView): void => {
+    modal.confirm({
+      title: `删除视图「${v.name}」？`,
+      content: '仅移除这个保存的筛选入口，项目数据不受影响；指向它的已打开标签会回落到工作台。',
+      okText: '删除视图',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        setSetting(
+          'customViews',
+          settings.customViews.filter((x) => x.id !== v.id),
+        );
+        void message.success('已删除视图');
+      },
+    });
+  };
   const handleCtxAction = (key: string): void => {
     const p = ctxProject;
     const col = ctxCollection;
+    const view = ctxView;
     setCtxMenu(null);
+    if (view !== undefined) {
+      switch (key) {
+        case 'openview':
+          openView(`custom:${view.id}`);
+          break;
+        case 'editview':
+          setViewEditor({ initial: view });
+          break;
+        case 'delview':
+          confirmDeleteView(view);
+          break;
+      }
+      return;
+    }
     if (p !== undefined) {
       switch (key) {
         case 'open':
@@ -324,6 +385,25 @@ export function Sidebar(): React.JSX.Element {
     // 这些"我的视图"本身仍保留：工作台总览的「需要处理」卡片会直接跳到对应卡片墙（viewTitle 映射保留）。
     items.push({ key: 'view:all', label: '工作台总览' });
     items.push({ key: 'view:recent', label: '最近打开' });
+    // 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5）：入口在侧栏（KNOWN-GAPS 原补法），
+    // 右键可编辑/删除；「新建视图…」打开七字段编辑弹窗
+    items.push({ key: 'sep-views', label: '我的视图' });
+    for (const v of settings.customViews) {
+      items.push({
+        key: `view:custom:${v.id}`,
+        label: (
+          <span
+            data-view-id={v.id}
+            className="tt-ellipsis"
+            style={{ display: 'block', maxWidth: 170 }}
+            title={v.name}
+          >
+            {v.name}
+          </span>
+        ),
+      });
+    }
+    items.push({ key: 'view-new', label: '新建视图…' });
     // 集合 = 可折叠子菜单（第 30 轮，用户需求：加入集合的项目要在侧栏能展开/收起查看）——
     // 点集合名=展开/收起成员列表；子项首位「打开集合视图」保留原平面条目的卡片墙入口；
     // 成员项目可直接点开，且带 data-project-id 可用右键整套菜单。收起为默认态。
@@ -468,6 +548,10 @@ export function Sidebar(): React.JSX.Element {
       );
       return;
     }
+    if (key === 'view-new') {
+      setViewEditor({ initial: null });
+      return;
+    }
     if (key.startsWith('view:')) {
       // 工作台总览（Dashboard）与卡片墙是两个屏：只有 view:all 落到总览，
       // 最近打开/已固定以及"我的视图"都落到各自的卡片墙标签（各自独立，可并存）。
@@ -554,30 +638,31 @@ export function Sidebar(): React.JSX.Element {
       <AccountBar />
       {/* 受控右键菜单（第 29 轮项目 / 第 31 轮集合，文件树/项目卡片同款）：固定定位 + document mousedown 关闭，
           容器 onMouseDown 阻止冒泡保证菜单内点击先于关闭执行 */}
-      {ctxMenu !== null && (ctxProject !== undefined || ctxCollection !== undefined) && (
-        <div
-          data-testid="sidebar-ctx-menu"
-          style={{
-            position: 'fixed',
-            left: ctxMenu.x,
-            top: ctxMenu.y,
-            zIndex: 1050,
-            borderRadius: 8,
-            background: SEMANTIC.layoutBg,
-            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)',
-            padding: 4,
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <Menu
-            selectable={false}
-            style={{ border: 'none', background: 'transparent' }}
-            items={ctxItems}
-            onClick={({ key }) => handleCtxAction(key)}
-          />
-        </div>
-      )}
+      {ctxMenu !== null &&
+        (ctxProject !== undefined || ctxCollection !== undefined || ctxView !== undefined) && (
+          <div
+            data-testid="sidebar-ctx-menu"
+            style={{
+              position: 'fixed',
+              left: ctxMenu.x,
+              top: ctxMenu.y,
+              zIndex: 1050,
+              borderRadius: 8,
+              background: SEMANTIC.layoutBg,
+              boxShadow: '0 6px 16px rgba(0, 0, 0, 0.16)',
+              padding: 4,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <Menu
+              selectable={false}
+              style={{ border: 'none', background: 'transparent' }}
+              items={ctxItems}
+              onClick={({ key }) => handleCtxAction(key)}
+            />
+          </div>
+        )}
       {pickerProject !== null && (
         <CollectionPickerModal
           key={pickerProject.id}
@@ -586,6 +671,13 @@ export function Sidebar(): React.JSX.Element {
         />
       )}
       <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />
+      {viewEditor !== null && (
+        <CustomViewModal
+          key={viewEditor.initial?.id ?? 'new'}
+          initial={viewEditor.initial}
+          onClose={() => setViewEditor(null)}
+        />
+      )}
     </div>
   );
 }

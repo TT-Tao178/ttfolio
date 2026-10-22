@@ -509,6 +509,15 @@ export interface CollectionInfo {
   projectIds: string[];
 }
 
+/** 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5）：存 settings.custom_views_json。 */
+export interface CustomView {
+  id: string;
+  name: string;
+  /** 卡片墙过滤参数（parseSubTab JSON 分支同构；键白名单见 CUSTOM_VIEW_FILTER_KEYS） */
+  filters: Record<string, string>;
+  createdAt: string;
+}
+
 /** 活动日志 */
 export interface ActivityEntry {
   id: number;
