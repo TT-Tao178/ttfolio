@@ -1,9 +1,15 @@
 /** Git 页签（FR-5.1..5.9）：变更分组、diff、暂存/放弃、提交、历史、分支、降级。 */
 import { Alert, App, Button, Empty, Input, List, Select, Space, Spin, Tag, Tooltip, Tree } from 'antd';
 import React, { useRef, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { GitBranch, GitLogEntry, GitStatus } from '@ttfolio/shared';
+import type { GitBranch, GitDiff, GitLogEntry, GitStatus } from '@ttfolio/shared';
 import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import { PaneSplit } from '@/components/PaneSplit';
@@ -342,6 +348,9 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
   );
 }
 
+/** 单页 500 行（FR-5.2 分块懒加载 / KNOWN-GAPS #6）：滚动近底自动续页，底部按钮兜底。 */
+const DIFF_PAGE_LINES = 500;
+
 function DiffQuery({
   projectId,
   path,
@@ -351,22 +360,40 @@ function DiffQuery({
   path: string;
   staged: boolean;
 }): React.JSX.Element {
-  const { data, isLoading } = useQuery({
+  const q = useInfiniteQuery({
     queryKey: ['git', projectId, 'diff', path, staged],
-    queryFn: () =>
-      api.get<{
-        path: string;
-        binary: boolean;
-        truncated: boolean;
-        patch: string;
-        additions: number;
-        deletions: number;
-      }>(`/api/git/${projectId}/diff`, { path, staged: staged ? '1' : '0' }),
+    queryFn: ({ pageParam }) =>
+      api.get<GitDiff>(`/api/git/${projectId}/diff`, {
+        path,
+        staged: staged ? '1' : '0',
+        offsetLines: String(pageParam),
+        limitLines: String(DIFF_PAGE_LINES),
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (last, allPages) => {
+      if (!last.hasMore) return undefined;
+      const loaded = allPages.reduce((sum, p) => sum + p.patch.split('\n').length, 0);
+      return loaded;
+    },
   });
-  if (isLoading) return <Spin size="small" />;
-  if (data === undefined) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无 diff" />;
-  if (data.binary) return <Alert type="info" message="二进制文件不可 diff" />;
-  return <DiffView patch={data.patch} truncated={data.truncated} />;
+  const pages = q.data?.pages ?? [];
+  if (q.isLoading) return <Spin size="small" />;
+  if (q.data === undefined) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无 diff" />;
+  if (pages[0]?.binary) return <Alert type="info" message="二进制文件不可 diff" />;
+  const patch = pages.map((p) => p.patch).join('\n');
+  const loadedLines = pages.reduce((sum, p) => sum + p.patch.split('\n').length, 0);
+  const lastPage = pages[pages.length - 1];
+  return (
+    <DiffView
+      patch={patch}
+      truncated={lastPage?.truncated === true && lastPage?.hasMore !== true}
+      totalLines={pages[0]?.totalLines}
+      loadedLines={loadedLines}
+      hasMore={lastPage?.hasMore === true}
+      onLoadMore={() => void q.fetchNextPage()}
+      loadingMore={q.isFetchingNextPage}
+    />
+  );
 }
 
 export function CommitDetail({ projectId, hash }: { projectId: string; hash: string }): React.JSX.Element {

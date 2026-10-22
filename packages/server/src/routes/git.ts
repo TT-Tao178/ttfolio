@@ -61,12 +61,23 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
 
   app.get('/api/git/:projectId/diff', async (req) => {
     const { projectId } = req.params as { projectId: string };
-    const q = req.query as { path?: string; staged?: string; ref?: string };
+    const q = req.query as {
+      path?: string;
+      staged?: string;
+      ref?: string;
+      offsetLines?: string;
+      limitLines?: string;
+    };
     if (q.path === undefined) return fail('BAD_REQUEST', '缺少 path');
     try {
       if (q.ref !== undefined) assertGitArg(q.ref, 'ref');
       const dir = projectDir(projectId);
-      const d = await diff(dir, q.path, q.staged === '1', q.ref);
+      // 行级分块（FR-5.2 / KNOWN-GAPS #6）：缺省不传 = 全量（兼容旧调用方）
+      const offsetLines =
+        q.offsetLines !== undefined ? Math.max(0, Number.parseInt(q.offsetLines, 10) || 0) : undefined;
+      const limitLines =
+        q.limitLines !== undefined ? Math.max(1, Number.parseInt(q.limitLines, 10) || 500) : undefined;
+      const d = await diff(dir, q.path, q.staged === '1', q.ref, { offsetLines, limitLines });
       return ok(d);
     } catch (err) {
       return fail(...toApiErrorTuple(err));

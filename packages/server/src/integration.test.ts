@@ -140,6 +140,46 @@ describe('Git 单文件 diff（0.3.5 体检回归锚点）', () => {
       expect((e as AppError).code).toBe('NO_STAGED');
     }
   });
+
+  it('diff 分块懒加载（FR-5.2 / KNOWN-GAPS #6）：offset/limit/totalLines/hasMore 与上限', async () => {
+    // 30 行改动文件（先 add 使其进入已暂存 diff；未跟踪文件 git diff 不显示）
+    const lines = Array.from({ length: 30 }, (_, i) => `第${i + 1}行内容`);
+    fs.writeFileSync(path.join(projDir, 'chunk-probe.txt'), `${lines.join('\n')}\n`);
+    git(projDir, ['add', 'chunk-probe.txt']);
+    const full = await diff(projDir, 'chunk-probe.txt', true, undefined, {});
+    expect(full.hasMore).toBe(false);
+    expect(full.offset).toBe(0);
+    expect(full.totalLines).toBe(full.patch.split('\n').length);
+    expect(full.patch).toContain('+第30行内容');
+
+    // 取第二页（起 10 行，页大小 8）
+    const page2 = await diff(projDir, 'chunk-probe.txt', true, undefined, {
+      offsetLines: 10,
+      limitLines: 8,
+    });
+    expect(page2.offset).toBe(10);
+    expect(page2.hasMore).toBe(true);
+    expect(page2.patch.split('\n').length).toBe(8);
+    // 分页切片与全量 patch 对应行完全一致
+    expect(page2.patch).toBe(full.patch.split('\n').slice(10, 18).join('\n'));
+
+    // 末页：hasMore=false
+    const total = full.totalLines ?? 0;
+    const lastPage = await diff(projDir, 'chunk-probe.txt', true, undefined, {
+      offsetLines: total - 2,
+      limitLines: 8,
+    });
+    expect(lastPage.hasMore).toBe(false);
+    expect(lastPage.patch).toContain('+第30行内容');
+
+    // limitLines 超过服务端硬上限 5000 → 按 5000 计（此处 patch 不足 5000 行，等效全量）
+    const capped = await diff(projDir, 'chunk-probe.txt', true, undefined, {
+      offsetLines: 0,
+      limitLines: 99_999,
+    });
+    expect(capped.patch.split('\n').length).toBe(full.patch.split('\n').length);
+    fs.rmSync(path.join(projDir, 'chunk-probe.txt'), { force: true });
+  });
 });
 
 describe('集合成员（0.3.5 回归锚点）', () => {

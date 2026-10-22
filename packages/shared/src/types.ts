@@ -208,10 +208,17 @@ export interface GitLogEntry {
 export interface GitDiff {
   path: string;
   binary: boolean;
+  /** 兼容字段：= hasMore 或超长单行字符兜底截断（第 63 轮起主用 hasMore/totalLines） */
   truncated: boolean;
   patch: string;
   additions: number;
   deletions: number;
+  /** 分块懒加载（FR-5.2 / KNOWN-GAPS #6）：完整 patch 总行数 */
+  totalLines?: number;
+  /** 本响应起始行号 */
+  offset?: number;
+  /** 后续是否还有行 */
+  hasMore?: boolean;
 }
 
 export interface GitBranch {

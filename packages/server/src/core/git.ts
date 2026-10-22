@@ -213,7 +213,20 @@ function headerOrNull(h: Record<string, string>, key: string): string | null {
   return v;
 }
 
-export async function diff(dir: string, relPath: string, staged: boolean, ref?: string): Promise<GitDiff> {
+export interface DiffPageOpts {
+  /** 起始行（0 起）；缺省 0 */
+  offsetLines?: number;
+  /** 单页行数上限（服务端硬上限 5000）；缺省=全部（兼容旧调用） */
+  limitLines?: number;
+}
+
+export async function diff(
+  dir: string,
+  relPath: string,
+  staged: boolean,
+  ref?: string,
+  opts?: DiffPageOpts,
+): Promise<GitDiff> {
   await assertGitAvailable();
   const numArgs =
     ref !== undefined
@@ -243,15 +256,28 @@ export async function diff(dir: string, relPath: string, staged: boolean, ref?: 
   }
   patchArgs.splice(1, 0, '-M');
   const patch = await git(dir, [...patchArgs, '--', relPath]);
+  // 分块懒加载（FR-5.2 / KNOWN-GAPS #6）：git 全量生成后按行切片返回；
+  // MAX 是单次响应的字符兜底（防御超长单行），与行分页正交。
+  const allLines = patch.split('\n');
+  const totalLines = allLines.length;
+  const offset = Math.max(0, opts?.offsetLines ?? 0);
+  const limit = Math.min(Math.max(1, opts?.limitLines ?? totalLines), 5000);
+  const slice = allLines.slice(offset, offset + limit);
+  let chunk = slice.join('\n');
   const MAX = 200000;
-  const truncated = patch.length > MAX;
+  const charTruncated = chunk.length > MAX;
+  if (charTruncated) chunk = chunk.slice(0, MAX);
+  const hasMore = offset + limit < totalLines;
   return {
     path: relPath,
     binary,
-    truncated,
-    patch: truncated ? patch.slice(0, MAX) : patch,
+    truncated: charTruncated || hasMore,
+    patch: chunk,
     additions,
     deletions,
+    totalLines,
+    offset,
+    hasMore,
   };
 }
 
