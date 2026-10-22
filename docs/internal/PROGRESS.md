@@ -1,5 +1,122 @@
 # PROGRESS
 
+## 第 66 轮：v0.4.3 出包（缺口补全批次 + 工具链升级随版本发布）
+
+- 版本三处同轮（1b9cc61）：package.json / server 常量 / CHANGELOG；版本口径
+  按既定纪律 +0.0.1（0.4.2 → 0.4.3）。
+- **出包两坑（均取证，预案扩充）**：① audit:prod ECONNRESET 连续两次（间隔
+  45s 重试无效，放宽到 90s 轮询第 2 次恢复）——预案①照旧但重试要给足窗口；
+  ② **electron-rebuild 新坑**：node-gyp 拉 Electron 44.9.3 头文件走 IPv6
+  （undici ConnectTimeout，`NODE_OPTIONS=--dns-result-order=ipv4first` 无效；
+  curl -4 可达；44.4.3 时代未暴露因旧头文件在缓存）→ 预案：curl -4 预下载
+  headers/SHASUMS256/win-x64 node.lib 三件到本地目录，起 127.0.0.1 静态镜像
+  （纯 IPv4 免 DNS），`electron-rebuild --dist-url=http://127.0.0.1:7800/headers`
+  编译通过；**教训：`-f` 失败会清掉现有 build 产物**（一度把 Node ABI 的
+  better_sqlite3.node 也删了），事后 `npm rebuild better-sqlite3` 恢复。
+  链路因此分步执行：audit/build/build:server（第三次链路已过）→ rebuild
+  （本地镜像）→ builder → verify，等效全链路，各步真实退出码判定。
+- **结果**：builder 一轮过（无 EBUSY），`ttFolio-Setup-0.4.3.exe`（约
+  146MB）+ blockmap 入 dist-electron；verify-dist-electron 自检 8 项全绿
+  含 0.4.3 版本断言与真实启动冒烟；rebuild 翻回 Node ABI 后门禁三绿复跑
+  （248 条）。
+- **发布**：tag v0.4.3 打在版本提交 1b9cc61，先 push main+tag 再经系统
+  curl 建 Release 页（正文取 CHANGELOG）；资产由用户拖传（对照清单已补行）。
+- **手测提醒（随 0.4.3）**：移动/复制大目录的后台进度与取消（文件树右键
+  复制到/移动到）、同名三选（覆盖/跳过/询问）、侧栏「我的视图」新建/改名/
+  删除与命令面板打开视图、大 diff 滚动续载与「已载 X/共 Y 行」提示、状态栏
+  多任务显示与精确取消；0.4.2→0.4.3 升级零迁移。
+
+## 第 65 轮：e2e 解冻整备（4/4 全绿，ca072c9 + c39b573）
+
+- **授权口径**：用户点名「完成剩余工作」（含 e2e 解冻）并批准计划——红线①
+  「不跑 e2e」在本轮被显式解除一次；此后运行约定：**出包轮/重大 UI 轮跑，
+  不进日常门禁**。
+- 配置修复：新版 Playwright（随锁文件刷新）以 CJS 加载 TS 配置，config 里
+  `import.meta` 直接语法炸 → 数据目录改 `path.resolve(process.cwd(),…)`；
+  补装 chromium 1248 内核（playwright install 一次过）。
+- spec 整备：新增 helpers `gotoWorkbench`（会话恢复把活动标签还原成项目
+  标签时先点「工作台」切回；等 Dashboard **或卡片墙添加按钮**任一出现）；
+  编辑器默认只读（T-028）→ 先点「编辑」再输入；Git 页签数字快捷键改点选
+  （编辑器聚焦时全局键处理器跳过数字键）。
+- **过程教训（取证在案）**：调试探针与 e2e 共用了 `.tmp-test/e2e-data` 且
+  探针服务器未及时杀净——Windows 文件锁让 e2e-server 的启动 `rmSync` 被
+  静默 catch 跳过，用例跑在探针污染过的库上，症状诡异（会话里出现探针项
+  目标签）。处置：taskkill /T /F 杀净探针进程树 + 清数据目录重跑。
+- **探针抓到两个真实问题**：① dirty-dot 是 flex 子项，长路径下被压缩到
+  0 宽（未保存信号完全不可见）→ 补 `flexShrink:0`（ca072c9，单独提交）；
+  ② AddProjectModal 登记成功后有意切 `subTab:'view:all'` 卡片墙（0.3.5
+  「添加了但没反应」修复）——工作台标签不显示 Dashboard 属正常产品状态，
+  helper 按此放宽断言（非缺陷）。
+- 结果：`npm run test:e2e` **4/4 passed（26.5s）**。KNOWN-GAPS「环境限制」
+  节的冻结声明解除（见该文）。
+
+## 第 64 轮：工具链升级（339ed41，不出包）
+
+- vite ^5.4→**6.4.5**；@vitejs/plugin-react ^4.3→**5.2.0**（6.x 只支持
+  vite 8，peer 实查后选 5.x）；vitest ^2.1→**5.0.5**（跨 3/4 两个大版本，
+  本仓 vitest.config 仅 include/timeout/alias，全兼容零改动）。
+- eslint 8(eslintrc)→**10.13(flat)**：新增 `eslint.config.mjs` 1:1 迁移全部
+  规则；lint script 去 `--ext`。两个迁移决策：① `eslint-plugin-react`
+  移除（旧配置从未启用任何 react/* 规则）；② eslint 10 新核心规则
+  `no-useless-assignment` 关闭——本仓库「初值+try/catch 重赋值」防御式
+  写法的初值是压 TS2454 的必要存在，成片误报 23 处。
+- typescript-eslint ^8.72（peer 支持 eslint 10）；electron 44.4.3→**44.9.3**
+  （锁文件刷新顺带完成 44.7+ 目标；二进制经 npmmirror 镜像重下；
+  allowScripts 换新版本号并补 esbuild/electron-winstaller 条目）。
+- 坑：lockfile 残留的旧 eslint 树让 `npm install` ERESOLVE 两次，删
+  node_modules 全量重装解决；electron postinstall 被 allowScripts 旧版本
+  号拦住（dist 缺失），`node install.js` + 镜像补下。
+- 门禁三绿（248 条）+ vite 6 build 通过。
+
+## 第 63 轮：#6 大 diff 分块懒加载（60bb563，T-038 / FR-5.2）
+
+- 服务端 `core/git.ts diff` 增 offsetLines/limitLines（页 ≤5000 硬上限）：
+  git 全量生成后按行切片，响应增 totalLines/offset/hasMore（truncated 保留
+  兼容；200KB 字符兜底保留）；不传参=全量，旧调用零改动；提交详情
+  （diffForCommit）维持现状不扩范围。
+- 前端 DiffView 改 @tanstack/react-virtual 虚拟渲染（行 pre+横向滚动、行高
+  恒定 18px，DOM 只随视口增长）；GitTab DiffQuery 改 useInfiniteQuery
+  （页 500 行），滚动近底自动续页 + 底部「加载更多」按钮，顶部「已载 X/
+  共 Y 行」如实提示。
+- 测试 +1（248）：分页切片与全量逐行一致、末页 hasMore、limit 上限。
+  测试首版踩 git 常识坑：未 add 的新文件 `git diff` 不显示（改 staged）。
+
+## 第 62 轮：#5 自定义「我的视图」（21b7bd2，T-036 / FR-4.11）
+
+- 存储：settings 新键 `custom_views_json`（CustomView[]，zod 全量校验
+  ≤30 条；不建新表——与 recent_pins/ui_layout_json 同策略；PATCH 坏值
+  400、GET 坏值回落空数组），**零迁移**。
+- 服务端过滤参数补齐：staleDays 放宽 1..3650（原硬编码只认 '30'）；新增
+  `lang`（primary_language 等值）/`stack`（tech_stack 子串）/`git`
+  （dirty|clean|nogit）。
+- 前端：parseSubTab 增 `view:custom:<id>` 查表分支（纯函数保持，已删视图
+  回落 active）；侧栏「我的视图」分组（右键改名/删除，data-view-id 委托照
+  集合同款）；CustomViewModal 七字段（语言/技术栈候选项来自当前项目聚合、
+  可自由输入）；命令面板每视图登记一条打开命令。
+- **真实缺陷修复（新测试抓到）**：better-sqlite3 12.x 关闭双引号字符串
+  （DQS=0），`listProjects` 的 staleDays SQL `datetime("now")` 报
+  `no such column`——**内置「30 天没打开」视图当前必坏**；探针取证后改单
+  引号字面量。旧版 better-sqlite3 允许 DQS，属依赖升级带出的潜伏缺陷。
+- 测试 +9（238→247）。
+
+## 第 61 轮：#1 fs/move 任务化（84e4424，T-032 / FR-4.7）
+
+- fsx 新增渐进式 `copyTreeProgressive`/`verifyTreeProgressive`（逐文件
+  让步+取消检查，语义与同步原语一致）；执行体抽 `core/fstask.ts` 可直测：
+  同盘 rename 瞬时、跨盘渐进复制→校验→删源，**verify 全过才删源、取消
+  绝不删源、新建目标半成品清理、已存在目标（覆盖）保留现场**；单项失败
+  不中止整批（markPartial 部分成功，同 trash-empty 范式）。
+- TaskManager：start 增可选 meta.projectId、TaskContext 增 markPartial；
+  非 analyze/index kind 广播新事件 `task.progress`（原两事件名零改动）。
+- POST /api/fs/move 改异步任务（同步预检不变：守卫/冲突三选/自子目录
+  拒绝），返回 taskId；**overwrite 补齐明确语义**（先删目标旧内容，弹窗
+  三选——MoveCopyModal 注释自 0.2.x 起预留本次补）；taskId:null=无可执行
+  项同步完成。新端点 GET /api/tasks、POST /api/tasks/cancel（index 专用
+  两端点不动）；StatusBar 全任务显示+精确取消；变更流水 move 改源+目标
+  双条目；顺带清路由死代码。
+- 测试 +14（224→238，fstask.test.ts：渐进原语取消/校验、执行体部分成功
+  与不删源、HTTP 任务化语义、通用任务端点）。
+
 ## 第 60 轮：v0.4.2 出包（T-111/T-112/T-101/T-104/T-102 随版本发布）
 
 - **版本口径纠正（e9ac6b8）**：先误按功能跨度取 0.5.0，用户指出 0.4.1 已发布、
