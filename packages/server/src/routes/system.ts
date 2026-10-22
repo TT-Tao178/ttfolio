@@ -765,6 +765,17 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     return ok({ taskId });
   });
 
+  // ---- 运行中任务（FR-4.7）：全 kind 列表与精确取消；index 专用端点保持不动 ----
+  app.get('/api/tasks', async () => {
+    return ok({ running: ctx.tasks.list() });
+  });
+
+  app.post('/api/tasks/cancel', async (req) => {
+    const b = (req.body ?? {}) as { taskId?: string };
+    if (b.taskId === undefined) return fail('BAD_REQUEST', '缺少 taskId');
+    return ok({ cancelled: ctx.tasks.cancel(b.taskId) });
+  });
+
   app.get('/api/tasks/history', async (req) => {
     const q = req.query as { limit?: string };
     const limit = Math.min(Math.max(Number(q.limit ?? '50'), 1), 200);

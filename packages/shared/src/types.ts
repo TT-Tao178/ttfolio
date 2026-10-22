@@ -271,6 +271,8 @@ export interface TaskInfo {
   status: 'running' | 'done' | 'cancelled' | 'error';
   error?: string;
   partial?: boolean;
+  /** 所属项目（move-copy 等任务可选携带，SSE 载荷与状态栏共用） */
+  projectId?: string;
   startedAt: string;
   finishedAt?: string;
 }
@@ -285,6 +287,8 @@ export type SseEventName =
   | 'git.changed'
   | 'search.index.progress'
   | 'trash.changed'
+  /** 通用任务进度（move-copy / trash-empty 等非分析/索引任务，FR-4.7） */
+  | 'task.progress'
   /** 插件启停/安装变化（FR-14.1） */
   | 'plugin.changed'
   /** 脚本插件输出行（FR-14.1） */

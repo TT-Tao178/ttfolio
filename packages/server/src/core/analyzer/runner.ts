@@ -44,6 +44,7 @@ export async function analyzeProjects(ctx: AppContext, projectIds: string[]): Pr
               void total;
               void phase;
             },
+            markPartial: (): void => {},
           },
         );
       } catch (err) {

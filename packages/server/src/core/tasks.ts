@@ -10,6 +10,8 @@ export interface TaskContext {
   checkCancelled(): void;
   isCancelled(): boolean;
   progress(done: number, total: number, phase?: string): void;
+  /** 部分成功标记（FR-4.7）：任务照常完成，但状态与历史里带失败说明。 */
+  markPartial(message: string): void;
 }
 
 type Runner = (ctx: TaskContext) => Promise<void>;
@@ -45,7 +47,13 @@ export class TaskManager {
     this.persist = p;
   }
 
-  start(kind: TaskInfo['kind'], title: string, total: number, runner: Runner): string {
+  start(
+    kind: TaskInfo['kind'],
+    title: string,
+    total: number,
+    runner: Runner,
+    meta?: { projectId?: string },
+  ): string {
     const taskId = ulid();
     const record: TaskRecord = {
       taskId,
@@ -54,6 +62,7 @@ export class TaskManager {
       done: 0,
       total,
       status: 'running',
+      projectId: meta?.projectId,
       startedAt: new Date().toISOString(),
       cancelled: false,
     };
@@ -78,6 +87,10 @@ export class TaskManager {
         record.total = total_;
         if (phase) record.title = `${title} — ${phase}`;
         this.emitProgress(record);
+      },
+      markPartial: (message) => {
+        record.partial = true;
+        record.error = message;
       },
     };
     void runner(ctx)
@@ -162,15 +175,22 @@ export class TaskManager {
   }
 
   private emitProgress(t: TaskRecord): void {
-    const event = t.kind === 'index' ? 'search.index.progress' : 'analysis.progress';
+    // analyze/index 沿用既有事件名（消费方零改动）；其余任务走通用 task.progress（FR-4.7）
+    const event =
+      t.kind === 'index'
+        ? 'search.index.progress'
+        : t.kind === 'analyze'
+          ? 'analysis.progress'
+          : 'task.progress';
     this.sse.publish(event, {
       taskId: t.taskId,
-      projectId: undefined,
+      projectId: t.projectId,
       done: t.done,
       total: t.total,
       status: t.status,
       title: t.title,
       error: t.error,
+      partial: t.partial,
     });
   }
 }

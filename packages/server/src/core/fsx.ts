@@ -355,3 +355,126 @@ export function measureTree(p: string): { files: number; bytes: number } {
   }
   return { files, bytes };
 }
+
+// ---- 渐进式复制/校验（FR-4.7 / KNOWN-GAPS #1：长任务进度与取消） ----
+// 同步原语（copyRecursive/verifyRecursive）会阻塞事件循环，任务化后必须逐文件
+// 让步 + 检查取消；语义与同步版严格一致：目录符号链接跳过、文件链接跟随。
+
+/** 每 N 个文件让出一次事件循环（analyzer/search 同款节拍）。 */
+const YIELD_EVERY = 64;
+
+export interface TreeCopyHooks {
+  /** 抛 CANCELLED 即中止（不删源由调用方保证） */
+  checkCancelled(): void;
+  /** 已复制字节累计（校验阶段不需要，可省略） */
+  onProgress?(doneBytes: number): void;
+}
+
+function yieldLoop(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+/** 渐进复制：返回本次复制的字节数。dest 父目录必须已存在或为目录树根。 */
+export async function copyTreeProgressive(src: string, dest: string, hooks: TreeCopyHooks): Promise<number> {
+  const st = statSync(src);
+  if (st.isFile()) {
+    hooks.checkCancelled();
+    copyFileSync(src, dest);
+    hooks.onProgress?.(st.size);
+    await yieldLoop();
+    return st.size;
+  }
+  let copied = 0;
+  let sinceYield = 0;
+  mkdirSync(dest, { recursive: true });
+  const stack: Array<{ s: string; d: string }> = [{ s: src, d: dest }];
+  while (stack.length > 0) {
+    const cur = stack.pop();
+    if (cur === undefined) break;
+    let entries: FsEntry[];
+    try {
+      entries = listEntries(cur.s);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      // 目录符号链接不递归（junction 成环防护，与 copyRecursive 一致）
+      if (entry.isDir && entry.isSymlink) continue;
+      const s = path.join(cur.s, entry.name);
+      const d = path.join(cur.d, entry.name);
+      if (entry.isDir) {
+        mkdirSync(d, { recursive: true });
+        stack.push({ s, d });
+        continue;
+      }
+      if (!entry.isFile) continue;
+      hooks.checkCancelled();
+      let size = 0;
+      try {
+        size = statSync(s).size;
+      } catch {
+        /* 统计失败按 0 计，复制错误自然抛出 */
+      }
+      copyFileSync(s, d);
+      copied += size;
+      hooks.onProgress?.(copied);
+      sinceYield += 1;
+      if (sinceYield >= YIELD_EVERY) {
+        sinceYield = 0;
+        await yieldLoop();
+      }
+    }
+  }
+  return copied;
+}
+
+/** 渐进校验：逐文件比 size + sha256（与 verifyRecursive 同口径）。 */
+export async function verifyTreeProgressive(src: string, dest: string, hooks: TreeCopyHooks): Promise<void> {
+  const s = statSync(src);
+  const d = statSync(dest);
+  if (s === null || d === null || s.isDirectory() !== d.isDirectory()) {
+    throw new AppError('IO_ERROR', '复制校验失败：类型不一致');
+  }
+  if (s.isFile()) {
+    hooks.checkCancelled();
+    if (d.size !== s.size) throw new AppError('IO_ERROR', '复制校验失败：体积不一致');
+    if (hashFile(src) !== hashFile(dest)) throw new AppError('IO_ERROR', '复制校验失败：哈希不一致');
+    return;
+  }
+  let sinceYield = 0;
+  const stack: Array<{ s: string; d: string }> = [{ s: src, d: dest }];
+  while (stack.length > 0) {
+    const cur = stack.pop();
+    if (cur === undefined) break;
+    let entries: FsEntry[];
+    try {
+      entries = listEntries(cur.s);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isDir && entry.isSymlink) continue;
+      hooks.checkCancelled();
+      const sPath = path.join(cur.s, entry.name);
+      const dPath = path.join(cur.d, entry.name);
+      const sSt = statSync(sPath);
+      const dSt = statSync(dPath);
+      if (sSt === null || dSt === null || sSt.isDirectory() !== dSt.isDirectory()) {
+        throw new AppError('IO_ERROR', '复制校验失败：类型不一致');
+      }
+      if (sSt.isFile()) {
+        if (dSt.size !== sSt.size) throw new AppError('IO_ERROR', '复制校验失败：体积不一致');
+        if (hashFile(sPath) !== hashFile(dPath)) throw new AppError('IO_ERROR', '复制校验失败：哈希不一致');
+      } else {
+        stack.push({ s: sPath, d: dPath });
+      }
+      sinceYield += 1;
+      if (sinceYield >= YIELD_EVERY) {
+        sinceYield = 0;
+        await yieldLoop();
+      }
+    }
+  }
+}

@@ -95,10 +95,8 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
   });
   const { data: tasks } = useQuery({
     queryKey: ['tasks'],
-    queryFn: () =>
-      api.get<{ running: TaskInfo[]; stats: { files: number; bytes: number } | null }>(
-        '/api/search/index/status',
-      ),
+    // FR-4.7：全 kind 运行中任务（分析/索引/移动复制/清空回收站）
+    queryFn: () => api.get<{ running: TaskInfo[] }>('/api/tasks'),
     refetchInterval: 5000,
   });
 
@@ -177,22 +175,25 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
         <Space size={4}>
           <span data-testid="status-task" className="tt-ellipsis" style={{ maxWidth: 200 }}>
             {running[0]?.title}
+            {running.length > 1 ? `（+${running.length - 1}）` : ''}
           </span>
           <Progress
             percent={Math.round(((running[0]?.done ?? 0) / Math.max(running[0]?.total ?? 1, 1)) * 100)}
             size="small"
             style={{ width: 120 }}
           />
-          <Button
-            size="small"
-            type="text"
-            danger
-            icon={<CloseCircleOutlined />}
-            onClick={() => {
-              const id = running[0]?.taskId;
-              if (id !== undefined) void api.post('/api/search/index/cancel', { taskId: id });
-            }}
-          />
+          <Tooltip title="取消该任务">
+            <Button
+              size="small"
+              type="text"
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={() => {
+                const id = running[0]?.taskId;
+                if (id !== undefined) void api.post('/api/tasks/cancel', { taskId: id });
+              }}
+            />
+          </Tooltip>
         </Space>
       )}
       <span style={{ marginLeft: 'auto' }}>

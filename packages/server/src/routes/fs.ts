@@ -5,6 +5,7 @@ import type { AppContext } from '../context.js';
 import { ok, fail, toApiError } from './helpers.js';
 import { AppError } from '../core/errors.js';
 import * as fsx from '../core/fsx.js';
+import { runMoveCopyPlan, type MoveStep } from '../core/fstask.js';
 import { assertSafeName, isInsideOrEqual } from '../core/pathGuard.js';
 import { promises as fsp } from 'node:fs';
 import { resolveInProject } from '../roots.js';
@@ -310,7 +311,9 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
-  // ---- 移动 / 复制（异步任务 + 进度 + 可取消） ----
+  // ---- 移动 / 复制（异步任务 + 进度 + 可取消，FR-4.7 / KNOWN-GAPS #1） ----
+  // 同步预检把守卫、冲突三选（ask/skip/overwrite）与自子目录拒绝全部前置于任务，
+  // 预检失败仍是原同步 400 语义；执行体在 core/fstask（进度/取消/部分成功/删源不变量）。
   app.post('/api/fs/move', async (req) => {
     const parsed = fsMoveSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
@@ -322,53 +325,68 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
         const g = await resolveInProject(ctx.db(), b.projectId, p, { mustExist: true });
         items.push(g);
       }
+      const steps: MoveStep[] = [];
       for (const item of items) {
         const name = path.basename(item.real);
         const dest = path.join(targetDir.real, name);
         if (dest.toLowerCase() === item.real.toLowerCase()) continue;
-        if (fsx.exists(dest)) {
+        const destSt = fsx.statSafe(dest);
+        if (destSt !== null) {
           if (b.onConflict === 'skip') continue;
-          if (b.onConflict === 'ask')
+          if (b.onConflict === 'ask') {
             return fail('INVALID_NAME', `目标已存在：${name}（可选择 覆盖 或 跳过）`);
-        }
-        if (b.mode === 'move') {
-          const isDirMove = fsx.statSafe(item.real)?.isDir ?? false;
-          if (
-            isDirMove &&
-            item.real.toLowerCase() !== dest.toLowerCase() &&
-            path.dirname(item.real).toLowerCase() !== targetDir.real.toLowerCase()
-          ) {
-            // 目录移动到自身子目录：拒绝（体检 P2：裸前缀比较会误拦兄弟目录——
-            // D:\w\a 移入 D:\w\ab 时 dest=D:\w\ab\a 恰以 D:\w\a 开头；
-            // 用守卫库的 isInsideOrEqual（path.relative 语义，C-02）才是真包含）
-            if (isInsideOrEqual(item.real, dest)) {
-              return fail('INVALID_NAME', '不能把目录移动到它自己的子目录内');
-            }
           }
-          fsx.movePath(item.real, dest);
-          if (b.confirm !== true && fsx.statSafe(item.real) === null) {
-            // move 完成
-          }
-        } else {
-          fsx.copyRecursive(item.real, dest);
+          // overwrite：目标旧内容先删（弹窗已按覆盖语义二次确认；无法在失败时"还原"，
+          // 该不可逆性由确认弹窗文案如实告知）
+          fsx.rmSync(dest, { recursive: true, force: true });
         }
-        fsx.markSelfWrite(dest);
+        const isDirItem = fsx.statSafe(item.real)?.isDir ?? false;
+        if (b.mode === 'move' && isDirItem && isInsideOrEqual(item.real, dest)) {
+          // 目录移动到自身子目录：拒绝（体检 P2：用 isInsideOrEqual 的 path.relative
+          // 语义而非裸前缀比较——D:\w\a 移入 D:\w\ab 不得误拦；相等情形已在上面 continue）
+          return fail('INVALID_NAME', '不能把目录移动到它自己的子目录内');
+        }
+        steps.push({
+          src: item.real,
+          dest,
+          bytes: fsx.measureTree(item.real).bytes,
+          destPreExisted: destSt !== null,
+          srcRel: relToRootOf(item.projectRoot, item.real),
+          destRel: relToRootOf(targetDir.projectRoot, dest),
+        });
       }
+      if (steps.length === 0) return ok({ taskId: null });
+      const total = Math.max(
+        steps.reduce((s, x) => s + x.bytes, 0),
+        1,
+      );
+      const projectId = b.projectId;
+      const title = `${b.mode === 'move' ? '移动' : '复制'} ${steps.length} 项到 ${path.basename(targetDir.real)}`;
+      const taskId = ctx.tasks.start(
+        'move-copy',
+        title,
+        total,
+        async (taskCtx) => {
+          await runMoveCopyPlan(steps, { mode: b.mode }, taskCtx, (step) => {
+            // 变更流水：move = 源+目标双条目（同 rename 口径）；copy = 仅目标
+            ctx.changes.publish({
+              projectId,
+              relPaths: b.mode === 'move' ? [step.srcRel, step.destRel] : [step.destRel],
+              kind: 'update',
+              source: 'api',
+            });
+          });
+        },
+        { projectId },
+      );
       logActivity(ctx.db(), {
         kind: b.mode === 'move' ? 'fs.move' : 'fs.copy',
         level: 'L2',
         projectId: b.projectId,
-        detail: { items: b.items, target: targetDir.real },
+        detail: { items: b.items, target: targetDir.real, taskId },
         actor: currentActor().actor,
       });
-      // 移动/复制：目标目录内新增（逐条按 items 落流水；复制源不动）
-      ctx.changes.publish({
-        projectId: b.projectId,
-        relPaths: b.items.map((it) => String(it).replace(/\\/g, '/')),
-        kind: 'create',
-        source: 'api',
-      });
-      return ok({ done: true });
+      return ok({ taskId });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }

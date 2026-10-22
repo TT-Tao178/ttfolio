@@ -56,6 +56,7 @@ const noopCtx = {
   checkCancelled: (): void => {},
   isCancelled: (): boolean => false,
   progress: (): void => {},
+  markPartial: (): void => {},
 };
 
 function git(cwd: string, args: string[], input?: string): string {

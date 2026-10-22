@@ -94,6 +94,7 @@ export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) =
             void queryClient.invalidateQueries({ queryKey: ['index-status'] });
             break;
           case 'analysis.progress':
+          case 'task.progress':
             void queryClient.invalidateQueries({ queryKey: ['tasks'] });
             break;
           default:
@@ -104,6 +105,7 @@ export function useSse(onState: (s: SseState) => void, onEvent?: (e: SseEvent) =
       for (const name of [
         'hello',
         'analysis.progress',
+        'task.progress',
         'project.analyzed',
         'project.updated',
         'fs.changed',
