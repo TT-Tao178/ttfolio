@@ -190,6 +190,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = tabs.filter((t) => t.id !== id);
     const nextActive = activeTabId === id ? (next[Math.min(idx, next.length - 1)]?.id ?? null) : activeTabId;
     set({ tabs: next, activeTabId: nextActive });
+    // 关掉最后一个标签后不再留空白（用户反馈）：默认打开工作台总览；
+    // 会话随 1s 防抖持久化，重启后恢复的也是总览（替代原「空会话」分支）
+    if (next.length === 0) {
+      get().openTab(
+        { kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+        '工作台',
+      );
+    }
     return null;
   },
 

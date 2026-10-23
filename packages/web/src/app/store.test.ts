@@ -105,7 +105,10 @@ describe('closeTab 与 closedTabs 栈', () => {
       if (t === undefined) break;
       s.closeTab(t.id);
     }
-    expect(useAppStore.getState().tabs).toHaveLength(0);
+    // 关掉最后一个后自动打开工作台总览（用户反馈：全关后不留空白）——
+    // 栈里仍是 10 条（上限），当前唯一标签是总览
+    expect(useAppStore.getState().tabs).toHaveLength(1);
+    expect(useAppStore.getState().tabs[0]?.kind).toBe('overview');
     expect(useAppStore.getState().closedTabs).toHaveLength(10);
   });
 });
