@@ -338,8 +338,24 @@ export function Dashboard(): React.JSX.Element {
           <Card size="small">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="还没有登记项目，点右上「添加项目」开始"
-            />
+              description={
+                <>
+                  还没有登记项目
+                  <br />
+                  <span style={{ fontSize: 12, opacity: 0.65 }}>
+                    ① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索
+                  </span>
+                </>
+              }
+            >
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => useAppStore.getState().requestAddProject()}
+              >
+                添加项目
+              </Button>
+            </Empty>
           </Card>
         ) : (
           <>

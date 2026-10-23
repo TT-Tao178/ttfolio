@@ -636,6 +636,18 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
             />
             {/* 手动检查更新（api.github.com 元数据 + 引导手动下载，评审 C10 轻方案） */}
             <UpdateCheck />
+            {/* 新手导览重看入口（T-120）：一切引导可选——看完/跳过后仍可随时再看 */}
+            <div style={{ marginTop: 16 }}>
+              <Button
+                size="small"
+                onClick={() => {
+                  useAppStore.getState().requestOnboarding();
+                  void message.info('已打开新手导览（可点右上角 × 随时关闭）');
+                }}
+              >
+                重新查看新手导览
+              </Button>
+            </div>
             {/* Agent 接入说明（FR-13.1）：让外部 agent 的发现路径显式可查 */}
             <div
               style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SEMANTIC.split}` }}
