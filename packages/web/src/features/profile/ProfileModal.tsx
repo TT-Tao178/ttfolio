@@ -200,9 +200,6 @@ export function ProfileModal({ open, onClose }: { open: boolean; onClose: () => 
             </Button>
           )}
         </div>
-        <div style={{ fontSize: 12, opacity: 0.55, textAlign: 'center' }}>
-          保存后，你在此软件中的操作在审计日志与资源仓库里会显示这个名字（agent 另有自己的身份）。
-        </div>
       </div>
     </Modal>
   );
