@@ -187,3 +187,26 @@ body,
 .tt-autoscroll .ant-input-number-handler-wrap {
   opacity: 1;
 }
+
+/* 动态流水完整路径（第 67 轮用户需求）：目录段灰显、过长时从左侧截断保住文件名；
+   文件名加重。direction:rtl 让省略号出现在左端（路径的尾部=文件名永远可见）。 */
+.tt-live-path {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+}
+.tt-live-dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  opacity: 0.55;
+}
+.tt-live-base {
+  white-space: nowrap;
+  font-weight: 600;
+  flex-shrink: 0;
+}

@@ -46,6 +46,23 @@ function timeOf(iso: string): string {
   return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 }
 
+function splitPath(p: string): { dir: string; base: string } {
+  const idx = p.lastIndexOf('/');
+  return idx >= 0 ? { dir: p.slice(0, idx + 1), base: p.slice(idx + 1) } : { dir: '', base: p };
+}
+
+/** 完整相对路径：目录段灰显、过长时从左侧截断（保住文件名），文件名加重——
+ *  与文件树的路径观感一致（用户反馈：动态页要能看清改的是哪个文件）。 */
+function LivePath({ path, style }: { path: string; style?: React.CSSProperties }): React.JSX.Element {
+  const { dir, base } = splitPath(path);
+  return (
+    <span className="tt-mono tt-live-path" style={style} title={path}>
+      {dir !== '' && <span className="tt-live-dir">{dir}</span>}
+      <span className="tt-live-base">{base}</span>
+    </span>
+  );
+}
+
 interface Burst {
   burstId: string;
   items: ChangeEventInfo[];
@@ -96,6 +113,16 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
     const el = scrollRef.current;
     if (el !== null) el.scrollTop = el.scrollHeight;
   }, [follow, events.length]);
+
+  // 跟随时自动打开最新变更的文件（用户需求：点开动态页就能旁观 agent 干活）——
+  // 右栏查看器自动选中最新事件；「正在写入」窗口内 250ms 短轮询让内容持续刷新。
+  // 点条目即钉住（follow=false 停止抢焦点），重新打开开关即跳回最新。
+  useEffect(() => {
+    if (!follow) return;
+    const cand = events[events.length - 1];
+    if (cand === undefined) return;
+    setSelectedSeq((cur) => (cur === cand.seq ? cur : cand.seq));
+  }, [follow, events]);
 
   const setBaselineToHead = (): void => {
     if (!isRepo) {
@@ -179,7 +206,7 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
           </Button>
           <span style={{ fontSize: 12, opacity: 0.65 }}>{events.length} 条 · 已落库（保留 7 天）</span>
           <span style={{ flex: 1 }} />
-          <Tooltip title="跟随最新（点条目即钉住）">
+          <Tooltip title="跟随最新：自动滚动到最新变更并打开对应文件（点条目即钉住）">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
               <VerticalAlignBottomOutlined />
               <Switch
@@ -241,18 +268,7 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
                         }}
                       >
                         <Tooltip title={kindText(e)}>{kindIcon(e)}</Tooltip>
-                        <span
-                          className="tt-mono"
-                          style={{
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={e.path}
-                        >
-                          {e.path}
-                        </span>
+                        <LivePath path={e.path} style={{ flex: 1 }} />
                         {e.changeCount > 1 && (
                           <Tag style={{ fontSize: 10, marginInlineEnd: 0 }}>×{e.changeCount}</Tag>
                         )}
@@ -286,7 +302,7 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
-                latest === null ? '等待文件变更' : '点左侧条目查看内容，或打开「跟随最新」并选中最新一条'
+                latest === null ? '等待文件变更' : '打开「跟随最新」自动旁观文件变化，或点左侧条目查看'
               }
             />
             {latest !== null && (
@@ -313,16 +329,17 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
               }}
             >
               <span
-                className="tt-mono"
                 style={{
-                  fontSize: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  fontSize: 12,
                 }}
-                title={selected.path}
               >
-                {kindIcon(selected)} {selected.path}
+                {kindIcon(selected)}
+                <LivePath path={selected.path} />
               </span>
               {writing && (
                 <Tag color="processing" style={{ fontSize: 10 }}>
