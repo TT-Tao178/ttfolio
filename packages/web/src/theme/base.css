@@ -210,3 +210,32 @@ body,
   font-weight: 600;
   flex-shrink: 0;
 }
+
+/* 文件树（第 67 轮用户需求）：选中态醒目化 + 悬停/选中平滑过渡——
+   选中 = 主色底 + 左侧 3px 主色竖条 + 主色加重字重；悬停 = 淡背景 + 轻微右移。
+   颜色全部走主题变量/currentColor 混合，六主题自动适配；圆角与过渡统一缓动。 */
+[data-testid='file-tree'] .ant-tree-treenode {
+  border-radius: 8px;
+  padding-right: 8px;
+}
+[data-testid='file-tree'] .ant-tree-node-content-wrapper {
+  border-radius: 6px;
+  transition:
+    background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-testid='file-tree'] .ant-tree-node-content-wrapper:hover {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  transform: translateX(2px);
+}
+[data-testid='file-tree'] .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: var(--tt-primary-bg);
+  color: var(--tt-primary);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 0 var(--tt-primary);
+}
+[data-testid='file-tree'] .ant-tree-node-content-wrapper.ant-tree-node-selected:hover {
+  transform: none;
+}
