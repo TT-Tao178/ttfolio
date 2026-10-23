@@ -1,7 +1,7 @@
 /** 动态页签（FR-13.2 v2 / T-111）：变更流水落库可回读；左栏按 burst 分组 + 来源徽标，
  *  右栏跟随最新 / 当前内容 / 与基线差异（基线 = 手动「设基线」时的 git HEAD）。 */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Button, Empty, Segmented, Switch, Tag, Tooltip } from 'antd';
 import {
   DeleteOutlined,
@@ -19,13 +19,17 @@ import { langExtension } from '@/features/files/langExt';
 import { ImagePreview } from '@/features/files/ImagePreview';
 import { DiffView } from '@/features/git/DiffView';
 import { useSettings } from '@/app/settings';
+import { subscribeSseEvents } from '@/app/sse';
 import { useSettingsDark } from '@/features/files/useDark';
 import { SEMANTIC } from '@/theme/tokens';
 import { useLiveEvents, type ChangeEventInfo, type ChangeSource } from './liveStore';
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp'];
-/** 「正在写入」窗口：最后一次变更在该窗口内时当前文件短轮询刷新。 */
+/** 「正在写入」提示窗口：最后一次变更在该窗口内时右栏头部显示「正在写入…」。
+ *  第 68 轮起内容刷新不再由该窗口定时轮询，改事件驱动（见 scheduleRefresh）。 */
 const WRITING_WINDOW_MS = 10_000;
+/** 事件驱动刷新的最小间隔（节流）：同文件事件再密也最多 4 次/秒取内容。 */
+const REFRESH_MIN_GAP_MS = 250;
 
 const SOURCE_META: Record<ChangeSource, { label: string; color: string | undefined }> = {
   watcher: { label: '外部', color: 'default' },
@@ -139,11 +143,54 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
       .catch(() => void message.error('读取 git HEAD 失败'));
   };
 
-  // 正在写入：当前文件最近变更在 10 秒窗口内 → 250ms 轮询刷新（其余走事件）
+  // 正在写入：当前文件最近变更在 10 秒窗口内 → 右栏头部显示「正在写入…」标记
   const writing =
     selected !== null &&
     Date.now() - Date.parse(selected.lastAt) < WRITING_WINDOW_MS &&
     selected.kind !== 'delete';
+
+  // 事件驱动刷新（第 68 轮性能优化 2，用户点名）：选中路径出现新 fs.changed
+  // 事件才取内容/diff，250ms 节流——替代旧「窗口内固定 250ms 轮询」，写入间隙零请求。
+  const queryClient = useQueryClient();
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const baselineRef = useRef(baseline);
+  baselineRef.current = baseline;
+  const lastRefreshRef = useRef(0);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current !== null) return;
+    const wait = Math.max(0, lastRefreshRef.current + REFRESH_MIN_GAP_MS - Date.now());
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      lastRefreshRef.current = Date.now();
+      const cur = selectedRef.current;
+      if (cur === null || cur.kind === 'delete') return;
+      void queryClient.invalidateQueries({ queryKey: ['agent-live-file', projectId, cur.path] });
+      void queryClient.invalidateQueries({
+        queryKey: ['agent-live-diff', projectId, cur.path, baselineRef.current],
+      });
+    }, wait);
+  }, [projectId, queryClient]);
+  useEffect(() => {
+    const unsubscribe = subscribeSseEvents((evt) => {
+      if (evt.event !== 'fs.changed') return;
+      if (evt.data['projectId'] !== projectId) return;
+      const arr = evt.data['events'];
+      if (!Array.isArray(arr)) return;
+      const cur = selectedRef.current;
+      if (cur === null || cur.kind === 'delete') return;
+      const hit = arr.some((e) => (e as { path?: unknown }).path === cur.path);
+      if (hit) scheduleRefresh();
+    });
+    return () => {
+      unsubscribe();
+      if (refreshTimerRef.current !== null) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [projectId, scheduleRefresh]);
 
   const fileQuery = useQuery({
     queryKey: ['agent-live-file', projectId, selected?.path ?? ''],
@@ -152,7 +199,6 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
         `/api/fs/file?projectId=${projectId}&path=${encodeURIComponent(selected?.path ?? '')}`,
       ),
     enabled: selected !== null && selected.kind !== 'delete' && viewMode === 'content',
-    refetchInterval: writing ? 250 : false,
   });
   const diffQuery = useQuery({
     queryKey: ['agent-live-diff', projectId, selected?.path ?? '', baseline],
