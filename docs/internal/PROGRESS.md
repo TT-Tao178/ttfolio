@@ -1,5 +1,23 @@
 # PROGRESS
 
+## 第 69 轮：v0.4.4 出包（UI 四项 + 动态页性能优化随版本发布）
+
+- 版本三处同轮（e327952）：package.json / server 常量 / CHANGELOG；0.4.3 →
+  **0.4.4**（每包 +0.0.1）。
+- **出包（EBUSY 两进宫，预案②换目录路线）**：链前四步全过（audit 无抖动；
+  electron-rebuild 头文件**未再超时**——上次本地镜像喂出的缓存在 44.9.3 下
+  复用成功，预案③可记「一次喂镜后续走缓存」）；electron-builder 在旧
+  win-unpacked 的 app.asar 上 EBUSY 两次（间隔 5 分钟，退避无效），取证无
+  任何 ttFolio/electron 进程、`rm` 删除同样被拒——**杀软扫描器硬锁**，按
+  预案②换全新目录 `-c.directories.output=dist-electron-044t1` 一轮过。
+- **结果**：VERIFY_DIST=dist-electron-044t1/win-unpacked 自检 8 项全绿含
+  0.4.4 断言与真实启动冒烟；安装包（约 146MB）+ blockmap 移回 dist-electron；
+  rebuild better-sqlite3 翻回 Node ABI、门禁复跑三绿（248 条，退出码实查）。
+  dist-electron-044t1 与旧 win-unpacked 残留在扫描锁定期暂删不掉（已
+  gitignore，自愈后可手动删）。
+- **发布**：tag v0.4.4 打在版本提交 e327952，先 push main+tag 再经系统
+  curl 建 Release 页（正文取 CHANGELOG）；资产由用户拖传（对照清单已补行）。
+
 ## 第 68 轮：动态页性能优化两项（用户点名，未出包）
 
 > 背景：用户问「动态页对性能损失多少」——按场景给出分析（唯一成本窗口是
