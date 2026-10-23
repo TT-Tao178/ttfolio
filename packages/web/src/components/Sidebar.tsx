@@ -8,6 +8,7 @@ import {
   BranchesOutlined,
   CopyOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
@@ -24,6 +25,7 @@ import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { CustomViewModal } from '@/features/workbench/CustomViewModal';
+import { downloadProjectReport } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
@@ -217,6 +219,7 @@ export function Sidebar(): React.JSX.Element {
           { key: 'copy', label: '复制路径', icon: <CopyOutlined /> },
           { key: 'explorer', label: '在资源管理器中显示', disabled: ctxProject.pathOk === false },
           { key: 'analyze', label: '重新分析', disabled: ctxProject.pathOk === false },
+          { key: 'report', label: '导出 Markdown 报告', icon: <DownloadOutlined /> },
         ]
       : ctxCollection !== undefined
         ? [
@@ -337,6 +340,11 @@ export function Sidebar(): React.JSX.Element {
         case 'analyze':
           void api.post('/api/projects/analyze', { projectIds: [p.id] });
           void message.success('已开始重新分析');
+          break;
+        case 'report':
+          void downloadProjectReport(p)
+            .then((msg) => message.success(msg))
+            .catch(() => message.error('导出报告失败'));
           break;
       }
       return;

@@ -18,6 +18,7 @@ import {
   StarOutlined,
   StarFilled,
   CopyOutlined,
+  DownloadOutlined,
   FolderOpenOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
@@ -30,6 +31,7 @@ import { fmtBytes, fmtMs, relTime } from '@/lib/format';
 import { LanguageBar } from '@/components/LanguageBar';
 import { StateView } from '@/components/StateView';
 import { typeLabel } from '@/components/DetailPanel';
+import { downloadProjectReport } from '@/features/workbench/projectMenu';
 import { FilesTab } from '@/features/files/FilesTab';
 import { GitTab } from '@/features/git/GitTab';
 import { ArchivesTab } from '@/features/archives/ArchivesTab';
@@ -143,6 +145,18 @@ export function ProjectPage({
           </Button>
           <Button size="small" onClick={() => setAliasOpen(true)}>
             改别名（L1）
+          </Button>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              if (p === undefined) return;
+              void downloadProjectReport(p)
+                .then((msg) => message.success(msg))
+                .catch(() => message.error('导出报告失败'));
+            }}
+          >
+            导出报告
           </Button>
         </Space>
       </div>
