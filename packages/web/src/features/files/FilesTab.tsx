@@ -30,7 +30,6 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError, rawUrl } from '@/lib/api';
-import { mediaKindOf } from '@ttfolio/shared';
 import type { ProjectDetail, TreeNode, TreeResponse } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
@@ -42,6 +41,7 @@ import { MoveCopyModal } from './MoveCopyModal';
 import { OfficePreview } from '@/features/docs/OfficePreview';
 import { resolveViewer } from './viewerDispatch';
 import { ComparePickModal } from '@/features/compare/ComparePickModal';
+import { visibleKeysInOrder, rangeSelect, type TreeNodeLike } from './treeSelect';
 
 const GIT_COLORS: Record<string, string> = {
   modified: SEMANTIC.warning,
@@ -127,6 +127,11 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
   // 右键菜单（第 27 轮重构为容器委托 + 受控固定定位菜单）：mcTarget 是复制/移动弹窗，
   // dirPath 为复制绝对路径所需的项目根（与详情页共享查询缓存）
   const [mcTarget, setMcTarget] = useState<{ items: string[]; mode: 'move' | 'copy' } | null>(null);
+  // 文件树多选（T-128）：开关默认关（单选行为零变化）；selPaths 为选中集，
+  // anchorRef 记录 Shift 范围选择起点
+  const [multiMode, setMultiMode] = useState(false);
+  const [selPaths, setSelPaths] = useState<string[]>([]);
+  const anchorRef = useRef<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   // 文件对比（FR-13.9 / T-106b）：右键「与其他文件对比…」的基準文件
   const [compareBase, setCompareBase] = useState<string | null>(null);
@@ -299,8 +304,10 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
 
   const del = useMutation({
     mutationFn: (paths: string[]) => api.post('/api/fs/delete', { projectId, paths, confirm: true }),
-    onSuccess: () => {
+    onSuccess: (_d, variables) => {
       void message.success('已移入回收站（可在回收站恢复）');
+      // 精确清除选中集（T-128 多选批量删除后不残留失效路径）；单删时 selPaths 本为空
+      setSelPaths((prev) => prev.filter((p) => !variables.includes(p)));
       setSelectedPath(null);
       void refetch();
     },
@@ -376,6 +383,20 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
               >
                 删除
               </Button>
+              {/* 多选开关（T-128）：默认关=单选行为零变化；开启后点击/Ctrl/Shift 组合多选 */}
+              <span style={{ fontSize: 12 }}>多选</span>
+              <Switch
+                size="small"
+                checked={multiMode}
+                onChange={(v) => {
+                  setMultiMode(v);
+                  if (!v) {
+                    setSelPaths([]);
+                    anchorRef.current = null;
+                  }
+                }}
+                title="多选模式：点击或 Ctrl+点击切换选中，Shift+点击范围选；配合底部批量条操作"
+              />
               <span style={{ fontSize: 12 }}>忽略项</span>
               {/* 忽略项开关走全局设置（原先只有本地 state，设置页里的 show_ignored 是死键） */}
               <Switch size="small" checked={showIgnored} onChange={(v) => setSetting('showIgnored', v)} />
@@ -446,7 +467,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                   showIcon
                   blockNode
                   treeData={treeData}
-                  selectedKeys={selectedPath === null ? [] : [selectedPath]}
+                  selectedKeys={multiMode ? selPaths : selectedPath === null ? [] : [selectedPath]}
                   expandedKeys={expandedKeys}
                   onExpand={(keys) => setExpandedKeys(keys)}
                   loadData={async (node) => {
@@ -457,7 +478,7 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                       /* loadChildren 已处理提示与失败标记 */
                     }
                   }}
-                  onSelect={(keys) => {
+                  onSelect={(keys, info) => {
                     const key = keys[0];
                     // 点已选中的节点时 rc-tree 会"反选"，keys 为空数组 → key 不是 string。
                     // 原实现在这里直接 return，于是"后退回到未打开文件 → 再点同一个文件"没有任何反应
@@ -466,20 +487,91 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
                     const resolved = typeof key === 'string' ? key : selectedPath;
                     if (resolved === null) return;
                     const kind = findKind(treeData, resolved);
-                    if (kind === 'file') {
-                      // FR-13.5 联动：媒体文件直接进「媒体」页签灯箱；其余照旧右栏打开
-                      if (mediaKindOf(resolved) !== null) {
-                        useAppStore.getState().updateActiveLocation({ subTab: 'media' }, true);
-                        useAppStore.getState().setMediaFocus({ projectId, path: resolved });
+                    // 多选模式（T-128）：点击=切换选中、Ctrl/⌘=切换、Shift=按可见顺序范围选；
+                    // 不打开文件，右栏保持现状；退出多选恢复单选行为
+                    if (multiMode) {
+                      const nodeKey = typeof info?.node?.key === 'string' ? info.node.key : resolved;
+                      const native = info?.nativeEvent as MouseEvent | undefined;
+                      if (native?.shiftKey) {
+                        setSelPaths(
+                          rangeSelect(
+                            visibleKeysInOrder(treeData as TreeNodeLike[], expandedKeys),
+                            anchorRef.current,
+                            nodeKey,
+                          ),
+                        );
+                      } else if (native?.ctrlKey || native?.metaKey) {
+                        setSelPaths((prev) =>
+                          prev.includes(nodeKey) ? prev.filter((x) => x !== nodeKey) : [...prev, nodeKey],
+                        );
                       } else {
-                        useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
+                        setSelPaths((prev) => (prev.length === 1 && prev[0] === nodeKey ? prev : [nodeKey]));
                       }
+                      anchorRef.current = nodeKey;
+                      setSelectedPath(nodeKey);
+                      return;
+                    }
+                    if (kind === 'file') {
+                      // T-127：图片与其他文件一致，走右栏预览分发器（此前媒体文件跳
+                      // 「媒体」页签全屏灯箱，用户反馈点开就是全屏不合理）；媒体页签
+                      // 本身保留，仍可从侧栏/媒体入口进入
+                      useAppStore.getState().updateActiveLocation({ targetPath: resolved }, true);
                     }
                     setSelectedPath(kind === 'file' ? resolved : typeof key === 'string' ? key : null);
                   }}
                 />
               )}
             </div>
+            {multiMode && selPaths.length > 0 && (
+              <div
+                data-testid="tree-multiselect-bar"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  borderTop: `1px solid ${SEMANTIC.split}`,
+                  padding: '6px 2px 0',
+                  fontSize: 12,
+                }}
+              >
+                <span style={{ opacity: 0.75 }}>已选 {selPaths.length} 项</span>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(selPaths.join('\n'));
+                    void message.success(`已复制 ${selPaths.length} 条相对路径`);
+                  }}
+                >
+                  复制路径
+                </Button>
+                <Button size="small" onClick={() => setMcTarget({ items: selPaths, mode: 'move' })}>
+                  移动到…
+                </Button>
+                <Button size="small" onClick={() => setMcTarget({ items: selPaths, mode: 'copy' })}>
+                  复制到…
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  onClick={() => {
+                    modal.confirm({
+                      title: `删除这 ${selPaths.length} 项？`,
+                      content: '将移入回收站，可在回收站恢复。',
+                      okText: '删除',
+                      okButtonProps: { danger: true },
+                      cancelText: '取消',
+                      onOk: () => del.mutate(selPaths),
+                    });
+                  }}
+                >
+                  删除
+                </Button>
+                <Button size="small" type="text" onClick={() => setSelPaths([])}>
+                  清空
+                </Button>
+              </div>
+            )}
           </div>
         }
         right={
@@ -522,6 +614,8 @@ export function FilesTab({ projectId }: { projectId: string }): React.JSX.Elemen
           // 移动/复制后已展开子层是本地缓存，invalidate 根查询清不掉——整树收起强制重读，
           // 用户重新展开看到的一定是新结构
           setExpandedKeys([]);
+          // 多选批量移动/复制后旧路径失效，清空选中集（T-128）
+          setSelPaths([]);
           void refetch();
         }}
       />
