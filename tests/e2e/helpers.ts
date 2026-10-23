@@ -2,6 +2,17 @@
 import type { Page } from '@playwright/test';
 
 /**
+ * 跳过新手导览（T-120）：全新环境（0 项目 && 未看过）会在启动后自动弹 antd Tour，
+ * 遮罩会挡住后续交互——出现即点右上角 × 关闭（localStorage 记忆随之写入）。
+ */
+export async function dismissTour(page: Page): Promise<void> {
+  const close = page.locator('.ant-tour-close');
+  await close.click({ timeout: 2500 }).catch(() => {
+    /* 未弹出（已有项目或已看过）——正常路径 */
+  });
+}
+
+/**
  * 回到工作台总览屏：服务端会话恢复可能把活动标签还原成项目/其他标签。
  * 注意（第 65 轮取证）：AddProjectModal 登记成功后有意的「切到卡片墙」行为
  * （Workbench onSuccess → subTab:'view:all'，0.3.5 的"添加了但没反应"修复）会让

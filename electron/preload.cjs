@@ -3,12 +3,23 @@
  * 目前只有一件事：主题设置变化时上报，主进程据此切 nativeTheme.themeSource，
  * 让 Windows 原生窗口标题栏跟随应用深浅色（原生标题栏默认恒白、不随页面变，历史报障）。
  */
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('ttfolioNative', {
   /** mode 取值：light | dark | oled | system；主进程按白名单映射，未知值回 system。 */
   setTheme: (mode) => {
     ipcRenderer.send('tt:theme-changed', String(mode));
+  },
+  /**
+   * 拖拽登记（FR-2.2 决策修订 / T-118）：把 DataTransfer 里的 File 对象换成绝对路径。
+   * 仅桌面版可用（Web 沙箱拿不到路径）；失败返回空串由调用方过滤。
+   */
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return '';
+    }
   },
   /**
    * 缩略图原生解码（FR-13.5 / T-113）：绝对路径 + 目标最长边 → dataURL | null。

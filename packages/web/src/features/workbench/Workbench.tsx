@@ -31,6 +31,7 @@ import { CollectionPickerModal } from './CollectionPickerModal';
 import { buildProjectMenu, useArchiveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
+import { markPendingAnalysis } from './pendingAnalyze';
 export { parseSubTab };
 import { SEMANTIC } from '@/theme/tokens';
 
@@ -311,7 +312,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             loading={isLoading}
             error={error}
             empty={(projects ?? []).length === 0}
-            emptyText="还没有登记任何项目"
+            emptyText="还没有登记任何项目：① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索"
             emptyAction={{ label: '添加第一个项目', onClick: () => setAddOpen(true) }}
           >
             {view === 'card' ? (
@@ -436,6 +437,9 @@ function AddProjectModal({
   >([]);
   const [picking, setPicking] = useState(false);
   const [browsing, setBrowsing] = useState(false);
+  // 拖拽登记（T-118）：仅桌面版（preload 桥存在）可用；drop 高亮态
+  const canDrop = typeof window.ttfolioNative?.getPathForFile === 'function';
+  const [dragOver, setDragOver] = useState(false);
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   // 集合上下文仅用于展示与登记后入集：名字取 ['collections'] 缓存（与侧栏共享，未加载时降级中性文案）
@@ -446,6 +450,21 @@ function AddProjectModal({
   });
   const collectionName =
     collectionId !== null ? (collections ?? []).find((c) => c.id === collectionId)?.name : undefined;
+
+  // 拖拽登记（T-118）：全局 drop 收集到的路径在弹窗打开时消费一次（App 级 drop → store → 这里）
+  useEffect(() => {
+    if (!open) return;
+    const prefill = useAppStore.getState().addProjectPrefill;
+    if (prefill !== null && prefill !== '') {
+      setText(prefill);
+      useAppStore.getState().setAddProjectPrefill(null);
+    }
+  }, [open]);
+
+  const dropPathsOf = (e: React.DragEvent): string[] =>
+    Array.from(e.dataTransfer.files)
+      .map((f) => window.ttfolioNative?.getPathForFile?.(f) ?? '')
+      .filter((p) => p !== '');
 
   const add = useMutation({
     mutationFn: async (body: unknown) => {
@@ -467,6 +486,8 @@ function AddProjectModal({
       return { ...r, joined };
     },
     onSuccess: (r) => {
+      // 分析完成反馈（T-119）：新登记的项目在 project.analyzed SSE 到达时 toast 一次
+      markPendingAnalysis(r.added);
       if (r.added.length > 0) {
         if (collectionId !== null) {
           if (r.joined) void message.success(`已登记 ${r.added.length} 个项目并加入集合，正在分析…`);
@@ -546,7 +567,47 @@ function AddProjectModal({
       width={640}
       data-testid="add-project-modal"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          // 拖拽登记（T-118）：桌面版整个弹窗都是落点，拖近时虚线高亮
+          ...(canDrop
+            ? {
+                border: `1px dashed ${dragOver ? SEMANTIC.primary : SEMANTIC.split}`,
+                borderRadius: 8,
+                padding: dragOver ? 11 : 12,
+                background: dragOver ? SEMANTIC.primaryBg : undefined,
+                transition: 'border-color 0.15s ease, background-color 0.15s ease',
+              }
+            : {}),
+        }}
+        onDragOver={(e) => {
+          if (!canDrop) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (!canDrop) return;
+          e.stopPropagation();
+          setDragOver(false);
+        }}
+        onDrop={(e) => {
+          if (!canDrop) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(false);
+          const paths = dropPathsOf(e);
+          if (paths.length === 0) {
+            void message.info('没有可识别的拖入内容');
+            return;
+          }
+          setText((cur) => (cur.trim() === '' ? paths.join('\n') : `${cur}\n${paths.join('\n')}`));
+          void message.info(`已填入 ${paths.length} 个路径，点「登记以上目录」确认（非文件夹会被自动跳过）`);
+        }}
+      >
         <div>
           <div style={{ marginBottom: 6 }}>
             ① 添加单个项目（粘贴项目文件夹路径）——也支持一次粘贴多行批量登记，可带引号、\\?\ 前缀
@@ -631,10 +692,17 @@ function AddProjectModal({
             </div>
           )}
         </div>
-        <div style={{ fontSize: 12, opacity: 0.65 }}>
-          提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，拖拽添加暂不可用——请用上方三种入口（粘贴路径 /
-          系统对话框 / 父目录批量登记）。
-        </div>
+        {canDrop ? (
+          <div style={{ fontSize: 12, opacity: 0.65 }}>
+            提示：桌面版支持把项目文件夹直接拖进本窗口或本弹窗——路径会自动填入上方输入框确认后登记；
+            混入的文件会被自动跳过，只登记文件夹。也可以粘贴多行路径、用系统对话框或父目录批量登记。
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, opacity: 0.65 }}>
+            提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，Web 模式下拖拽添加不可用——请用上方三种入口
+            （粘贴路径 / 系统对话框 / 父目录批量登记）。桌面版支持直接拖入。
+          </div>
+        )}
       </div>
     </Modal>
   );

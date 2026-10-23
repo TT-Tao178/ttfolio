@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { gotoWorkbench } from './helpers';
+import { gotoWorkbench, dismissTour } from './helpers';
 
 const FIXTURE = path.resolve(process.cwd(), '.tmp-test', 'e2e-fixture-a');
 
@@ -15,7 +15,10 @@ test.beforeAll(() => {
   fs.mkdirSync(path.join(FIXTURE, 'docs'), { recursive: true });
   fs.writeFileSync(path.join(FIXTURE, 'README.md'), '# e2e 项目 A\n\n初始内容\n');
   fs.writeFileSync(path.join(FIXTURE, 'notes.md'), '# 笔记\n第一版\n');
-  fs.writeFileSync(path.join(FIXTURE, 'package.json'), JSON.stringify({ name: 'e2e-a', dependencies: { vue: '^3.4.0', vite: '^5.0.0' } }));
+  fs.writeFileSync(
+    path.join(FIXTURE, 'package.json'),
+    JSON.stringify({ name: 'e2e-a', dependencies: { vue: '^3.4.0', vite: '^5.0.0' } }),
+  );
   fs.writeFileSync(path.join(FIXTURE, 'main.ts'), 'export const n = 1;\n');
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: FIXTURE });
   execFileSync('git', ['config', 'user.email', 'e2e@local'], { cwd: FIXTURE });
@@ -31,6 +34,7 @@ test.afterAll(() => {
 test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', async ({ page }) => {
   // 1) 粘贴路径登记
   await gotoWorkbench(page);
+  await dismissTour(page); // 全新环境会弹首启导览（T-120），跳过后再操作
   await page.locator('[data-testid="add-project-btn"]').click();
   await expect(page.locator('[data-testid="paste-paths"]')).toBeVisible({ timeout: 10000 });
   await page.locator('[data-testid="paste-paths"]').fill(FIXTURE);
@@ -76,6 +80,9 @@ test('添加项目 → 打开文件 → 编辑保存 → Git 暂存提交', asyn
   // 7) 仓库验证：提交存在，且一次提交只包含暂存文件
   const log = execFileSync('git', ['log', '--oneline', '-1'], { cwd: FIXTURE, encoding: 'utf8' });
   expect(log).toContain('只包含暂存文件');
-  const files = execFileSync('git', ['show', '--name-only', '--format=', 'HEAD'], { cwd: FIXTURE, encoding: 'utf8' });
+  const files = execFileSync('git', ['show', '--name-only', '--format=', 'HEAD'], {
+    cwd: FIXTURE,
+    encoding: 'utf8',
+  });
   expect(files.trim().split('\n')).toEqual(['notes.md']);
 });

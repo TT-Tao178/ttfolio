@@ -190,6 +190,12 @@ export async function validateRegistrableRoot(userPath: string): Promise<string>
       throw new AppError(err.code, actionable(err.message), err.detail, err.httpStatus);
     throw err;
   }
+  // 只能登记文件夹（T-118 拖拽登记陪跑守卫）：拖入的文件/快捷方式落 skipped 如实提示，
+  // 不再被当成项目目录写进索引
+  const st = await fsp.stat(real);
+  if (!st.isDirectory()) {
+    throw new AppError('INVALID_NAME', `不是文件夹：${userPath}（ttFolio 只能登记文件夹）`);
+  }
   return real;
 }
 

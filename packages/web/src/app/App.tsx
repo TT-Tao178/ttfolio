@@ -7,6 +7,8 @@ import { queryClient } from '@/lib/qc';
 import { SettingsProvider, useSettings } from '@/app/settings';
 import { useAppStore, serializeSession } from '@/app/store';
 import { useSse, subscribeSseEvents, type SseState } from '@/app/sse';
+import { takePendingAnalysis } from '@/features/workbench/pendingAnalyze';
+import { OnboardingTour } from '@/features/onboarding/OnboardingTour';
 import { TabBar } from '@/components/TabBar';
 import { PathBar } from '@/components/PathBar';
 import { StatusBar } from '@/components/StatusBar';
@@ -150,6 +152,44 @@ function Shell(): React.JSX.Element {
       else void message.info(msg);
     }
   });
+
+  // 拖拽登记（T-118）：桌面版把任意位置拖入的文件夹收集为登记预填并打开添加弹窗；
+  // 全局 preventDefault 防止 Electron 窗口被拖入文件导航走。Web 模式不接管。
+  useEffect(() => {
+    const native = window.ttfolioNative;
+    const getPath = native?.getPathForFile;
+    if (typeof getPath !== 'function') return undefined;
+    const stop = (e: DragEvent): void => {
+      e.preventDefault();
+    };
+    const onDrop = (e: DragEvent): void => {
+      e.preventDefault();
+      const paths = Array.from(e.dataTransfer?.files ?? [])
+        .map((f) => getPath(f))
+        .filter((p) => p !== '');
+      if (paths.length === 0) return;
+      const st = useAppStore.getState();
+      st.setAddProjectPrefill(paths.join('\n'));
+      st.requestAddProject();
+    };
+    document.addEventListener('dragover', stop);
+    document.addEventListener('drop', onDrop);
+    return () => {
+      document.removeEventListener('dragover', stop);
+      document.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
+  // 「分析中」完成反馈（T-119）：本轮新登记项目分析完成时一次性 toast（module 级暂存）
+  useEffect(
+    () =>
+      subscribeSseEvents((e) => {
+        if (e.event !== 'project.analyzed') return;
+        const pid = e.data['projectId'];
+        if (typeof pid === 'string' && takePendingAnalysis(pid)) void message.success('新登记项目分析完成');
+      }),
+    [message],
+  );
 
   // 渲染层未捕获异常落盘（第 33 轮 M9）：window.onerror + unhandledrejection
   // → POST /api/log/client-error（pino 日志），白屏可诊断。节流：同消息 10 秒
@@ -455,6 +495,7 @@ function Shell(): React.JSX.Element {
       {terminalOpen && <TerminalPanel />}
       <StatusBar sseState={sseState} />
       <CommandPalette />
+      <OnboardingTour />
       <span
         data-testid="app-theme"
         data-dark={dark ? '1' : '0'}

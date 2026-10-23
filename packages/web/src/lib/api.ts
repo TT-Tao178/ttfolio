@@ -12,6 +12,8 @@ declare global {
       setTheme?: (mode: string) => void;
       /** 主进程 nativeImage 解码并按最长边缩放，返回 dataURL；失败返回 null。 */
       thumbDecode?: (absPath: string, maxPx: number) => Promise<string | null>;
+      /** 拖拽登记（T-118）：DataTransfer 的 File → 绝对路径；仅桌面版存在。 */
+      getPathForFile?: (file: File) => string;
     };
   }
 }

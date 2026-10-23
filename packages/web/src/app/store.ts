@@ -78,6 +78,12 @@ interface AppState {
   /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
   addProjectNonce: number;
   requestAddProject: () => void;
+  /** 新手导览（T-120）：设置→关于「重新查看」入口信号，nonce 自增触发 */
+  onboardingNonce: number;
+  requestOnboarding: () => void;
+  /** 拖拽登记（T-118）：全局 drop 收集到的路径，AddProjectModal 打开时消费一次 */
+  addProjectPrefill: string | null;
+  setAddProjectPrefill: (v: string | null) => void;
   /** 待自动打开第一个文件的项目 id（打开项目落「文件」页签时设置，FilesTab 消费后清空） */
   pendingAutoOpenProject: string | null;
   requestAutoOpenProject: (projectId: string) => void;
@@ -301,6 +307,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   addProjectNonce: 0,
   requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
+  onboardingNonce: 0,
+  requestOnboarding: () => set({ onboardingNonce: get().onboardingNonce + 1 }),
+  addProjectPrefill: null,
+  setAddProjectPrefill: (v) => set({ addProjectPrefill: v }),
   pendingAutoOpenProject: null,
   requestAutoOpenProject: (projectId) => set({ pendingAutoOpenProject: projectId }),
   treeLocate: null,
