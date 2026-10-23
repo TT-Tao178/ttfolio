@@ -140,12 +140,8 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
     category: 'Git',
     run: (ctx) => openStoreTab(ctx.store, 'search', 'Git 总览', 'git-overview'),
   },
-  {
-    id: 'view.search-page',
-    title: '打开搜索页',
-    category: '视图',
-    run: (ctx) => openStoreTab(ctx.store, 'search', '搜索'),
-  },
+  // 「打开搜索页」死命令已删（T-115）：kind='search' 除 git-overview 外无渲染分支，
+  // 此前执行得到空白标签；搜索入口已有 Ctrl+K / 顶栏搜索 / 侧栏搜索域。
   // ---- 项目 ----
   {
     id: 'project.add',

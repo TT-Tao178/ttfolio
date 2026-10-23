@@ -14,6 +14,7 @@ import { DomainRail } from '@/components/DomainRail';
 import { PaneSplit } from '@/components/PaneSplit';
 import { Sidebar } from '@/components/Sidebar';
 import { DetailPanel } from '@/components/DetailPanel';
+import { StateView } from '@/components/StateView';
 import { Workbench } from '@/features/workbench/Workbench';
 import { ProjectPage } from '@/features/project/ProjectPage';
 import { TrashPage } from '@/features/trash/TrashPage';
@@ -410,7 +411,29 @@ function Shell(): React.JSX.Element {
                       ) : activeTab.subTab === 'git-overview' ? (
                         <GitOverview />
                       ) : (
-                        <div />
+                        // 兜底（T-115）：未知/遗留 kind（旧会话残留的 search/file/image 等）
+                        // 不再渲染白屏，给出可行动的提示
+                        <StateView
+                          loading={false}
+                          empty
+                          emptyText="此标签无内容或已失效，请关闭此标签"
+                          emptyAction={{
+                            label: '回到工作台',
+                            onClick: () =>
+                              useAppStore.getState().openTab(
+                                {
+                                  kind: 'overview',
+                                  projectId: null,
+                                  targetPath: null,
+                                  subTab: null,
+                                  scroll: 0,
+                                },
+                                '工作台',
+                              ),
+                          }}
+                        >
+                          {null}
+                        </StateView>
                       )}
                     </PaneErrorBoundary>
                   </div>
