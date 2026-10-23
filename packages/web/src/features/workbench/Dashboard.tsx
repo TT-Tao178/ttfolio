@@ -13,6 +13,7 @@ import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { ProjectCard } from './ProjectCard';
+import { BatchActionBar } from './BatchActionBar';
 import { buildTodoDigest } from './todoDigest';
 import { langColor, SEMANTIC } from '@/theme/tokens';
 
@@ -32,6 +33,10 @@ export function Dashboard(): React.JSX.Element {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  // 批量多选（T-117）：与卡片墙同款交互——Ctrl/⌘+点选或勾选角标，共享 BatchActionBar
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const toggleSelect = (id: string): void =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', 'dashboard', settings.cardSort],
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort }),
@@ -355,6 +360,9 @@ export function Dashboard(): React.JSX.Element {
                   onOpen={() => openProject(p)}
                   onPin={() => pin.mutate(p)}
                   onAnalyze={() => analyze.mutate([p.id])}
+                  selected={selectedIds.includes(p.id)}
+                  selectMode={selectedIds.length > 0}
+                  onToggleSelect={() => toggleSelect(p.id)}
                 />
               ))}
             </div>
@@ -372,6 +380,9 @@ export function Dashboard(): React.JSX.Element {
                 showTotal={(n) => `共 ${n} 个项目`}
               />
             </div>
+            {selectedIds.length > 0 && (
+              <BatchActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} />
+            )}
           </>
         )}
       </div>
