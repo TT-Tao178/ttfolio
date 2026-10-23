@@ -10,7 +10,7 @@ import {
   PlusOutlined,
   VerticalAlignBottomOutlined,
 } from '@ant-design/icons';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { api } from '@/lib/api';
 import type { FileContent, GitDiff, GitLogEntry, ProjectDetail } from '@ttfolio/shared';
@@ -443,7 +443,11 @@ function LiveFileView({
   );
 }
 
-/** 只读 CodeMirror 视图：与编辑器共用 cmTheme/cmHighlight 与语言包（FR-13.4 一致性）。 */
+/** 只读 CodeMirror 视图：与编辑器共用 cmTheme/cmHighlight 与语言包（FR-13.4 一致性）。
+ *  第 68 轮性能优化（用户点名）：旧实现依赖 [path, content, dark, scheme] 整只
+ *  销毁重建——「正在写入」窗口内每秒最多 4 次全量重建（解析+建 DOM）。现改为
+ *  视图只随 dark/scheme（低频）重建；同路径内容刷新走 dispatch 全文替换
+ *  （doc 相同则跳过），滚动位置天然保持；换文件用 Compartment 热切语言。 */
 function ReadOnlyCode({
   path,
   content,
@@ -456,12 +460,19 @@ function ReadOnlyCode({
   const { settings } = useSettings();
   const scheme = settings.syntaxScheme;
   const hostRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const langComp = useRef(new Compartment());
+  // 创建 effect 只依赖 dark/scheme，path/content 经镜像读取最新值
+  const latest = useRef({ path, content });
+  latest.current = { path, content };
+  const langPathRef = useRef(path);
+
   useEffect(() => {
     if (hostRef.current === null) return undefined;
     const view = new EditorView({
-      doc: content,
+      doc: latest.current.content,
       extensions: [
-        langExtension(path),
+        langComp.current.of(langExtension(latest.current.path)),
         cmTheme(dark),
         cmHighlight(dark, scheme),
         EditorView.lineWrapping,
@@ -470,8 +481,29 @@ function ReadOnlyCode({
       ],
       parent: hostRef.current,
     });
-    return () => view.destroy();
-  }, [path, content, dark, scheme]);
+    viewRef.current = view;
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+  }, [dark, scheme]);
+
+  // 内容增量：同路径刷新只 dispatch 替换全文（内容相同则跳过）
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null) return;
+    if (view.state.doc.toString() === content) return;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } });
+  }, [content]);
+
+  // 换文件：语言热切换（扩展名相同则 reconfigure 幂等，代价可忽略；不同才真正换解析器）
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view === null || langPathRef.current === path) return;
+    langPathRef.current = path;
+    view.dispatch({ effects: langComp.current.reconfigure(langExtension(path)) });
+  }, [path]);
+
   return (
     <div
       ref={hostRef}
