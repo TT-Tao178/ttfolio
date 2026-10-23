@@ -4,7 +4,7 @@
  * 若 Dashboard 反向 import Workbench 会形成循环依赖。
  */
 import { App, Avatar, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
-import { MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
+import { LoadingOutlined, MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -188,6 +188,11 @@ export function ProjectCard({
           {p.pathOk === false ? (
             <Tag style={{ flexShrink: 0 }} color="error" icon={<WarningOutlined />}>
               目录失效
+            </Tag>
+          ) : p.analyzedAt === null ? (
+            // 「分析中」（T-119）：已登记尚未完成首次分析——完成经 project.analyzed SSE 刷新消失
+            <Tag style={{ flexShrink: 0 }} color="processing" icon={<LoadingOutlined spin />}>
+              分析中
             </Tag>
           ) : (
             <Tag style={{ flexShrink: 0 }} color="blue">
