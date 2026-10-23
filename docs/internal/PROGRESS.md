@@ -1,5 +1,37 @@
 # PROGRESS
 
+## 第 71 轮：P2 三件（T-118~120）随 v0.4.6 发布（含 #7 决策修订翻转）
+
+- 用户点名「做 118-120」并预授权出包流程（构建产物目录一律不代删，路径清单
+  交用户手动清理）。
+- **T-118（891eb33）**：桌面版拖拽登记——preload 桥 getPathForFile（webUtils）、
+  全局 drop → 添加弹窗预填（store.addProjectPrefill 一次性消费）、弹窗即落点
+  （虚线高亮）、文案按环境区分；服务端 validateRegistrableRoot 补「必须是文件
+  夹」守卫（混合拖入的文件落 skipped 如实提示）。**决策修订**：FR-2.2「拖拽
+  不做」的前提仅在 Web 沙箱成立——经用户拍板桌面版放开，**KNOWN-GAPS #7
+  翻转**、任务总表 T-008 同步备注；Web 模式维持不做。
+- **T-119（6ae4c39）**：「分析中」卡片态——analyzedAt==null 显示旋转 badge
+  （摘要字段已存在，零服务端改动零新表）；完成经 project.analyzed SSE 自动刷
+  新消失；新登记项目一次性完成 toast（pendingAnalyze 模块 + App 层消费）。
+- **T-120（8143666）**：首启可选导览——OnboardingTour（antd Tour）：无项目 &&
+  未看过自动弹 4 步（心智模型/标签/Ctrl+K/登记 CTA），每步可跳过、看完即记
+  忆；设置→关于「重新查看新手导览」（store.onboardingNonce）；两处空状态统一
+  主按钮+三步说明；e2e main-flow 适配导览跳过（helpers.dismissTour）。
+- 跨界文件（Workbench/App/store 横跨三任务）按主归属拆三提交并如实注明先行
+  入库部分，保证每个提交点可编译。
+- **出包（新坑一次）**：electron-rebuild 失败——取证为**用户开着的三组
+  `npm run dev`（tsx watch）锁着 better-sqlite3 的 .node**（命令行实锤，非头
+  文件问题）；杀净三组进程树后 rebuild 直接成功（头文件缓存生效）。教训并入
+  HANDOVER：出包前「查端口」不够，要按命令行查 npm run dev/tsx watch。
+  链前四步手动过 → builder 换 dist-electron-046t1 一轮过 → VERIFY_DIST 8 项
+  全绿（0.4.6 断言）→ 移回 → rebuild 翻回 Node ABI → 门禁复跑三绿（248 条
+  退出码实查）。
+- **发布**：tag v0.4.6 打在版本提交 cef86fe；push 与 Release 页走用户本地代理
+  7897（命令级，未落持久配置）；资产由用户拖传（对照清单已补行）。
+- **手测提醒（随 0.4.6）**：桌面版拖 1/多个文件夹进窗口登记（含拖入文件被跳
+  过的提示）、新登记项目的「分析中」badge 与完成 toast/自动刷新、删除
+  localStorage 后首启导览（或设置→关于重看）、空状态三步说明。升级零迁移。
+
 ## 第 70 轮：体验改进任务书入册 + P1 三件（T-115~117）随 v0.4.5 发布
 
 - **入册**：用户点名《ttFolio体验改进任务书-2026-10-24.md》（P1~P5 共 12 任务）
