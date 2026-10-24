@@ -452,6 +452,16 @@ export async function commitDetail(dir: string, hash: string): Promise<CommitDet
   return { entry, files };
 }
 
+/** 只读枚举已配置的远程名。`git remote` 不触网、纯列配置；仅供「在终端推送」引导
+ *  的显隐判定（T-125）——绝不实现 push/pull/fetch/远程管理/凭据（FR-5.8 红线不变）。 */
+export async function remotes(dir: string): Promise<string[]> {
+  const out = await git(dir, ['remote']);
+  return out
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+}
+
 export async function branches(dir: string): Promise<GitBranch[]> {
   await assertGitAvailable();
   const out = await git(dir, [

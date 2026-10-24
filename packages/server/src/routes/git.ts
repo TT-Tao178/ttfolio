@@ -13,6 +13,7 @@ import {
   log,
   commitDetail,
   branches,
+  remotes,
   checkout,
   createBranch,
   isRepo,
@@ -207,6 +208,18 @@ export const gitRoutes: FastifyPluginAsync = async (app) => {
     try {
       const dir = projectDir(projectId);
       return ok(await branches(dir));
+    } catch (err) {
+      return fail(...toApiErrorTuple(err));
+    }
+  });
+
+  // T-125：只读 remote 判定——「在终端推送」入口的显隐依据。
+  // `git remote` 纯列配置不触网；不做任何远程管理/push/pull/fetch（FR-5.8 红线不变）。
+  app.get('/api/git/:projectId/remotes', async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    try {
+      const dir = projectDir(projectId);
+      return ok({ remotes: await remotes(dir) });
     } catch (err) {
       return fail(...toApiErrorTuple(err));
     }

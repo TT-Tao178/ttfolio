@@ -14,9 +14,10 @@ import { relTime } from '@/lib/format';
 import { useAppStore } from '@/app/store';
 import { PaneSplit } from '@/components/PaneSplit';
 import { DiffView } from './DiffView';
+import { injectTerminalText } from '@/features/terminal/TerminalPanel';
 
 export function GitTab({ projectId }: { projectId: string }): React.JSX.Element {
-  const { message, modal } = App.useApp();
+  const { message, modal, notification } = App.useApp();
   const queryClient = useQueryClient();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [stagedView, setStagedView] = useState(false);
@@ -46,6 +47,21 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
     queryFn: () => api.get<GitBranch[]>(`/api/git/${projectId}/branches`),
     enabled: status?.isRepo === true,
   });
+  // T-125：只读 remote 判定——「在终端推送」入口显隐（无远程如实隐藏）
+  const { data: remotesData } = useQuery({
+    queryKey: ['git', projectId, 'remotes'],
+    queryFn: () => api.get<{ remotes: string[] }>(`/api/git/${projectId}/remotes`),
+    enabled: status?.isRepo === true,
+  });
+  const hasRemote = (remotesData?.remotes.length ?? 0) > 0;
+
+  // T-125：一键到终端——只预填命令不代执行（写入文本不带回车，用户检查后自己回车）；
+  // 集成终端不可用（Web 模式）时如实降级提示
+  const handoffToTerminal = (text: string): void => {
+    if (!injectTerminalText(text)) {
+      void message.info('集成终端需要桌面版；也可用项目右键「在此打开终端」的系统终端');
+    }
+  };
 
   const invalidate = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['git', projectId] });
@@ -86,6 +102,40 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
   });
   const pendingBranchRef = useRef('');
 
+  // T-125：提交成功 → notification 附「在终端推送」——点击只在集成终端预填
+  // `git push`（不带回车，绝不代执行；ttFolio 不做 push/pull/远程管理）。
+  // 无远程配置的仓库如实不出现该动作（只读 git remote 判定）。
+  const commitAndNotify = (): void => {
+    gitOp.mutate(
+      { op: 'commit', body: { message: commitMsg } },
+      {
+        onSuccess: () => {
+          setCommitMsg('');
+          if (hasRemote) {
+            notification.info({
+              key: 'tt-commit-push',
+              message: '提交成功',
+              description: '需要推送可一键到集成终端预填 git push（不代执行；ttFolio 不做 push/pull）。',
+              duration: 8,
+              btn: (
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    notification.destroy('tt-commit-push');
+                    handoffToTerminal('git push');
+                  }}
+                >
+                  在终端推送
+                </Button>
+              ),
+            });
+          }
+        },
+      },
+    );
+  };
+
   if (isLoading) return <Spin style={{ display: 'block', margin: '64px auto' }} />;
   if (error !== undefined && error !== null) {
     return <Alert type="error" message={error instanceof Error ? error.message : '加载失败'} />;
@@ -108,7 +158,19 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
       <Alert
         type="warning"
         message={`仓库处于 ${status.inProgress === 'merge' ? 'merge' : 'rebase'} 状态`}
-        description="请先在命令行完成该操作，ttFolio 的暂存/提交在解决后可用。"
+        description={
+          <span>
+            请先在命令行完成该操作，ttFolio 的暂存/提交在解决后可用。
+            <Button
+              size="small"
+              style={{ marginLeft: 8 }}
+              onClick={() => handoffToTerminal('git status')}
+              data-testid="in-progress-terminal"
+            >
+              在终端处理
+            </Button>
+          </span>
+        }
       />
     );
   }
@@ -272,10 +334,7 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && commitMsg.trim() !== '') {
                     // 体检 P2：成功才清空——失败（身份未配置/钩子拒绝）不丢已写信息
-                    gitOp.mutate(
-                      { op: 'commit', body: { message: commitMsg } },
-                      { onSuccess: () => setCommitMsg('') },
-                    );
+                    commitAndNotify();
                   }
                 }}
                 data-testid="commit-message"
@@ -286,10 +345,7 @@ export function GitTab({ projectId }: { projectId: string }): React.JSX.Element 
                 style={{ marginTop: 6 }}
                 disabled={commitMsg.trim() === '' || status.staged.length === 0}
                 onClick={() => {
-                  gitOp.mutate(
-                    { op: 'commit', body: { message: commitMsg } },
-                    { onSuccess: () => setCommitMsg('') },
-                  );
+                  commitAndNotify();
                 }}
                 data-testid="commit-btn"
               >
