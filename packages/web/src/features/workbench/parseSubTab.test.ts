@@ -64,4 +64,8 @@ describe('parseSubTab', () => {
   it('未知前缀回落默认', () => {
     expect(parseSubTab('weird')).toEqual({ status: 'active' });
   });
+
+  it('view:all-projects → 全量卡片墙（侧栏折叠行入口，未知 view 键回落 active）', () => {
+    expect(parseSubTab('view:all-projects')).toEqual({ status: 'active' });
+  });
 });

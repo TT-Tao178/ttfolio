@@ -526,21 +526,32 @@ export function Sidebar(): React.JSX.Element {
       </span>
     ),
   }));
+  // 项目超过 30 个时侧栏折叠：列表保留前 30 项，其后追加「还有 X 个项目 · 查看全部」，
+  // 点击开「全部项目」卡片墙（view:all-projects 经 parseSubTab 未知键回落 status=active 全量视图；
+  // 键名不能复用 view:all——侧栏里它是工作台总览、Workbench 登记成功后又用它切卡片墙）。
+  // 计数如实（=列表总数 − 已展示数）；≤30 时无此行与现状零差别；集合/标签分区在其之前不受影响。
+  const overflowCount = (projects ?? []).length - projectItems.length;
+  const moreRow: SidebarItem | null =
+    overflowCount > 0 ? { key: 'view:all-projects', label: `还有 ${overflowCount} 个项目 · 查看全部` } : null;
   if (domain === 'projects') {
     items.push({ key: 'sep-projects', label: '项目' });
     items.push(...projectItems);
+    if (moreRow !== null) items.push(moreRow);
   } else if (domain === 'git') {
     items.push({ key: 'sep-projects', label: '项目 Git' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':git') })));
+    if (moreRow !== null) items.push(moreRow);
   } else if (domain === 'archives') {
     items.push({ key: 'sep-projects', label: '项目架构图' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
+    if (moreRow !== null) items.push(moreRow);
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:archives`;
   } else if (domain === 'docs') {
     items.push({ key: 'doclib', label: '文档库（跨项目浏览）' });
     items.push({ key: 'sep-projects', label: '项目文档' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
+    if (moreRow !== null) items.push(moreRow);
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:docs`;
     else if (activeTab?.kind === 'doclib') selected = 'doclib';
@@ -711,6 +722,9 @@ function viewTitle(key: string): string {
       return '30 天没打开';
     case 'my-archived':
       return '已归档';
+    // T-121 折叠行「查看全部」的目标卡片墙标题（view:all-projects 走 openView 的标题映射）
+    case 'all-projects':
+      return '全部项目';
     default:
       return key;
   }
