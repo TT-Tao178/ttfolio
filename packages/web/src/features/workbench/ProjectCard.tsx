@@ -6,7 +6,7 @@
 import { App, Avatar, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
 import { LoadingOutlined, MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
@@ -15,7 +15,12 @@ import { relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from '@/features/workbench/RelocateModal';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
-import { buildProjectMenu, useArchiveProject, downloadProjectReport } from '@/features/workbench/projectMenu';
+import {
+  buildProjectMenu,
+  useArchiveProject,
+  useRemoveProject,
+  downloadProjectReport,
+} from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({
@@ -36,8 +41,7 @@ export function ProjectCard({
   selectMode?: boolean;
   onToggleSelect?: () => void;
 }): React.JSX.Element {
-  const { message, modal } = App.useApp();
-  const queryClient2 = useQueryClient();
+  const { message } = App.useApp();
   const [relocateOpen, setRelocateOpen] = useState(false);
   // 归属集合徽标（评审：归属结果不可见——加完集合必须去侧栏/集合视图才能确认）。
   // p.collections 只有 id，集合名走共享的 ['collections'] 缓存映射；最多展示 2 个 + 溢出计数。
@@ -51,35 +55,8 @@ export function ProjectCard({
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   // 归属集合弹窗：条件渲染 + key=项目 id，每次打开全新挂载（勾选态取打开瞬间快照）
   const [pickerOpen, setPickerOpen] = useState(false);
-  const remove = useMutation({
-    mutationFn: (mode: string) =>
-      api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
-    onSuccess: () => {
-      void message.success('已移除');
-      void queryInvalidate();
-    },
-  });
-  const queryInvalidate = async (): Promise<void> => {
-    await queryClient2.invalidateQueries({ queryKey: ['projects'] });
-  };
-  const confirmUnregister = (): void => {
-    modal.confirm({
-      title: `仅移除「${p.alias ?? p.diskName}」的登记？`,
-      content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
-      okText: '移除登记',
-      okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync('unregister'),
-    });
-  };
-  const confirmDelete = (): void => {
-    modal.confirm({
-      title: `移除登记并删除「${p.alias ?? p.diskName}」的文件？`,
-      content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
-      okText: '移入回收站',
-      okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync('delete'),
-    });
-  };
+  // 移除登记/移除并删除（T-129 收敛到共享 hook，与侧栏右键/表格同源；弹窗在 hook 内）
+  const removeProject = useRemoveProject();
 
   // 「打开文件页」强制 files；「打开项目」跟随默认页签设置（onOpen）
   const openFiles = (): void => {
@@ -102,8 +79,8 @@ export function ProjectCard({
     onCollections: () => setPickerOpen(true),
     onArchive: () => archiveProject(p),
     onRelocate: () => setRelocateOpen(true),
-    onUnregister: confirmUnregister,
-    onDelete: confirmDelete,
+    onUnregister: () => removeProject(p, 'unregister'),
+    onDelete: () => removeProject(p, 'delete'),
     onReport: () => {
       void downloadProjectReport(p)
         .then((m) => void message.success(m))

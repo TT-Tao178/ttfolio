@@ -25,7 +25,7 @@ import { SETTINGS_SECTIONS } from '@/features/settings/sections';
 import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModal';
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { CustomViewModal } from '@/features/workbench/CustomViewModal';
-import { downloadProjectReport } from '@/features/workbench/projectMenu';
+import { downloadProjectReport, useRemoveProject } from '@/features/workbench/projectMenu';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
@@ -121,6 +121,9 @@ export function Sidebar(): React.JSX.Element {
     },
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });
+  // T-129：右键直出「移除登记 / 删除文件」——确认链路与卡片菜单同源（共享 hook，
+  // 移除=L1 仅索引库软删；删除=L3 整目录进回收站，审计在服务端）
+  const removeProject = useRemoveProject();
 
   // 项目项右侧的「最后打开」相对时间会随时间流逝变档（1分钟内 → N分钟前 → …），
   // 打开项目后由 SSE 失效 projects 查询即时刷新；这里再 30s 心跳覆盖"挂着不动"的场景，
@@ -165,10 +168,10 @@ export function Sidebar(): React.JSX.Element {
             ? 'data-collection-id'
             : 'data-view-id';
       const id = el?.getAttribute(attr) ?? '';
-      // 10 行菜单（8 项 + 2 分隔）：贴右边留菜单宽度、贴底下留菜单高度，小窗口保底 8px
+      // 13 行菜单（10 项 + 3 分隔，T-129 增移除/删除两项）：贴右边留菜单宽度、贴底下留菜单高度，小窗口保底 8px
       setCtxMenu({
         x: Math.min(e.clientX, window.innerWidth - 232),
-        y: Math.min(e.clientY, Math.max(8, window.innerHeight - 360)),
+        y: Math.min(e.clientY, Math.max(8, window.innerHeight - 440)),
         kind,
         id,
       });
@@ -220,6 +223,15 @@ export function Sidebar(): React.JSX.Element {
           { key: 'explorer', label: '在资源管理器中显示', disabled: ctxProject.pathOk === false },
           { key: 'analyze', label: '重新分析', disabled: ctxProject.pathOk === false },
           { key: 'report', label: '导出 Markdown 报告', icon: <DownloadOutlined /> },
+          { type: 'divider' as const },
+          // T-129：与卡片菜单同款两项直出（danger 配色，位置收敛在末尾不与既有项冲突）
+          { key: 'unregister', label: '仅从 ttFolio 移除登记' },
+          {
+            key: 'delete',
+            label: '移除并删除文件（进回收站）',
+            danger: true,
+            disabled: ctxProject.pathOk === false,
+          },
         ]
       : ctxCollection !== undefined
         ? [
@@ -345,6 +357,12 @@ export function Sidebar(): React.JSX.Element {
           void downloadProjectReport(p)
             .then((msg) => message.success(msg))
             .catch(() => message.error('导出报告失败'));
+          break;
+        case 'unregister':
+          removeProject(p, 'unregister');
+          break;
+        case 'delete':
+          removeProject(p, 'delete');
           break;
       }
       return;

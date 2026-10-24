@@ -28,7 +28,7 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
-import { buildProjectMenu, useArchiveProject, downloadProjectReport } from './projectMenu';
+import { buildProjectMenu, useArchiveProject, useRemoveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
 import { markPendingAnalysis } from './pendingAnalyze';
@@ -63,7 +63,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 
   // ---- 表格视图的项目操作（评审 P2：此前操作列只有「打开」、行无右键，与卡片不对等）----
   // 菜单定义/分发与卡片共用 buildProjectMenu；确认类动作在此注入（确认弹窗与请求归本组件）
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
   const [relocateProject, setRelocateProject] = useState<ProjectSummary | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
@@ -114,34 +114,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     onSuccess: () => void message.success('已开始重新分析'),
   });
 
-  // 移除登记/移除并删除（与 ProjectCard 同款语义；确认弹窗在 confirmXxx 内）
-  const remove = useMutation({
-    mutationFn: ({ p, mode }: { p: ProjectSummary; mode: string }) =>
-      api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
-    onSuccess: () => {
-      void message.success('已移除');
-      void queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
-  });
-  const confirmUnregister = (p: ProjectSummary): void => {
-    modal.confirm({
-      title: `仅移除「${p.alias ?? p.diskName}」的登记？`,
-      content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
-      okText: '移除登记',
-      okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync({ p, mode: 'unregister' }),
-    });
-  };
-  const confirmDelete = (p: ProjectSummary): void => {
-    modal.confirm({
-      title: `移除登记并删除「${p.alias ?? p.diskName}」的文件？`,
-      content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
-      okText: '移入回收站',
-      okButtonProps: { danger: true },
-      onOk: () => remove.mutateAsync({ p, mode: 'delete' }),
-    });
-  };
+  // 移除登记/移除并删除（T-129 收敛到共享 hook：与卡片菜单/侧栏右键同源，弹窗在 hook 内）
+  const removeProject = useRemoveProject();
 
   const openFilesTab = (p: ProjectSummary): void => {
     useAppStore.getState().requestAutoOpenProject(p.id);
@@ -163,8 +137,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       onCollections: () => setPickerProject(p),
       onArchive: () => archiveProject(p),
       onRelocate: () => setRelocateProject(p),
-      onUnregister: () => confirmUnregister(p),
-      onDelete: () => confirmDelete(p),
+      onUnregister: () => removeProject(p, 'unregister'),
+      onDelete: () => removeProject(p, 'delete'),
       onReport: () => {
         void downloadProjectReport(p)
           .then((m) => void message.success(m))

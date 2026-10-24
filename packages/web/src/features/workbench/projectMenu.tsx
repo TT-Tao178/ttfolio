@@ -21,7 +21,7 @@ import {
   StarFilled,
   StarOutlined,
 } from '@ant-design/icons';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError, downloadWithToken } from '@/lib/api';
 import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
@@ -60,6 +60,45 @@ export function useArchiveProject(): (p: ProjectSummary) => void {
       });
     } else {
       void run();
+    }
+  };
+}
+
+/**
+ * 移除登记 / 移除并删除文件（FR-2.5 / T-011 语义，T-129 三处调用点收敛：
+ * 卡片/表格菜单、侧栏右键共用一份确认弹窗与请求——移除=L1 仅索引库软删、
+ * 删除=L3 整目录进回收站（?mode=delete&confirm=1 双确认），审计在服务端）。
+ */
+export function useRemoveProject(): (p: ProjectSummary, mode: 'unregister' | 'delete') => void {
+  const { modal, message } = AntdApp.useApp();
+  const queryClient = useQueryClient();
+  const remove = useMutation({
+    mutationFn: ({ p, mode }: { p: ProjectSummary; mode: 'unregister' | 'delete' }) =>
+      api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
+    onSuccess: () => {
+      void message.success('已移除');
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
+  });
+  return (p, mode) => {
+    const name = p.alias ?? p.diskName;
+    if (mode === 'unregister') {
+      modal.confirm({
+        title: `仅移除「${name}」的登记？`,
+        content: '只删除 ttFolio 里的索引记录，不会动磁盘上的任何文件。之后可重新添加。',
+        okText: '移除登记',
+        okButtonProps: { danger: true },
+        onOk: () => remove.mutateAsync({ p, mode }),
+      });
+    } else {
+      modal.confirm({
+        title: `移除登记并删除「${name}」的文件？`,
+        content: '整个项目目录将移入 ttFolio 回收站（可在回收站恢复原路径）。',
+        okText: '移入回收站',
+        okButtonProps: { danger: true },
+        onOk: () => remove.mutateAsync({ p, mode }),
+      });
     }
   };
 }
