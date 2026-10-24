@@ -1,5 +1,44 @@
 # PROGRESS
 
+## 第 75 轮：终端三件（T-123/124/125）随 v0.4.9 发布
+
+- 用户点名「执行 T-123~125 并打包」（前句「先升级」指 zod——已在第 74 轮随
+  0.4.8 完成，如实说明后未重做）。三件均独立提交、门禁独立跑绿。
+- **T-123（665912b）**：顶栏终端开关按钮（CodeOutlined，开启态 primary，与
+  窗口嵌入开关同风格，Web 模式可见、面板内维持「需桌面版」如实提示）；Ctrl+`
+  收编注册表——评估结论代价小（注册表循环本就跑在 window keydown，xterm 的
+  attachCustomKeyEventHandler 已把该组合交还宿主，行为等价），terminal.toggle
+  补 keyEditable: true 自动进设置改绑 UI 与 ? 帮助，App onKey 硬编码分支删除。
+- **T-124（691de66）**：终端输出路径点击直达文件页签。识别/配对抽纯函数
+  terminalLinks.ts（15 条单测）：绝对路径按已登记项目 dirPath 最长前缀配对
+  （嵌套登记/大小写/双分隔符不敏感）、当前项目内相对路径（多段+末段带扩展名）、
+  tsc 的 path(12,5): 与 node 栈 path:12:5 行号尾缀先剥再配对、URL 片段跳过
+  （lookbehind 防 https:// 的 s:// 当盘符）、每行 32 个上限。接线用 xterm
+  registerLinkProvider + **逐 cell 扫描换算**——xterm range 是 cell 坐标，
+  CJK 宽字符占 2 格，字符串下标直接当 x 用会错位。点击与命令面板完全同构
+  （openTab files + targetPath）；未命中项目降级复制路径。初版三坑（未剥
+  行号尾缀/scheme 误配/未用类型导入）被单测与 lint 各拦一次后修复。
+- **T-125（5ce4c63）**：Git 断点一键到终端。TerminalPanel 暴露最小注入 API
+  injectTerminalText（module 挂点，开面板→复用/新建标签→pty.write 文本
+  **不带回车绝不代执行**；Web 模式挂点恒 null 调用方降级）；提交成功
+  notification 附「在终端推送」（无远程如实隐藏——服务端新增只读
+  GET /api/git/:projectId/remotes，git remote 纯列配置不触网）；merge/rebase
+  提示块加「在终端处理」→ 预填 git status。FR-5.8 红线不变（不做
+  push/pull/fetch/远程管理/凭据，预填无 \r）。
+- **出包（4156186 版本三处）**：audit/build/build:server/rebuild 四步链头
+  全绿；builder 双镜像 env 显式带（第 74 轮教训生效）+ 全新输出目录
+  dist-electron-049t1 一轮过；VERIFY_DIST 8 项全绿（含 0.4.9 断言）；安装包
+  回移 + npm rebuild 翻回 Node ABI；门禁三绿复跑（272 条）+ e2e 4/4。
+  进程核查出现 6 个「匹配」——实为查进程命令本身携带模式串的自匹配伪命中
+  （rebuild 未遇 EPERM 佐证无真实 dev/start 进程），记录避免下轮误判。
+- **发布**：tag v0.4.9 打在 4156186；push/tag/Release 走代理 7897（命令级）；
+  Release 页正式脚本创建（201），API 复核标题/正文/无 T-编号/0 资产；
+  上传资产对照已补行。
+- **手测提醒（随 0.4.9）**：顶栏终端按钮开合与 primary 高亮；设置 → 快捷键
+  出现「打开 / 收起集成终端」可改绑；终端里 ls/编译输出的项目内路径 hover
+  出现下划线、点击直达文件页签（项目外路径点击复制）；提交成功通知的
+  「在终端推送」只预填不执行；未配置远程的项目提交后无推送入口。升级零迁移。
+
 ## 第 74 轮：T-121 侧栏折叠入口 + T-122 域条收敛提案，随 v0.4.8 发布（含 zod 高危修复）
 
 - 用户点名两项：T-121（侧栏 30 项上限改折叠+全量入口）与 T-122（域条收敛评估，
