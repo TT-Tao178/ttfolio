@@ -40,7 +40,12 @@ const WS_SYSMENU = 0x00080000;
 const WS_CLIPCHILDREN = 0x02000000;
 const WS_MINIMIZEBOX = 0x00020000;
 const WS_MAXIMIZEBOX = 0x00010000;
-const WS_EX_TOOLWINDOW = 0x00000080;
+/** WS_EX_APPWINDOW：强制顶层窗口出现在任务栏（容器靠它当任务栏条目）。 */
+const WS_EX_APPWINDOW = 0x00040000;
+
+const WM_GETICON = 0x007f;
+const WM_SETICON = 0x0080;
+const GCLP_HICON = -14;
 
 const GWL_STYLE = -16;
 const GWL_EXSTYLE = -20;
@@ -54,6 +59,18 @@ const SWP_SHOWWINDOW = 0x0040;
 
 const SW_HIDE = 0;
 const SW_SHOW = 5;
+const SW_SHOWMAXIMIZED = 3;
+const SW_RESTORE = 9;
+const SC_RESTORE = 0xf120;
+const SC_MAXIMIZE = 0xf030;
+const WM_SYSCOMMAND = 0x0112;
+const SMTO_ABORTIFHUNG = 0x0002;
+
+/** RedrawWindow 标志：失效 + 子窗口一起 + 立即重画 + 边框。 */
+const RDW_INVALIDATE = 0x0001;
+const RDW_ALLCHILDREN = 0x0080;
+const RDW_UPDATENOW = 0x0100;
+const RDW_FRAME = 0x0400;
 
 const GA_PARENT = 1;
 
@@ -82,13 +99,16 @@ let ffiError = null;
 
 function buildTable() {
   const user32 = koffi.load('user32.dll');
-  const ole32 = koffi.load('ole32.dll');
   const kernel32 = koffi.load('kernel32.dll');
+  const shell32 = koffi.load('shell32.dll');
   return {
     IsWindow: user32.func('int32_t IsWindow(intptr_t)'),
     IsChild: user32.func('int32_t IsChild(intptr_t parent, intptr_t child)'),
+    IsZoomed: user32.func('int32_t IsZoomed(intptr_t)'),
+    IsIconic: user32.func('int32_t IsIconic(intptr_t)'),
     GetClassNameW: user32.func('int32_t GetClassNameW(intptr_t, void *buf, int32_t max)'),
     GetWindowTextW: user32.func('int32_t GetWindowTextW(intptr_t, void *buf, int32_t max)'),
+    SetWindowTextW: user32.func('int32_t SetWindowTextW(intptr_t, str16)'),
     GetWindowRect: user32.func('int32_t GetWindowRect(intptr_t, void *rc)'),
     CreateWindowExW: user32.func(
       'intptr_t CreateWindowExW(uint32_t ex, str16 cls, str16 name, uint32_t style, int32_t x, int32_t y, int32_t w, int32_t h, intptr_t parent, intptr_t menu, intptr_t inst, intptr_t param)',
@@ -99,9 +119,12 @@ function buildTable() {
     GetAncestor: user32.func('intptr_t GetAncestor(intptr_t, uint32_t)'),
     GetWindowLongPtrW: user32.func('int64_t GetWindowLongPtrW(intptr_t, int32_t)'),
     SetWindowLongPtrW: user32.func('int64_t SetWindowLongPtrW(intptr_t, int32_t, int64_t)'),
+    GetClassLongPtrW: user32.func('int64_t GetClassLongPtrW(intptr_t, int32_t)'),
+    SendMessageW: user32.func('int64_t SendMessageW(intptr_t, uint32_t, intptr_t, intptr_t)'),
     SetWindowPos: user32.func(
       'int32_t SetWindowPos(intptr_t, intptr_t, int32_t, int32_t, int32_t, int32_t, uint32_t)',
     ),
+    RedrawWindow: user32.func('int32_t RedrawWindow(intptr_t, void *rect, intptr_t rgn, uint32_t flags)'),
     GetWindowPlacement: user32.func('int32_t GetWindowPlacement(intptr_t, void *wp)'),
     SetWindowPlacement: user32.func('int32_t SetWindowPlacement(intptr_t, void *wp)'),
     GetWindowDpiAwarenessContext: user32.func('intptr_t GetWindowDpiAwarenessContext(intptr_t)'),
@@ -109,10 +132,18 @@ function buildTable() {
     SetThreadDpiAwarenessContext: user32.func('intptr_t SetThreadDpiAwarenessContext(intptr_t)'),
     SetThreadDpiHostingBehavior: user32.func('int32_t SetThreadDpiHostingBehavior(int32_t)'),
     GetGUIThreadInfo: user32.func('int32_t GetGUIThreadInfo(uint32_t tid, void *info)'),
-    CoInitializeEx: ole32.func('int32_t CoInitializeEx(intptr_t, uint32_t)'),
-    CoCreateInstance: ole32.func(
-      'int32_t CoCreateInstance(void *clsid, intptr_t outer, uint32_t ctx, void *iid, void **ppv)',
+    GetWindowThreadProcessId: user32.func('uint32_t GetWindowThreadProcessId(intptr_t, void *pid)'),
+    SendMessageTimeoutW: user32.func(
+      'intptr_t SendMessageTimeoutW(intptr_t, uint32_t, intptr_t, intptr_t, uint32_t, uint32_t, void *result)',
     ),
+    SHGetPropertyStoreForWindow: shell32.func(
+      'int32_t SHGetPropertyStoreForWindow(intptr_t hwnd, void *riid, void **ppv)',
+    ),
+    OpenProcess: kernel32.func('intptr_t OpenProcess(uint32_t access, int32_t inherit, uint32_t pid)'),
+    QueryFullProcessImageNameW: kernel32.func(
+      'int32_t QueryFullProcessImageNameW(intptr_t proc, uint32_t flags, void *buf, void *size)',
+    ),
+    CloseHandle: kernel32.func('int32_t CloseHandle(intptr_t handle)'),
     GetCurrentThreadId: kernel32.func('uint32_t GetCurrentThreadId()'),
   };
 }
@@ -151,6 +182,22 @@ function available() {
 function isWindow(hwnd) {
   try {
     return hwnd !== 0 && d.IsWindow(hwnd) === 1;
+  } catch {
+    return false;
+  }
+}
+
+function isZoomed(hwnd) {
+  try {
+    return d.IsZoomed(hwnd) === 1;
+  } catch {
+    return false;
+  }
+}
+
+function isIconic(hwnd) {
+  try {
+    return d.IsIconic(hwnd) === 1;
   } catch {
     return false;
   }
@@ -212,45 +259,70 @@ function fail(error, code = 'error') {
   return { ok: false, error, code };
 }
 
-// ---- COM：ITaskbarList（任务栏保留，Phase 0 S6 已验 AddTab=S_OK）----
-let taskbar = null;
-let taskbarError = null;
-
-function initTaskbar() {
-  if (taskbar !== null || taskbarError !== null) return taskbarError;
+// ---- 任务栏 ----
+/**
+ * 任务栏按钮：**加在容器上**（容器是真正的顶层窗口），不是加在被嵌窗口上。
+ *
+ * v0.5.0 的错法：对被重挂成子窗口的目标 `AddTab` 返回 S_OK，但任务栏根本不出现按钮
+ * （用户实测「窗口嵌进来之后任务栏就找不到它了」）。WS_CHILD 窗口没有任务栏条目，AddTab 也
+ * 变不出来。v0.5.1 先试过给容器加 WS_EX_APPWINDOW —— UIA 实测同样无效：**有属主的窗口
+ * 不进任务栏**，ex-style 强不了。所以走回 AddTab，但对象换成容器；容器里装着被嵌窗口，
+ * 任务栏悬停预览自然就是实时画面。
+ */
+/**
+ * 标题/图标/任务栏身份都镜像到容器。
+ *
+ * 任务栏身份为什么要单独设（v0.5.1 实测）：容器属于 ttFolio 进程，默认会被任务栏并入
+ * ttFolio 那一个按钮（"… - 2 个运行窗口"），用户还是「找不到那个窗口」。给容器设目标进程
+ * 的 AppUserModelID（PKEY_AppUserModel_ID）之后，它会以对方程序的身份单独出现在任务栏，
+ * 标题是目标标题、缩略图是实时画面。
+ */
+function applyTaskbarIdentity(container, hwnd, title) {
   try {
-    // STA。Electron 主线程可能已被别处初始化成 MTA，RPC_E_CHANGED_MODE(0x80010106) 不算失败
-    const hrCo = d.CoInitializeEx(0, 2);
-    // 0=S_OK，1=S_FALSE（同模式已初始化，正常），0x80010106=RPC_E_CHANGED_MODE（别处已把线程
-    // 初始化成 MTA，进程内 STA 对象仍可创建）。这三种都继续；其余如实报错。
-    // 注意：只认 0 会漏掉 S_FALSE——Electron 主线程进 whenReady 时已是 STA，必然返回 S_FALSE。
-    const coOk = hrCo === 0 || hrCo >>> 0 === 1 || hrCo >>> 0 === 0x80010106;
-    if (!coOk) {
-      throw new Error(`CoInitializeEx=0x${(hrCo >>> 0).toString(16)}`);
-    }
-    const clsid = guidBuf(0x56fdf344, 0xfd6d, 0x11d0, [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90]);
-    const iid = guidBuf(0x56fdf342, 0xfd6d, 0x11d0, [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90]);
-    const ppv = koffi.alloc('void *', 1);
-    const hr = d.CoCreateInstance(clsid, 0, 1 /* CLSCTX_INPROC_SERVER */, iid, ppv);
-    if (hr !== 0) throw new Error(`CoCreateInstance=0x${(hr >>> 0).toString(16)}`);
-    const obj = koffi.decode(ppv, 'void *');
-    const vt = koffi.decode(obj, 'void **');
-    const hrInitProto = koffi.proto('int32_t t131_hr_init(void *self)');
-    const hrInit = koffi.call(koffi.decode(vt, 24, 'void *'), hrInitProto, obj);
-    if (hrInit !== 0) throw new Error(`HrInit=0x${(hrInit >>> 0).toString(16)}`);
-    const addProto = koffi.proto('int32_t t131_add_tab(void *self, intptr_t hwnd)');
-    const delProto = koffi.proto('int32_t t131_del_tab(void *self, intptr_t hwnd)');
-    taskbar = {
-      add: (hwnd) => koffi.call(koffi.decode(vt, 32, 'void *'), addProto, obj, hwnd),
-      del: (hwnd) => koffi.call(koffi.decode(vt, 40, 'void *'), delProto, obj, hwnd),
-    };
-    return null;
-  } catch (err) {
-    taskbarError = err instanceof Error ? err : new Error(String(err));
-    return taskbarError;
+    // 标题镜像：任务栏/Alt+Tab 悬停显示的是目标的标题
+    if (title !== '') d.SetWindowTextW(container, title);
+    // 图标镜像：优先窗口自己的图标，退而取窗口类的图标
+    const icon =
+      Number(d.SendMessageW(hwnd, WM_GETICON, 1 /* ICON_BIG */, 0)) ||
+      Number(d.SendMessageW(hwnd, WM_GETICON, 0, 0));
+    const cls = icon !== 0 ? icon : Number(d.GetClassLongPtrW(hwnd, GCLP_HICON));
+    if (cls !== 0) d.SendMessageW(container, WM_SETICON, 1 /* ICON_BIG */, cls);
+    // 任务栏身份：用目标 exe 路径当 AppID，让容器**独立**成一个任务栏按钮（否则会被并进
+    // ttFolio 那一个按钮里，用户还是找不到）。尝试抄目标自带 AppID 的路径会走
+    // IPropertyStore::GetValue，koffi 下读 PROPVARIANT 指针直接把主进程打崩了（实测），
+    // 不做——独立按钮 + 悬停标题 + 实时缩略图已经够用。
+    const appId = exePathOf(hwnd);
+    if (appId !== '') setWindowAppId(container, appId);
+  } catch {
+    /* 标题/图标/AppID 镜像失败不影响功能 */
   }
 }
 
+/** 目标窗口所属进程的可执行文件全路径（拿不到就返回空串）。 */
+function exePathOf(hwnd) {
+  try {
+    const pid = Buffer.alloc(8);
+    d.GetWindowThreadProcessId(hwnd, pid);
+    const handle = Number(
+      d.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, 0, pid.readUInt32LE(0)),
+    );
+    if (handle === 0) return '';
+    try {
+      const buf = Buffer.alloc(2048);
+      const size = Buffer.alloc(4);
+      size.writeUInt32LE(1024, 0);
+      if (d.QueryFullProcessImageNameW(handle, 0, buf, size) === 0) return '';
+      const n = size.readUInt32LE(0);
+      return buf.toString('utf16le', 0, Math.max(0, n) * 2);
+    } finally {
+      d.CloseHandle(handle);
+    }
+  } catch {
+    return '';
+  }
+}
+
+/** GUID 小端 16 字节（koffi 封送 COM 结构体靠手工拼，见文件头铁律②）。 */
 function guidBuf(d1, d2, d3, tail) {
   const b = Buffer.alloc(16);
   b.writeUInt32LE(d1, 0);
@@ -258,6 +330,42 @@ function guidBuf(d1, d2, d3, tail) {
   b.writeUInt16LE(d3, 6);
   for (let i = 0; i < 8; i++) b[8 + i] = tail[i];
   return b;
+}
+
+/** PKEY_AppUserModel_ID = {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, pid 5 */
+function appIdPropertyKey() {
+  const key = Buffer.alloc(20);
+  guidBuf(0x9f4c2855, 0x9f79, 0x4b39, [0xa8, 0xd0, 0xe1, 0xd4, 0x2d, 0xe1, 0xd5, 0xf3]).copy(key, 0);
+  key.writeUInt32LE(5, 16);
+  return key;
+}
+
+/**
+ * 给窗口设 AppUserModelID：SHGetPropertyStoreForWindow + IPropertyStore::SetValue(PKEY_AppUserModel_ID)。
+ * PROPVARIANT 手工拼（VT_LPWSTR=31，x64 下指针在偏移 8）；SetValue 会自己拷贝字符串，
+ * 所以临时 Buffer 只在调用期间有效即可。
+ */
+function setWindowAppId(hwnd, appId) {
+  try {
+    const store = koffi.alloc('void *', 1);
+    const iid = guidBuf(0x886d8eeb, 0x8cf2, 0x4446, [0x8d, 0x02, 0xcd, 0xba, 0x1d, 0xbd, 0xcf, 0x99]);
+    const hr = d.SHGetPropertyStoreForWindow(hwnd, iid, store);
+    if (hr !== 0) return false;
+    const obj = koffi.decode(store, 'void *');
+    const vt = koffi.decode(obj, 'void **');
+    const key = appIdPropertyKey();
+    const value = Buffer.alloc(32);
+    value.writeUInt16LE(31, 0); // VT_LPWSTR
+    const text = Buffer.from(`${appId}\u0000`, 'utf16le');
+    value.writeBigUInt64LE(BigInt(koffi.address(text)), 8);
+    const setValue = koffi.proto('int32_t t131_ps_set_value(void *self, void *key, void *value)');
+    const commit = koffi.proto('int32_t t131_ps_commit(void *self)');
+    const hrSet = koffi.call(koffi.decode(vt, 48, 'void *'), setValue, obj, key, value);
+    const hrCommit = koffi.call(koffi.decode(vt, 56, 'void *'), commit, obj);
+    return hrSet === 0 && hrCommit === 0;
+  } catch {
+    return false;
+  }
 }
 
 // ---- 状态 ----
@@ -321,6 +429,15 @@ function attach(electronHwnd, sourceId, rect) {
   const denied = DENY_CLASSES[className];
   if (denied !== undefined) return fail(denied, 'unsupported');
 
+  // 关键（v0.5.1 修）：最大化/最小化的窗口**不能**直接重挂。
+  // 实测：把最大化的 Chrome 直接塞进容器，内容区整片空白（白/黑屏），且分离后窗口会变成
+  // 「最大化标志 + 容器尺寸」的畸形状态（用户报的"还原有 bug"）。正确姿势是先还原成正常
+  // 尺寸再重挂，分离时按原 WINDOWPLACEMENT 还原，需要的话再最大化回去。
+  const wasZoomed = isZoomed(hwnd);
+  if (wasZoomed || isIconic(hwnd)) {
+    sysCommand(hwnd, SC_RESTORE);
+  }
+
   const s = {
     hwnd,
     host,
@@ -337,13 +454,16 @@ function attach(electronHwnd, sourceId, rect) {
     visible: false,
     focused: false,
     taskbar: false,
+    wasZoomed,
   };
 
   // DPI 状态窗口法（设计 §3.1）：容器必须与目标的感知上下文一致，否则 SetParent 行为未定义。
   // 成对切换 → 建窗口 → 立即还原，期间 JS 不重入、Chromium 消息循环也插不进来。
   // 容器是**归属于宿主窗口的顶层弹出窗口**（WS_POPUP + hWndParent=owner），不是 WS_CHILD：
   // Electron 的合成层（DComp）会整片盖住客户区里的原生子窗口，真机探针实测子窗口方案像素全白；
-  // 归属性弹出窗口由 DWM 保证压在 owner 之上、随 owner 最小化、不进 Alt+Tab，实测渲染正确。
+  // 归属性弹出窗口由 DWM 保证压在 owner 之上、随 owner 最小化，实测渲染正确。
+  // ex-style 用 WS_EX_APPWINDOW：让这个顶层容器自己出现在任务栏（被嵌窗口成了子窗口后
+  // 没有任务栏条目，ITaskbarList::AddTab 也变不出来——v0.5.0 实测 S_OK 但按钮不出现）。
   let container = 0;
   try {
     const oldHosting = d.SetThreadDpiHostingBehavior(2 /* MIXED */);
@@ -351,7 +471,7 @@ function attach(electronHwnd, sourceId, rect) {
     const oldCtx = targetCtx !== 0 ? d.SetThreadDpiAwarenessContext(targetCtx) : 0;
     try {
       container = d.CreateWindowExW(
-        WS_EX_TOOLWINDOW,
+        WS_EX_APPWINDOW,
         'STATIC',
         'ttfolio-embed-slot',
         (WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN) >>> 0,
@@ -405,6 +525,9 @@ function attach(electronHwnd, sourceId, rect) {
       SWP_FRAMECHANGED | SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE,
     );
     d.ShowWindow(hwnd, SW_SHOW);
+    // 重挂会打断 Chromium 的合成输出（浏览器尤其明显）：立刻整窗重画一次，
+    // 否则可能停在空白/灰底，直到用户去动一下窗口才恢复。
+    d.RedrawWindow(hwnd, null, 0, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME);
   } catch (err) {
     // 半途失败：原地回滚，绝不留下"样式被改、父窗口还被挂着"的残局
     rollback(s);
@@ -413,7 +536,9 @@ function attach(electronHwnd, sourceId, rect) {
 
   s.attached = true;
   session = s;
-  s.taskbar = addTaskbarTab(hwnd);
+  applyTaskbarIdentity(container, hwnd, s.title);
+  // 任务栏条目由系统自动给（容器是顶层窗口 + WS_EX_APPWINDOW + 独立 AppID），不需要 AddTab
+  s.taskbar = true;
   applyVisibility();
   startPoll();
   emit({ type: 'attached', info: publicInfo(s) });
@@ -442,22 +567,14 @@ function safeDpi(hwnd) {
   }
 }
 
-function addTaskbarTab(hwnd) {
-  const err = initTaskbar();
-  if (err !== null || taskbar === null) return false;
+/** 同步让目标窗口切换窗口状态（SW_RESTORE / SW_MAXIMIZE 用 ShowWindow 是异步投递的，
+ *  紧接着 SetParent 会读到旧状态——SendMessageTimeout 让它当场生效，且带超时保护不卡主线程）。 */
+function sysCommand(hwnd, cmd) {
   try {
-    return taskbar.add(hwnd) === 0;
+    const res = Buffer.alloc(8);
+    d.SendMessageTimeoutW(hwnd, WM_SYSCOMMAND, cmd, 0, SMTO_ABORTIFHUNG, 400, res);
   } catch {
-    return false;
-  }
-}
-
-function removeTaskbarTab(hwnd) {
-  if (taskbar === null) return;
-  try {
-    taskbar.del(hwnd);
-  } catch {
-    /* 忽略 */
+    /* 目标无响应：继续走后面的流程，最坏是画面晚一帧刷新 */
   }
 }
 
@@ -469,7 +586,6 @@ function detach() {
   stopPoll();
   visibleGen++;
   if (d !== null) {
-    removeTaskbarTab(s.hwnd);
     restoreWindow(s);
     try {
       if (isWindow(s.container)) d.DestroyWindow(s.container);
@@ -501,6 +617,9 @@ function restoreWindow(s) {
     if (s.origStyle !== 0) d.SetWindowLongPtrW(s.hwnd, GWL_STYLE, s.origStyle | 0);
     if (s.origExStyle !== 0) d.SetWindowLongPtrW(s.hwnd, GWL_EXSTYLE, s.origExStyle | 0);
     s.placement.writeUInt32LE(44, 0);
+    // 还原成什么状态由 showCmd 决定：原来最大化就写 SW_SHOWMAXIMIZED（走 SetWindowPlacement
+    // 才是可靠的路径；先前用 ShowWindow(SW_MAXIMIZE) 补救，实测时灵时不灵）。
+    s.placement.writeUInt32LE(s.wasZoomed ? SW_SHOWMAXIMIZED : 1 /* SW_SHOWNORMAL */, 8);
     d.SetWindowPlacement(s.hwnd, s.placement);
     d.SetWindowPos(
       s.hwnd,
@@ -513,6 +632,8 @@ function restoreWindow(s) {
     );
     d.ShowWindow(s.hwnd, SW_SHOW);
     ensureOnScreen(s.hwnd);
+    // 重挂会打断 Chromium 的合成输出：强制整窗重画一遍，避免留在"灰底死画面"
+    d.RedrawWindow(s.hwnd, null, 0, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME);
   } catch {
     /* 目标可能已退出：还原失败不抛，避免把退出流程拖死 */
   }
