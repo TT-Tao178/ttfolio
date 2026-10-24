@@ -1,18 +1,22 @@
 /** 集成终端面板（FR-14.2 / T-104）：底部可开合、多标签、每标签独立 shell。
  *  伪终端跑在 Electron 主进程（node-pty），这里用 xterm.js 渲染并经 preload 桥收发；
- *  Web 模式无原生桥 → 如实提示「需桌面版」。会话语义：进程不跨重启存活，重启后为空。 */
+ *  Web 模式无原生桥 → 如实提示「需桌面版」。会话语义：进程不跨重启存活，重启后为空。
+ *  T-124：输出里的项目路径可点击直达文件页签（识别/配对纯函数见 terminalLinks.ts）；
+ *  T-125：暴露最小注入 API（injectTerminalText）供 Git 断点场景预填命令，绝不代执行。 */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Dropdown, Empty, Select, Space, Tooltip } from 'antd';
+import { Alert, App as AntdApp, Button, Dropdown, Empty, Select, Space, Tooltip } from 'antd';
 import { CloseOutlined, PlusOutlined, DownOutlined } from '@ant-design/icons';
 import { Terminal } from '@xterm/xterm';
+import type { IBufferLine, ILink } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { ProjectDetail } from '@ttfolio/shared';
+import type { ProjectDetail, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { SEMANTIC } from '@/theme/tokens';
+import { extractPathsFromLine, type LinkProject } from './terminalLinks';
 
 interface NativeTerminal {
   shells: () => Promise<{
@@ -52,15 +56,30 @@ interface TermTab {
 const MIN_H = 120;
 const MAX_H = 640;
 
+/** T-125：最小注入 API 的挂点（组件挂载时赋值、卸载时清空）。Web 模式恒 null，
+ *  调用方据返回值如实降级。只写文本不带回车——预填后由用户检查并自己回车执行。 */
+let terminalInjector: ((text: string) => void) | null = null;
+export function injectTerminalText(text: string): boolean {
+  if (terminalInjector === null) return false;
+  terminalInjector(text);
+  return true;
+}
+
 export function TerminalPanel(): React.JSX.Element {
   const setTerminalOpen = useAppStore((s) => s.setTerminalOpen);
   const { settings, setSetting } = useSettings();
+  const { message } = AntdApp.useApp();
   const activeTab = useAppStore((s) => s.tabs.find((t) => t.id === s.activeTabId) ?? null);
   const projectId = activeTab?.kind === 'project' ? activeTab.projectId : null;
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
     queryFn: () => api.get<ProjectDetail>(`/api/projects/${projectId ?? ''}`),
     enabled: projectId !== null,
+  });
+  // T-124：全部已登记项目（与侧栏共用缓存键）——绝对路径按 dirPath 前缀配对
+  const { data: linkProjects } = useQuery({
+    queryKey: ['projects', 'sidebar'],
+    queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active' }),
   });
 
   const [meta, setMeta] = useState<Awaited<ReturnType<NativeTerminal['shells']>> | null>(null);
@@ -106,6 +125,48 @@ export function TerminalPanel(): React.JSX.Element {
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
+  const activeKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeKeyRef.current = activeKey;
+  }, [activeKey]);
+
+  // T-124：识别上下文与点击动作走 ref——provider 在 TermHost 挂载时注册一次，
+  // projects/cwd 变化不重建 xterm 实例，点击时读 ref 最新值
+  const linkCtxRef = useRef<{ projects: LinkProject[]; cwdProjectId: string | null }>({
+    projects: [],
+    cwdProjectId: null,
+  });
+  useEffect(() => {
+    linkCtxRef.current = {
+      projects: (linkProjects ?? []).map((p) => ({ id: p.id, dirPath: p.dirPath })),
+      cwdProjectId: projectId,
+    };
+  }, [linkProjects, projectId]);
+  const actionsRef = useRef<{
+    open: (pid: string, rel: string) => void;
+    copy: (text: string) => void;
+  }>({ open: () => {}, copy: () => {} });
+  useEffect(() => {
+    actionsRef.current = {
+      open: (pid, rel) => {
+        const p = (linkProjects ?? []).find((x) => x.id === pid);
+        useAppStore.getState().openTab(
+          {
+            kind: 'project',
+            projectId: pid,
+            targetPath: rel === '' ? null : rel,
+            subTab: 'files',
+            scroll: 0,
+          },
+          p?.alias ?? p?.diskName ?? '项目',
+        );
+      },
+      copy: (text) => {
+        void navigator.clipboard.writeText(text);
+        void message.info('路径不在已登记项目内，已复制路径');
+      },
+    };
+  }, [linkProjects, message]);
 
   const createTab = useCallback(
     async (shell?: string) => {
@@ -142,6 +203,36 @@ export function TerminalPanel(): React.JSX.Element {
     void createTab();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta, cwd]);
+
+  // T-125 注入 API：开面板 → 复用当前标签（无可用的就新建）→ 写入文本（不带 \r，
+  // 绝不代执行——预填后由用户检查并自己回车）。cwd 用面板当前解析目录，调用点都在
+  // 活动项目页签内，即仓库/项目根。Web 模式 injector 恒 null，调用方据返回值如实降级。
+  useEffect(() => {
+    if (native === null) return undefined;
+    terminalInjector = (text: string) => {
+      setTerminalOpen(true);
+      const cur = tabsRef.current.find((t) => t.key === activeKeyRef.current);
+      if (cur?.ptyId != null) {
+        native.write(cur.ptyId, text);
+        return;
+      }
+      void (async () => {
+        await createTab();
+        // pty id 异步回填：短轮询等一次（上限 1s，放弃后面板会显示启动失败态）
+        for (let i = 0; i < 20; i++) {
+          const t = tabsRef.current.find((x) => x.key === activeKeyRef.current);
+          if (t?.ptyId != null) {
+            native.write(t.ptyId, text);
+            return;
+          }
+          await new Promise((r) => window.setTimeout(r, 50));
+        }
+      })();
+    };
+    return () => {
+      terminalInjector = null;
+    };
+  }, [native, createTab, setTerminalOpen]);
 
   const closeTab = (key: string): void => {
     const tab = tabs.find((t) => t.key === key);
@@ -318,6 +409,7 @@ export function TerminalPanel(): React.JSX.Element {
               cwd={cwd}
               onReady={(inst) => {
                 termsRef.current.set(t.key, inst);
+                registerPathLinks(inst.term, linkCtxRef, actionsRef);
               }}
               onInput={(data) => {
                 if (t.ptyId != null && native !== null) native.write(t.ptyId, data);
@@ -331,6 +423,73 @@ export function TerminalPanel(): React.JSX.Element {
       )}
     </div>
   );
+}
+
+/** 逐 cell 扫描一行：文本 + 每个字符的 cell 列/宽映射。
+ *  xterm 链接 range 用 cell 坐标（CJK 宽字符占 2 格、组合字符占 0 格），
+ *  字符串下标不能直接当 x 用，必须经此映射换算。 */
+function scanLineCells(line: IBufferLine): { text: string; colOf: number[]; widthOf: number[] } {
+  let text = '';
+  const colOf: number[] = [];
+  const widthOf: number[] = [];
+  for (let x = 0; x < line.length; x++) {
+    const cell = line.getCell(x);
+    if (cell === undefined) break;
+    const w = cell.getWidth();
+    if (w <= 0) continue; // 组合字符并入前格，无独立列
+    const chars = cell.getChars();
+    text += chars === '' ? ' ' : chars;
+    const n = chars === '' ? 1 : chars.length;
+    for (let k = 0; k < n; k++) {
+      colOf.push(x);
+      widthOf.push(w);
+    }
+  }
+  return { text, colOf, widthOf };
+}
+
+/** T-124：把识别纯函数（terminalLinks.ts）接到 xterm link provider——
+ *  每个 xterm 实例注册一次，项目/cwd 变化经 ref 取最新，不重建实例。 */
+function registerPathLinks(
+  term: Terminal,
+  ctxRef: React.MutableRefObject<{ projects: LinkProject[]; cwdProjectId: string | null }>,
+  actionsRef: React.MutableRefObject<{
+    open: (pid: string, rel: string) => void;
+    copy: (text: string) => void;
+  }>,
+): void {
+  term.registerLinkProvider({
+    provideLinks: (bufferLineNumber, callback) => {
+      const line = term.buffer.active.getLine(bufferLineNumber);
+      if (line === undefined) {
+        callback(undefined);
+        return;
+      }
+      const scan = scanLineCells(line);
+      const links: ILink[] = [];
+      for (const hit of extractPathsFromLine(scan.text, ctxRef.current)) {
+        const lastIdx = hit.end - 1;
+        const startCol = scan.colOf[hit.start] ?? hit.start;
+        const lastCol = scan.colOf[lastIdx] ?? lastIdx;
+        const lastW = scan.widthOf[lastIdx] ?? 1;
+        links.push({
+          range: {
+            start: { x: startCol + 1, y: bufferLineNumber },
+            end: { x: lastCol + lastW + 1, y: bufferLineNumber },
+          },
+          text: hit.text,
+          activate: () => {
+            if (hit.projectId !== null && hit.relPath !== null) {
+              actionsRef.current.open(hit.projectId, hit.relPath);
+            } else {
+              actionsRef.current.copy(hit.text);
+            }
+          },
+        });
+      }
+      callback(links.length > 0 ? links : undefined);
+    },
+  });
 }
 
 /** 每个标签一个 xterm 实例（隐藏的标签用 display:none 保留缓冲与滚动位置）。 */

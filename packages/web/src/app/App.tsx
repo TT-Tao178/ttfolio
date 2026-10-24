@@ -1,6 +1,12 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
 import { Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
-import { CodeOutlined, ExperimentOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import {
+  CodeOutlined,
+  ExperimentOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
@@ -297,15 +303,7 @@ function Shell(): React.JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [
-    paletteOpen,
-    setPalette,
-    activeTab,
-    updateActiveLocation,
-    message,
-    settings.keybindings,
-    commandCtx,
-  ]);
+  }, [paletteOpen, setPalette, activeTab, updateActiveLocation, message, settings.keybindings, commandCtx]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
