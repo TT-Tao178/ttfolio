@@ -48,6 +48,11 @@ interface AppState {
   terminalOpen: boolean;
   /** 窗口嵌入面板（FR-14.3 / T-102，实验性） */
   embedOpen: boolean;
+  /**
+   * 遮挡寄宿画面的原生浮层计数（T-131 空域守卫）：>0 时寄宿窗口必须让位（隐藏 + poster 顶住）。
+   * 由 EmbedPanel 的 MutationObserver 维护；可见性本身仍由主进程的推导函数统一决定。
+   */
+  nativeOverlayCount: number;
   dirty: Map<string, true>;
   settingsPaletteOpen: boolean;
   paletteOpen: boolean;
@@ -72,6 +77,7 @@ interface AppState {
   setDetail: (v: boolean) => void;
   setTerminalOpen: (v: boolean) => void;
   setEmbedOpen: (v: boolean) => void;
+  setNativeOverlayCount: (n: number) => void;
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
   setPalette: (v: boolean, opts?: { scope?: 'all' | 'project'; mode?: 'search' | 'command' }) => void;
@@ -138,6 +144,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   detailVisible: true,
   terminalOpen: false,
   embedOpen: false,
+  nativeOverlayCount: 0,
   dirty: new Map(),
   settingsPaletteOpen: false,
   paletteOpen: false,
@@ -293,6 +300,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDetail: (v) => set({ detailVisible: v }),
   setTerminalOpen: (v) => set({ terminalOpen: v }),
   setEmbedOpen: (v) => set({ embedOpen: v }),
+  setNativeOverlayCount: (n) => {
+    const next = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    if (get().nativeOverlayCount !== next) set({ nativeOverlayCount: next });
+  },
   markDirty: (key) => set({ dirty: new Map(get().dirty).set(key, true) }),
   clearDirty: (key) => {
     const m = new Map(get().dirty);

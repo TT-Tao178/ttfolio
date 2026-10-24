@@ -39,6 +39,8 @@ for (const need of [
   'node_modules/better-sqlite3/lib/index.js',
   'node_modules/bindings/bindings.js',
   'node_modules/file-uri-to-path/index.js',
+  // 窗口寄宿（T-131）依赖 koffi：入口在 asar 内，原生库在 @koromix 子包（下方单独断言）
+  'node_modules/koffi/package.json',
   'packages/web/dist/index.html',
 ]) {
   if (entries.some((e) => e.replaceAll('\\', '/').endsWith(need))) ok(`asar 内含 ${need}`);
@@ -58,6 +60,22 @@ if (!existsSync(nativeDir)) {
   const nodes = findNode(nativeDir);
   if (nodes.length === 0) fail('better-sqlite3 下没有 .node 原生产物');
   else ok(`原生模块已解包：${nodes.length} 个 .node（预编译目录）`);
+}
+
+// 2b) koffi 原生库（T-131 窗口寄宿）：koffi 的 CJS 入口按 __dirname 去找
+//     @koromix/koffi-<platform>/<triplet>/koffi.node，少了它寄宿面板会静默降级为不可用。
+const koffiRoot = path.join(unpacked, 'resources', 'app.asar.unpacked', 'node_modules', '@koromix');
+if (!existsSync(koffiRoot)) {
+  fail('app.asar.unpacked/node_modules/@koromix 不存在（koffi 原生库未解包，寄宿面板会不可用）');
+} else {
+  const findNode = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = path.join(dir, e.name);
+      return e.isDirectory() ? findNode(p) : e.name.endsWith('.node') ? [p] : [];
+    });
+  const n = findNode(koffiRoot).length;
+  if (n === 0) fail('@koromix 下没有 koffi 原生 .node');
+  else ok(`koffi 原生库已解包：${n} 个 .node`);
 }
 
 // 3) ABI 冒烟：模拟真实启动链路——把 asar 解包到临时目录，从其中的服务端 bundle 发起 require

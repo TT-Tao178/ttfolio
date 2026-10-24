@@ -50,8 +50,24 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
   /**
    * 窗口嵌入（FR-14.3 / T-102，T0 只读）：只提供窗口枚举；实际画面由渲染层
    * 经 getUserMedia 桌面源读取并直接展示（不落盘、不注入输入）。
+   * T-131 起并列一条「寄宿」链路：host.attach 把选中窗口真嵌进面板（可操作），
+   * 失败由调用方如实降级回监控模式。寄宿状态零持久化。
    */
   embed: {
     windows: () => ipcRenderer.invoke('tt:embed-windows'),
+    host: {
+      /** rect 为面板矩形（CSS px，相对页面视口），主进程负责 DIP→物理换算 */
+      attach: (sourceId, rect) => ipcRenderer.invoke('tt:embed-host-attach', String(sourceId), rect),
+      /** poster 静帧：必须在 attach 之前取（窗口被重挂后枚举不到） */
+      snapshot: (sourceId, rect) => ipcRenderer.invoke('tt:embed-host-snapshot', String(sourceId), rect),
+      detach: () => ipcRenderer.invoke('tt:embed-host-detach'),
+      resize: (rect) => ipcRenderer.send('tt:embed-host-resize', rect),
+      setVisible: (visible) => ipcRenderer.send('tt:embed-host-set-visible', visible === true),
+      onEvent: (cb) => {
+        const h = (_e, payload) => cb(payload);
+        ipcRenderer.on('tt:embed-host-changed', h);
+        return () => ipcRenderer.removeListener('tt:embed-host-changed', h);
+      },
+    },
   },
 });

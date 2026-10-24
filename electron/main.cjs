@@ -10,7 +10,16 @@
  *    用 Electron 原生 dialog.showOpenDialog 弹出（替代 PowerShell + WinForms 的误报高危组合）。
  *  - 数据目录仍是 %APPDATA%\ttFolio（安装/卸载、升级、Web 模式三态共用同一份数据）。
  */
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, nativeImage } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  nativeImage,
+  screen,
+} = require('electron');
 const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
@@ -38,6 +47,110 @@ ipcMain.on('tt:theme-changed', (_event, mode) => {
   const map = { light: 'light', dark: 'dark', oled: 'dark', cyberpunk: 'dark', sketch: 'light' };
   nativeTheme.themeSource = map[mode] ?? 'system';
 });
+
+/**
+ * 窗口寄宿（T-131 / FR-14.3 T1）：koffi 绑定 user32/ole32，全部同步调用跑在主线程。
+ * koffi 加载失败（缺原生库/非 Windows）只让寄宿面板如实不可用，绝不影响启动——
+ * 与 node-pty 同一姿势。mirror 直播（T-102）原样保留，是全部失败路径的降级终点。
+ */
+let embedHost = null;
+let embedHostError = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  embedHost = require('./embed-host.cjs');
+} catch (err) {
+  embedHostError = err && err.message ? err.message : String(err);
+}
+
+/** 渲染层最近一次上报的面板 DIP 矩形（相对页面视口）；窗口移动/缩放/跨屏时用它重算。 */
+let embedRectDip = null;
+
+/**
+ * 面板 DIP 矩形（相对页面视口）→ **屏幕物理像素**矩形。
+ * 为什么要经过 screen.dipToScreenRect：手乘 devicePixelRatio 在跨屏/异缩放时不可靠；
+ * 这里先补上客户区原点（getContentBounds 是屏幕 DIP）再整块换算。
+ * 注意：容器是「归属于窗口的顶层弹出窗口」（见 embed-host.cjs 头部说明），定位用屏幕坐标，
+ * 不是客户区坐标——这也是 route C 与设计 §1 子窗口方案在换算上的唯一差别。
+ */
+function embedRectToPx(rect) {
+  if (win === null || win.isDestroyed()) return null;
+  try {
+    const cb = win.getContentBounds();
+    const phys = screen.dipToScreenRect(win, {
+      x: cb.x + rect.x,
+      y: cb.y + rect.y,
+      width: rect.width,
+      height: rect.height,
+    });
+    return { x: phys.x, y: phys.y, width: phys.width, height: phys.height };
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeDipRect(rect) {
+  if (rect === null || typeof rect !== 'object') return null;
+  const x = Math.round(Number(rect.x));
+  const y = Math.round(Number(rect.y));
+  const width = Math.round(Number(rect.width));
+  const height = Math.round(Number(rect.height));
+  if (![x, y, width, height].every((v) => Number.isFinite(v))) return null;
+  if (width < 40 || height < 40 || width > 20000 || height > 20000) return null;
+  return { x, y, width, height };
+}
+
+/** 窗口移动/缩放/最大化/跨屏 DPI 变化时，按最近一次上报的 DIP 矩形重算容器位置。 */
+function syncEmbedRect() {
+  if (embedHost === null || !embedHost.isAttached() || embedRectDip === null) return;
+  const px = embedRectToPx(embedRectDip);
+  if (px !== null) embedHost.resize(px);
+}
+
+/** 退出/关窗口时的还原：与 before-quit 共用，幂等（两条路径都会触发）。 */
+function detachAllEmbeds() {
+  if (embedHost === null) return;
+  try {
+    embedHost.detachAll();
+  } catch (err) {
+    process.stdout.write(
+      `[ttfolio-electron] embed detach failed: ${err && err.message ? err.message : err}\n`,
+    );
+  }
+}
+
+/**
+ * 抓一帧窗口缩略图给渲染层当 poster（浮层遮挡期间顶住画面）。
+ * 时序很关键：必须**在 attach 之前**抓——窗口一旦被重挂成别人的子窗口，EnumWindows 就
+ * 枚举不到它了，desktopCapturer 只会返回 null（真机探针实测）。所以这里由渲染层在 attach
+ * 前主动调一次，抓到的静帧随状态存在渲染层；attach 之后再抓必然失败。
+ */
+async function captureWindowFrame(sourceId, rect) {
+  try {
+    const width = Math.max(160, Math.min(1600, Math.round(Number(rect?.width) || 640)));
+    const height = Math.max(90, Math.min(1200, Math.round(Number(rect?.height) || 360)));
+    const sources = await desktopCapturer.getSources({
+      types: ['window'],
+      thumbnailSize: { width, height },
+      fetchWindowIcons: false,
+    });
+    const hit = sources.find((s) => s.id === sourceId);
+    if (hit === undefined || hit.thumbnail.isEmpty()) return null;
+    return hit.thumbnail.toDataURL();
+  } catch {
+    return null;
+  }
+}
+
+if (embedHost !== null) {
+  embedHost.init({
+    onEvent: (payload) => {
+      if (win !== null && !win.isDestroyed()) win.webContents.send('tt:embed-host-changed', payload);
+    },
+    // 以下三项都延迟取值：调用发生在运行期，此时 app/screen/win 一定就绪
+    getWorkAreas: () => screen.getAllDisplays().map((d) => d.workArea),
+    isHostMinimized: () => win !== null && !win.isDestroyed() && win.isMinimized(),
+  });
+}
 
 /**
  * 缩略图原生解码（FR-13.5 / T-113）：渲染层给出项目内文件的绝对路径与目标最长边，
@@ -181,9 +294,12 @@ async function boot() {
   const state = loadWindowState({ width: 1440, height: 900 });
   win = new BrowserWindow(withRememberedBounds(state));
   if (state.maximized === true) win.maximize();
-  // 'close'（而非 'closed'）时保存——此时 win 引用仍在，getNormalBounds 可读
+  // 'close'（而非 'closed'）时保存——此时 win 引用仍在，getNormalBounds 可读。
+  // 寄宿还原必须挂在这里（设计 P0-3）：等到 before-quit 时 BrowserWindow 的 HWND 已销毁，
+  // 子窗口会被一起带走，正好命中"退出把用户窗口带走"这个最怕的情况。
   win.on('close', () => {
     if (win !== null) rememberWindowBounds(win);
+    detachAllEmbeds();
   });
   // 渲染进程崩溃兜底（第 33 轮 M9）：reason/exitCode 落 userData/renderer-crash.log，
   // 静默不弹窗（诊断走日志）；载入前挂上，崩溃后不自动重载（避免错误循环）
@@ -198,6 +314,30 @@ async function boot() {
   });
   win.on('closed', () => {
     win = null;
+  });
+  // 寄宿窗口的矩形必须跟着宿主走：窗口拖动/缩放/最大化/全屏/跨屏 DPI 变化时 ResizeObserver 不 fire，
+  // 只有这里能兜住。最小化/还原时重新推导可见性（推导函数在 embed-host 里，绝不在外面散写 ShowWindow）。
+  for (const ev of [
+    'resize',
+    'move',
+    'maximize',
+    'unmaximize',
+    'restore',
+    'enter-full-screen',
+    'leave-full-screen',
+  ]) {
+    win.on(ev, syncEmbedRect);
+  }
+  win.on('minimize', () => {
+    if (embedHost !== null) embedHost.refresh();
+  });
+  win.on('restore', () => {
+    if (embedHost !== null) embedHost.refresh();
+    syncEmbedRect();
+  });
+  screen.on('display-metrics-changed', () => {
+    syncEmbedRect();
+    if (embedHost !== null) embedHost.refresh();
   });
   process.stdout.write(`[ttfolio-electron] server ready on 127.0.0.1:${appPort}, loading window\n`);
   await win.loadURL(`http://127.0.0.1:${appPort}/`);
@@ -406,7 +546,12 @@ function killAllTerminals() {
   terminals.clear();
 }
 
-app.on('before-quit', killAllTerminals);
+// before-quit 只作兜底（真正可靠的还原点是 win.on('close')，见设计 P0-3）：
+// 两条路径都会触发，所以 detachAllEmbeds 与 killAllTerminals 都必须幂等。
+app.on('before-quit', () => {
+  killAllTerminals();
+  detachAllEmbeds();
+});
 
 /**
  * 窗口嵌入（FR-14.3 / T-102，T0 只读监控）：枚举可见顶层窗口供选择器使用，
@@ -437,6 +582,70 @@ ipcMain.handle('tt:embed-windows', async () => {
   } catch (err) {
     return { ok: false, error: err && err.message ? err.message : String(err), windows: [] };
   }
+});
+
+/**
+ * 窗口寄宿（T-131 / FR-14.3 T1）：把选中的窗口真嵌进面板，可操作。
+ * 与上面的只读监控并列（决策 4）：mirror 不删，是 attach 失败/失效的统一降级终点。
+ * 状态零持久化（决策 3）：重启后回到监控模式，不记忆上次寄宿的窗口。
+ */
+function embedUnavailable() {
+  return {
+    ok: false,
+    code: 'unavailable',
+    error: `窗口寄宿组件不可用：${embedHostError ?? '未知原因'}`,
+  };
+}
+
+ipcMain.handle('tt:embed-host-attach', async (_event, sourceId, rect) => {
+  if (embedHost === null) return embedUnavailable();
+  if (win === null || win.isDestroyed()) return { ok: false, code: 'host', error: '宿主窗口不可用' };
+  const dip = sanitizeDipRect(rect);
+  if (dip === null) return { ok: false, code: 'rect', error: '面板尺寸无效（可能尚未布局）' };
+  const px = embedRectToPx(dip);
+  if (px === null) return { ok: false, code: 'rect', error: '无法换算面板坐标' };
+  try {
+    const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
+    embedRectDip = dip;
+    const r = embedHost.attach(Number(handle), String(sourceId), px);
+    if (r.ok !== true) embedRectDip = null;
+    return r;
+  } catch (err) {
+    embedRectDip = null;
+    return { ok: false, code: 'exception', error: err && err.message ? err.message : String(err) };
+  }
+});
+
+// poster 静帧：渲染层在 attach 之前调（此时目标还是顶层窗口，抓得到；attach 之后就抓不到了）
+ipcMain.handle('tt:embed-host-snapshot', async (_event, sourceId, rect) => {
+  const dip = sanitizeDipRect(rect);
+  if (dip === null) return { ok: false, dataUrl: null };
+  const dataUrl = await captureWindowFrame(String(sourceId), dip);
+  return { ok: dataUrl !== null, dataUrl };
+});
+
+ipcMain.handle('tt:embed-host-detach', async () => {
+  embedRectDip = null;
+  if (embedHost === null) return { ok: true, detached: false };
+  try {
+    return embedHost.detach();
+  } catch (err) {
+    return { ok: false, error: err && err.message ? err.message : String(err) };
+  }
+});
+
+ipcMain.on('tt:embed-host-resize', (_event, rect) => {
+  if (embedHost === null) return;
+  const dip = sanitizeDipRect(rect);
+  if (dip === null) return;
+  embedRectDip = dip;
+  const px = embedRectToPx(dip);
+  if (px !== null) embedHost.resize(px);
+});
+
+ipcMain.on('tt:embed-host-set-visible', (_event, visible) => {
+  if (embedHost === null) return;
+  embedHost.setVisible(visible === true);
 });
 
 app.on('second-instance', () => {

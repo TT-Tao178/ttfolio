@@ -25,9 +25,15 @@ files:
   - node_modules/bindings/**/*
   - node_modules/file-uri-to-path/**/*
   - node_modules/node-pty/**/*
+  # koffi（窗口寄宿 T-131）：N-API 预编译 FFI，原生二进制在 @koromix/koffi-<platform>
+  # 子包里（koffi 的 CJS 入口按 __dirname 去找），两处都要打进去且在 asar 外
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/**/*
 asarUnpack:
   - node_modules/better-sqlite3/**/*
   - node_modules/node-pty/**/*
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/**/*
 win:
   icon: electron/build/icon.ico
   target:
