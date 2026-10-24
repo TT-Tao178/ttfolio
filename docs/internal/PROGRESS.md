@@ -1,5 +1,40 @@
 # PROGRESS
 
+## 第 79 轮：寄宿三大实测缺陷修复，随 v0.5.1 发布
+
+- 用户实测 0.5.0 后报三条：「窗口还原有 bug」「浏览器嵌入后出来不能用了」「嵌入的时候显示
+  黑屏」，另附两张 bug 截图（嵌入态只剩一条标题带 + 内容区死灰；分离后窗口变小且内容不回来），
+  并指出「一旦窗口被引入软件，任务栏就找不到这个窗口了」。四条全部在**真 Chrome** 上复现。
+- **根因一（黑屏/白屏 + 还原畸形是同一个根因）**：把 `IsZoomed`（最大化）的窗口直接
+  `SetParent` 进容器，Chromium 的合成输出直接失效——窗口几何、`IsWindowVisible` 全对，屏幕
+  上是空白；同时窗口保持着"最大化"标志但尺寸已被改成容器尺寸，分离后就成了「最大化标志 +
+  620×440」的畸形。对照实验：**先还原成正常尺寸再 attach，画面立刻正常**。
+  修法：attach 前 `SendMessageTimeout(WM_SYSCOMMAND, SC_RESTORE)`（`ShowWindow` 是异步投递，
+  紧接着 `SetParent` 会读到旧状态，不能用它）；记录 `wasZoomed`，分离时把
+  `WINDOWPLACEMENT.showCmd` 写成 `SW_SHOWMAXIMIZED`/`SW_SHOWNORMAL` 再 `SetWindowPlacement`
+  （走 showCmd 才可靠，先前的 `ShowWindow(SW_MAXIMIZE)` 补救时灵时不灵）。实测分离后 rect
+  与原最大化 rect 逐像素一致、`IsZoomed` 恢复 1。
+- **根因二（分离后内容变灰）**：重挂打断合成输出。修法：attach / detach 两侧都补
+  `RedrawWindow(RDW_INVALIDATE|RDW_ALLCHILDREN|RDW_UPDATENOW|RDW_FRAME)`。
+- **根因三（任务栏丢条目）**：目标被重挂成 `WS_CHILD` 后没有任务栏条目；v0.5.0 的
+  `ITaskbarList::AddTab` 返回 **S_OK 却不产生按钮**——当时只验了 HRESULT 没验"按钮是否真的
+  出现"，这条教训入档。修法：容器（真顶层窗口）带 `WS_EX_APPWINDOW` + 独立
+  `AppUserModelID`（取目标进程 exe 路径）+ 标题/图标镜像。修好前：容器与主窗口并成
+  "… - 2 个运行窗口"；修好后：UIA 实测任务栏多出**独立**条目、悬停标题=被嵌窗口标题、
+  分离后自动消失。
+  - 走过的弯路（已回退）：`WS_EX_APPWINDOW` 对**有属主**窗口不生效（UIA 实测按钮仍不出现）；
+    用 `IPropertyStore::GetValue` 抄目标自带 AppUserModelID 想让按钮直接挂到 Chrome 名下，
+    koffi 读 `PROPVARIANT` 指针会**把主进程打崩**（crashpad 实测），已放弃并写进代码注释。
+- **验证**：真 Chrome 探针（最大化 → 嵌入 → 分离）四项全过 + 截图取证；纯 Node 冒烟 17/17；
+  门禁 285 条三绿；产物自检 10/10（含 0.5.1 版本断言）；e2e 4/4。
+- **出包**：版本三处 0.5.1（70a2e16 的后续版本提交）；builder 全新目录 dist-electron-051t1；
+  安装包回移 dist-electron/；`npm rebuild better-sqlite3` 翻回 Node ABI 后门禁与 e2e 复跑通过。
+- **发布**：push 路由同上一轮（命令级 `GIT_SSL_NO_VERIFY=1` + 清空代理 env，未改持久配置）；
+  tag v0.5.1 → 70a2e16；Release 走正式脚本（201），API 复核标题/正文、无 T-编号、0 资产。
+  资产仍待用户手动拖传（对照表已补 0.5.1 行）。
+- 待用户手测：最大化浏览器嵌入应正常出画面；分离后应原样最大化回去；任务栏应能找到一个
+  独立条目（悬停是窗口标题）。
+
 ## 第 78 轮：T-131 窗口寄宿落地并随 v0.5.0 发布（大功能跳 minor）
 
 - 用户点名「完成 T-131，完成后打包为 0.5.0」，并另提一条硬要求：**UI 要有审美**（贴合
