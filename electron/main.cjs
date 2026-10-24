@@ -33,7 +33,15 @@ if (process.env['TTFOLIO_DATA_DIR'] !== undefined && process.env['TTFOLIO_DATA_D
   app.setPath('userData', path.join(process.env['TTFOLIO_DATA_DIR'], 'electron-userData'));
 }
 
-if (!app.requestSingleInstanceLock()) {
+/**
+ * 「以管理员身份重启」的第二次启动标记（管理员窗口接管，T-131 补充）。
+ * 带这个参数启动时跳过单实例锁：旧实例要等它起来后立刻退出，若先锁上会把它挡死
+ * （表现为点了按钮、UAC 过了、窗口什么都没变）。双实例并存窗口只有几百毫秒，
+ * 且旧实例此时已进入退出流程、不再写库。
+ */
+const ELEVATED_RETRY = process.argv.includes('--ttfolio-embed-retry');
+
+if (!ELEVATED_RETRY && !app.requestSingleInstanceLock()) {
   app.quit();
 }
 
@@ -341,6 +349,16 @@ async function boot() {
   });
   process.stdout.write(`[ttfolio-electron] server ready on 127.0.0.1:${appPort}, loading window\n`);
   await win.loadURL(`http://127.0.0.1:${appPort}/`);
+  // 提权重启回来的那次：自动把嵌入面板打开，让用户接着接管（不用再自己找按钮）。
+  // 渲染层订阅是 React 挂载后才建好的，单次发送容易丢——加载完成时发一次、2 秒后再补一次
+  // （重复打开面板是幂等的）。
+  if (ELEVATED_RETRY) {
+    const ping = () => {
+      if (win !== null && !win.isDestroyed()) win.webContents.send('tt:embed-retry');
+    };
+    win.webContents.once('did-finish-load', ping);
+    setTimeout(ping, 2000);
+  }
 }
 
 // ---- 窗口状态记忆（第 33 轮 M8）：尺寸/位置/最大化存 userData/window-state.json
@@ -622,6 +640,23 @@ ipcMain.handle('tt:embed-host-snapshot', async (_event, sourceId, rect) => {
   if (dip === null) return { ok: false, dataUrl: null };
   const dataUrl = await captureWindowFrame(String(sourceId), dip);
   return { ok: dataUrl !== null, dataUrl };
+});
+
+/**
+ * 以管理员身份重启（默认不启用，只在「管理员窗口接管失败」时由用户显式点按钮触发）。
+ * 走 ShellExecuteExW(runas)：UAC 弹一次；用户点了"否"就原样返回、什么都不做。
+ * 成功拉起新实例后本实例退出（新实例带 --ttfolio-embed-retry，会跳过单实例锁并自动开面板）。
+ */
+ipcMain.handle('tt:embed-relaunch-admin', async () => {
+  if (embedHost === null) return { ok: false, error: '窗口寄宿组件不可用' };
+  if (embedHost.isSelfElevated() === true) return { ok: false, error: 'ttFolio 已经是管理员权限' };
+  const params = process.defaultApp ? `"${app.getAppPath()}" --ttfolio-embed-retry` : '--ttfolio-embed-retry';
+  const r = embedHost.relaunchElevated(params);
+  if (r.ok === true) {
+    // 给 UAC/新进程一点启动时间再退出，避免新实例还没拿到锁就被旧的挡住
+    setTimeout(() => app.quit(), 400);
+  }
+  return r;
 });
 
 ipcMain.handle('tt:embed-host-detach', async () => {

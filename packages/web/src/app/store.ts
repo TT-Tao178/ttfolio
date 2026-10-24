@@ -53,6 +53,13 @@ interface AppState {
    * 由 EmbedPanel 的 MutationObserver 维护；可见性本身仍由主进程的推导函数统一决定。
    */
   nativeOverlayCount: number;
+  /**
+   * 「提权重启后请继续接管」信号（T-131 补充）：主进程在提权重启回来的实例里发一次
+   * tt:embed-retry，App 收到后自增此 nonce；EmbedPanel 据此直接切到寄宿模式。
+   */
+  embedRetryNonce: number;
+  /** 提权重启回来时置一次，EmbedPanel 据此切到寄宿模式 */
+  requestEmbedRetry: () => void;
   dirty: Map<string, true>;
   settingsPaletteOpen: boolean;
   paletteOpen: boolean;
@@ -145,6 +152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   terminalOpen: false,
   embedOpen: false,
   nativeOverlayCount: 0,
+  embedRetryNonce: 0,
   dirty: new Map(),
   settingsPaletteOpen: false,
   paletteOpen: false,
@@ -300,6 +308,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDetail: (v) => set({ detailVisible: v }),
   setTerminalOpen: (v) => set({ terminalOpen: v }),
   setEmbedOpen: (v) => set({ embedOpen: v }),
+  requestEmbedRetry: () => set({ embedRetryNonce: get().embedRetryNonce + 1 }),
   setNativeOverlayCount: (n) => {
     const next = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
     if (get().nativeOverlayCount !== next) set({ nativeOverlayCount: next });

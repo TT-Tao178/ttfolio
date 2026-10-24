@@ -58,6 +58,9 @@ interface NativeHost {
   resize: (rect: HostRect) => void;
   setVisible: (visible: boolean) => void;
   onEvent: (cb: (e: HostEvent) => void) => () => void;
+  /** 以管理员身份重启（默认不调用；仅在管理员窗口接管失败时由用户显式点击） */
+  relaunchAsAdmin?: () => Promise<{ ok: boolean; error?: string }>;
+  onRetryRequest?: (cb: () => void) => () => void;
 }
 
 interface NativeEmbed {
@@ -122,6 +125,7 @@ const STATUS_TEXT: Record<HostStatus, string> = {
 export function EmbedPanel(): React.JSX.Element {
   const setEmbedOpen = useAppStore((s) => s.setEmbedOpen);
   const nativeOverlayCount = useAppStore((s) => s.nativeOverlayCount);
+  const embedRetryNonce = useAppStore((s) => s.embedRetryNonce);
   const { settings, setSetting } = useSettings();
   const { message } = AntdApp.useApp();
   const [windows, setWindows] = useState<EmbedWindowInfo[]>([]);
@@ -139,6 +143,9 @@ export function EmbedPanel(): React.JSX.Element {
   const [status, setStatus] = useState<HostStatus>('idle');
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(null);
   const [hostError, setHostError] = useState<string | null>(null);
+  /** 失败类别（'elevated' = 管理员窗口，可提供提权重启入口） */
+  const [hostErrorCode, setHostErrorCode] = useState<string | null>(null);
+  const [elevateOpen, setElevateOpen] = useState(false);
   const [poster, setPoster] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
@@ -221,6 +228,7 @@ export function EmbedPanel(): React.JSX.Element {
           const reason = r.error ?? '未知原因';
           setStatus('failed');
           setHostError(reason);
+          setHostErrorCode(r.code ?? null);
           setHostInfo(null);
           // 如实提示并回落监控模式（设计 §3.7 降级链）
           setMode('monitor');
@@ -250,6 +258,14 @@ export function EmbedPanel(): React.JSX.Element {
       void hostApi.detach();
     };
   }, [mode, selected, hostApi, attachNonce]);
+
+  // 提权重启回来的那次：直接进寄宿模式接着接管（用户已经点过确认，不该让他再点一遍）
+  useEffect(() => {
+    if (embedRetryNonce <= 0) return;
+    setHostError(null);
+    setHostErrorCode(null);
+    setMode('host');
+  }, [embedRetryNonce]);
 
   // 面板矩形变化（拖宽/窗口缩放）→ rAF 节流后重算原生窗口位置
   useEffect(() => {
@@ -361,6 +377,24 @@ export function EmbedPanel(): React.JSX.Element {
     setPoster(null);
   };
 
+  /** 管理员窗口的显式入口：确认后提权重启（默认不开启，只有用户点按钮才走这里） */
+  const elevateAndRetry = (): void => {
+    setElevateOpen(false);
+    const fn = hostApi?.relaunchAsAdmin;
+    if (fn === undefined) {
+      void messageRef.current.warning('当前版本不支持提权重启');
+      return;
+    }
+    void fn()
+      .then((r) => {
+        if (r.ok !== true) void messageRef.current.warning(r.error ?? '提权重启失败');
+        else void messageRef.current.info('正在以管理员身份重启…', 4);
+      })
+      .catch((e: unknown) => {
+        void messageRef.current.warning(e instanceof Error ? e.message : String(e));
+      });
+  };
+
   if (native === null) {
     return (
       <div
@@ -447,7 +481,10 @@ export function EmbedPanel(): React.JSX.Element {
           onChange={(v) => {
             const next = v as Mode;
             if (next === mode) return;
-            if (next === 'host') setHostError(null);
+            if (next === 'host') {
+              setHostError(null);
+              setHostErrorCode(null);
+            }
             setMode(next);
           }}
           options={[
@@ -498,7 +535,16 @@ export function EmbedPanel(): React.JSX.Element {
         )}
         {hostError !== null && mode === 'monitor' && (
           <div style={{ fontSize: 11, color: SEMANTIC.warning, marginTop: 6, lineHeight: 1.6 }}>
-            上次寄宿失败：{hostError}（已回到监控模式）
+            上次寄宿失败：{hostError}
+            {hostErrorCode === 'elevated' && hostApi?.relaunchAsAdmin !== undefined ? (
+              <div style={{ marginTop: 6 }}>
+                <Button size="small" danger type="text" onClick={() => setElevateOpen(true)}>
+                  以管理员身份重启后再试…
+                </Button>
+              </div>
+            ) : (
+              <div style={{ marginTop: 4 }}>（已回到监控模式）</div>
+            )}
           </div>
         )}
       </div>
@@ -736,6 +782,40 @@ export function EmbedPanel(): React.JSX.Element {
           </Space>
         )}
       </div>
+
+      <Modal
+        open={elevateOpen}
+        title="以管理员身份重启 ttFolio？"
+        okText="继续重启"
+        cancelText="算了"
+        okButtonProps={{ danger: true }}
+        onOk={elevateAndRetry}
+        onCancel={() => setElevateOpen(false)}
+        width={460}
+      >
+        <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+          <p style={{ marginTop: 0 }}>
+            那个窗口以管理员权限运行，权限比 ttFolio 高，Windows 不允许普通权限的进程接管它的窗口。 让 ttFolio
+            也以管理员身份运行，就能寄宿它了。
+          </p>
+          <p style={{ marginBottom: 4 }}>但这有代价，确认之前请先看清楚：</p>
+          <ul style={{ paddingLeft: 20, marginTop: 0 }}>
+            <li>
+              <b>整个 ttFolio 都会在管理员权限下运行</b>
+              ——包括插件脚本与所有文件操作。只在你信任这一步时使用。
+            </li>
+            <li>
+              <b>拖拽登记会失效</b>：Windows 禁止从资源管理器往管理员权限的窗口拖文件。
+            </li>
+            <li>
+              <b>之后每次启动都会弹一次 UAC</b>（这次也会），日常使用没必要一直提权。
+            </li>
+          </ul>
+          <p style={{ marginBottom: 0, opacity: 0.75 }}>
+            不重启也不影响别的功能——这个窗口继续用「监控」模式只读看它就好。
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         open={tipOpen}

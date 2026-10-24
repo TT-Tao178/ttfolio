@@ -147,6 +147,7 @@ function buildTable() {
     CloseHandle: kernel32.func('int32_t CloseHandle(intptr_t handle)'),
     GetCurrentProcess: kernel32.func('intptr_t GetCurrentProcess()'),
     GetLastError: kernel32.func('uint32_t GetLastError()'),
+    ShellExecuteExW: shell32.func('int32_t ShellExecuteExW(void *sei)'),
     OpenProcessToken: advapi32.func('int32_t OpenProcessToken(intptr_t proc, uint32_t access, void *token)'),
     GetTokenInformation: advapi32.func(
       'int32_t GetTokenInformation(intptr_t token, int32_t cls, void *buf, uint32_t len, void *ret)',
@@ -384,6 +385,53 @@ function selfElevated() {
     }
   } catch {
     return null;
+  }
+}
+
+/**
+ * 以管理员身份重新拉起自己（UAC 会弹一次，用户点"否"就取消）。
+ *
+ * 默认不启用：只有用户在「管理员窗口接管失败」的提示里**显式点按钮**才会走到这里。
+ * 用 ShellExecuteExW(verb="runas") 而不是 PowerShell Start-Process——不额外拉进程，
+ * 也不触发"命令行编码/引号"那一类坑。SHELLEXECUTEINFOW 是手工拼的（x64 112 字节）。
+ */
+function relaunchElevated(params) {
+  const exe = process.execPath;
+  const r = shellExecute('runas', exe, params, require('node:path').dirname(exe));
+  if (r.ok === true) return r;
+  return {
+    ok: false,
+    error: r.code === 1223 ? '你取消了管理员授权' : `提权重启失败（${r.error ?? `错误码 ${r.code}`}）`,
+  };
+}
+
+/**
+ * ShellExecuteExW 的最小封装（SHELLEXECUTEINFOW 手工拼 x64 112 字节）。
+ * 抽出来是为了**能测**：用 verb='open' 跑一次 `cmd /c exit` 就能验证结构体与封送是否正确，
+ * 不必真弹 UAC。
+ */
+function shellExecute(verb, file, params, dir) {
+  try {
+    const verbBuf = Buffer.from(`${verb}\u0000`, 'utf16le');
+    const fileBuf = Buffer.from(`${file}\u0000`, 'utf16le');
+    const paramBuf = Buffer.from(`${params}\u0000`, 'utf16le');
+    const dirBuf = Buffer.from(`${dir}\u0000`, 'utf16le');
+    const sei = Buffer.alloc(112);
+    sei.writeUInt32LE(112, 0); // cbSize
+    sei.writeUInt32LE(0x00000040, 4); // fMask = SEE_MASK_NOCLOSEPROCESS
+    sei.writeBigUInt64LE(0n, 8); // hwnd
+    sei.writeBigUInt64LE(BigInt(koffi.address(verbBuf)), 16);
+    sei.writeBigUInt64LE(BigInt(koffi.address(fileBuf)), 24);
+    sei.writeBigUInt64LE(BigInt(koffi.address(paramBuf)), 32);
+    sei.writeBigUInt64LE(BigInt(koffi.address(dirBuf)), 40);
+    sei.writeInt32LE(1, 48); // nShow = SW_SHOWNORMAL
+    if (d.ShellExecuteExW(sei) === 0) {
+      const code = Number(d.GetLastError()) || 0;
+      return { ok: false, code, error: null };
+    }
+    return { ok: true, code: 0, error: null };
+  } catch (err) {
+    return { ok: false, code: 0, error: errMsg(err) };
   }
 }
 
@@ -908,4 +956,8 @@ module.exports = {
   getState,
   // 纯函数导出：冒烟脚本直接验证解析口径
   parseSourceId,
+  // 提权相关（管理员窗口支持，默认不启用，由渲染层显式入口触发）
+  isSelfElevated: selfElevated,
+  relaunchElevated,
+  shellExecute, // 供冒烟用 verb='open' 验证 SHELLEXECUTEINFOW 封送，不必弹 UAC
 };

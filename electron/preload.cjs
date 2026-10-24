@@ -68,6 +68,17 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
         ipcRenderer.on('tt:embed-host-changed', h);
         return () => ipcRenderer.removeListener('tt:embed-host-changed', h);
       },
+      /**
+       * 以管理员身份重启（管理员窗口接管失败后的显式入口）。会弹 UAC；用户拒绝则原样返回。
+       * 默认不会被调用——只有用户自己点了那个按钮才会走到这里。
+       */
+      relaunchAsAdmin: () => ipcRenderer.invoke('tt:embed-relaunch-admin'),
+      /** 提权重启回来时主进程会喊一声，渲染层据此打开嵌入面板 */
+      onRetryRequest: (cb) => {
+        const h = () => cb();
+        ipcRenderer.on('tt:embed-retry', h);
+        return () => ipcRenderer.removeListener('tt:embed-retry', h);
+      },
     },
   },
 });

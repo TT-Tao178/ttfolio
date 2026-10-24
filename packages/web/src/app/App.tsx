@@ -185,6 +185,23 @@ function Shell(): React.JSX.Element {
     };
   }, []);
 
+  // 提权重启回来时主进程会喊一声（管理员窗口接管场景，T-131 补充）：自动打开嵌入面板，
+  // 用户接着接管即可，不用自己再去找顶栏按钮。Web 模式没有这个桥，静默跳过。
+  useEffect(() => {
+    const host = (
+      window as unknown as {
+        ttfolioNative?: { embed?: { host?: { onRetryRequest?: (cb: () => void) => () => void } } };
+      }
+    ).ttfolioNative?.embed?.host;
+    const off = host?.onRetryRequest?.(() => {
+      useAppStore.getState().setEmbedOpen(true);
+      useAppStore.getState().requestEmbedRetry();
+    });
+    return () => {
+      if (typeof off === 'function') off();
+    };
+  }, []);
+
   // 「分析中」完成反馈（T-119）：本轮新登记项目分析完成时一次性 toast（module 级暂存）
   useEffect(
     () =>
