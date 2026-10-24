@@ -1,5 +1,27 @@
 # PROGRESS
 
+## 第 77 轮：T-130 集合视图「从已登记项目中添加」随 v0.4.11（本地就绪，**发布挂起**）
+
+- 用户点名 T-130 并打包。**出包全链路已完成**（安装包 ttFolio-Setup-0.4.11.exe
+  在 dist-electron/，自检 8 项全绿；门禁三绿 272 条 + e2e 4/4；版本提交
+  7b71fe4 + tag v0.4.11 均已落在本地），**但 push 与 Release 页因网络中断
+  挂起**：github 域直连/代理 7897/api 全部不可达（curl 全 000，多轮重试无效
+  ——非单点抖动，是到 github 的整体断路）。网络恢复后手动收尾两条：
+  `git -c http.proxy= -c https.proxy= push origin main v0.4.11`，然后
+  `node scripts/create-release.mjs 0.4.11 "集合批量勾选添加成员"`（直连失败
+  则前缀 https_proxy=http://127.0.0.1:7897，以当时探测为准）+ 上传资产对照
+  补行。
+- **T-130（9a039e9）**：新组件 CollectionAddMembersModal——列全部已登记项目
+  （active），**已在本集合的成员入口处排除**（验收项）；名称/别名/路径搜索
+  过滤 + 全选/取消全选（作用于过滤后可见集）；确认批量 POST members 追加
+  （replace 缺省 false + 服务端 INSERT OR IGNORE 双保险）；成功 invalidate
+  collections/projects 集合卡片墙即时出新成员；服务端单事务批量，要么整体
+  成功要么整体失败，失败如实展示原因。Workbench 工具条仅集合视图
+  （filters.collection 非空）在「添加项目」左渲染按钮（tooltip 明示「不登记
+  新文件夹」），弹窗 key=集合 id 全新挂载；集合名走 ['collections'] 共享缓存。
+- **手测提醒（随 0.4.11）**：集合视图工具条出现新按钮（其他视图不出现）；
+  搜索/全选/勾选多个确认后卡片墙即时出现；已入集项目不在弹窗列表。
+
 ## 第 76 轮：T-126 动态页接入导航 + T-129 右键直出移除/删除，随 v0.4.10 发布
 
 - 用户点名 T-126、T-129 并「做完出包」。
