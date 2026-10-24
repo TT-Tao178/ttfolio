@@ -1,5 +1,45 @@
 # PROGRESS
 
+## 第 74 轮：T-121 侧栏折叠入口 + T-122 域条收敛提案，随 v0.4.8 发布（含 zod 高危修复）
+
+- 用户点名两项：T-121（侧栏 30 项上限改折叠+全量入口）与 T-122（域条收敛评估，
+  仅提案不改代码），随后按 0.4.8 出包。
+- **T-121（0617e1d）**：Sidebar 项目列表保留前 30 项，其后追加「还有 X 个项目 ·
+  查看全部」折叠行（计数=列表总数−已展示数，如实），项目/Git/架构图/文档四个
+  域统一出现（四域共享同一份 projectItems，截断问题同源）；点击开「全部项目」
+  卡片墙——新视图键 view:all-projects 经 parseSubTab 未知键回落 status=active
+  全量视图；**刻意不复用 view:all**（侧栏里它是工作台总览入口、Workbench 登记
+  成功后又用它切卡片墙，复用撞语义）；viewTitle 补「全部项目」映射；高亮经
+  既有 view: 前缀分支自动生效（域跟随活动标签切回项目域后一致）；≤30 项零差别；
+  parseSubTab.test.ts 补锚点（257 条）。
+- **T-122（纯文档，不入仓库）**：设计文档目录新增《ttFolio域条收敛提案-2026-10-24.md》，
+  六点齐备：四域同列表三条代码实证（共享 projectItems/同一批项目标签/域是活动
+  标签派生量且不持久化）、before/after ASCII 线框（推荐 4 域+单一侧栏，备选
+  最小改动）、parseSubTab 零改动+域键删除+会话零迁移（session_tabs 无域字段；
+  search+git-overview 历史怪味刻意不动）、快捷键/? 帮助/注册表影响清单（1-8
+  为项目内切页签不受影响）、回滚方案+9 条风险、「丢掉的入口」10 项逐项确认
+  +两项前置条件。DomainRail/Sidebar 零改动，待用户拍板。
+- **计划外出包前置：zod 高危修复（6be116f）**：audit:prod 链头拦截 zod <4.6.6
+  高危（GHSA-mrhx-c7xc-m3w5，受限集合校验内存耗尽，CVSS 7.5；zod 承担全部
+  请求体与插件清单校验）。升级 ^3.23.8→^4.6.7（大版本）——全仓仅 3 文件使用，
+  API 面核查全落 v4 保留核心、两处 z.record 已是双参数形式；门禁全绿、audit
+  归零。CHANGELOG 0.4.8 补「修复」行，Release 正文同步。
+- **出包（5d9eed9 版本三处 + 2fa420b CHANGELOG 补行）**：builder 首跑在
+  electron zip 下载完后的二进制下载阶段 600s 超时——根因是本轮直接 npx 绕过了
+  dist-win.mjs 的镜像固化，带 ELECTRON_MIRROR/ELECTRON_BUILDER_BINARIES_MIRROR
+  双镜像重跑一轮过（教训：直跑 builder 必须显式带双镜像 env）；全新输出目录
+  dist-electron-048t1，VERIFY_DIST 8 项全绿（含 0.4.8 版本断言），安装包与
+  blockmap 移回 dist-electron/，npm rebuild 翻回 Node ABI。
+- **门禁与抖动**：门禁三绿两轮复跑（typecheck/lint/test 257 条，退出码实查）；
+  agent.test.ts 两次在 teardown fs.rmSync 临时目录时 EPERM（257 条全过、仅清理
+  失败，单独复跑与全量复跑均绿，判定为 Windows 杀软扫新写临时目录的文件锁抖动，
+  非本轮代码问题——后续若频发再评估把清理改容错）；e2e 4/4。
+- **发布**：push 与 tag/Release 走代理 7897（命令级）；tag v0.4.8 打在版本提交
+  5d9eed9；Release 页经正式脚本 scripts/create-release.mjs 创建（201），API
+  复核标题/正文（## 新增起、无内部任务词汇）/0 资产待拖传；上传资产对照已补行。
+- **手测提醒（随 0.4.8）**：登记 30+ 项目后侧栏项目分区末尾出现折叠行，点击开
+  「全部项目」卡片墙且侧栏高亮正确；≤30 项目时侧栏与 0.4.7 完全一致。升级零迁移。
+
 ## 第 73 轮：Release 页串版修复 + 发布规范入 CONTRIBUTING（0.4.3~0.4.7 五页已修）
 
 - 用户报障：0.4.2 之前 Release 页正常，0.4.3 起标题/正文不对。取证（API 拉全
