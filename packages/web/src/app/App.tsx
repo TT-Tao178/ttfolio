@@ -1,6 +1,6 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
 import { Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
-import { ExperimentOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { CodeOutlined, ExperimentOutlined, PlusOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/qc';
@@ -139,7 +139,6 @@ function Shell(): React.JSX.Element {
   const detailVisible = useAppStore((s) => s.detailVisible);
   const terminalOpen = useAppStore((s) => s.terminalOpen);
   const embedOpen = useAppStore((s) => s.embedOpen);
-  const setTerminalOpen = useAppStore((s) => s.setTerminalOpen);
   const setDetail = useAppStore((s) => s.setDetail);
 
   const onSseState = useCallback((s: SseState) => setSseState(s), []);
@@ -295,13 +294,6 @@ function Shell(): React.JSX.Element {
         }
         return;
       }
-      // 集成终端开关（FR-14.2 / T-104）：Ctrl+` 在终端聚焦时也要生效
-      // （xterm 的 attachCustomKeyEventHandler 已把该组合交还宿主）
-      if (e.ctrlKey && e.key === '`') {
-        e.preventDefault();
-        setTerminalOpen(!useAppStore.getState().terminalOpen);
-        return;
-      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -313,7 +305,6 @@ function Shell(): React.JSX.Element {
     message,
     settings.keybindings,
     commandCtx,
-    setTerminalOpen,
   ]);
 
   return (
@@ -366,6 +357,14 @@ function Shell(): React.JSX.Element {
             >
               导入
             </Button>
+          </Tooltip>
+          <Tooltip title="集成终端 (Ctrl+`)">
+            <Button
+              type={terminalOpen ? 'primary' : 'text'}
+              icon={<CodeOutlined />}
+              onClick={() => useAppStore.getState().setTerminalOpen(!useAppStore.getState().terminalOpen)}
+              data-testid="terminal-toggle"
+            />
           </Tooltip>
           <Tooltip title="窗口嵌入（实验性，只读监控）">
             <Button

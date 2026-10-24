@@ -96,6 +96,10 @@ export const BUILTIN_COMMANDS: CommandDef[] = [
     title: '打开 / 收起集成终端',
     category: '视图',
     keys: 'Ctrl+`',
+    // T-123 收编：App 全局快捷键循环统一走注册表匹配（xterm 的
+    // attachCustomKeyEventHandler 已把该组合交还宿主，聚焦终端时同样生效），
+    // 硬编码分支已删除；可改绑。
+    keyEditable: true,
     run: (ctx) => ctx.store.setTerminalOpen(!ctx.store.terminalOpen),
   },
   {
