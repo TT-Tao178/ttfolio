@@ -100,6 +100,7 @@ let ffiError = null;
 function buildTable() {
   const user32 = koffi.load('user32.dll');
   const kernel32 = koffi.load('kernel32.dll');
+  const advapi32 = koffi.load('advapi32.dll');
   const shell32 = koffi.load('shell32.dll');
   return {
     IsWindow: user32.func('int32_t IsWindow(intptr_t)'),
@@ -144,6 +145,12 @@ function buildTable() {
       'int32_t QueryFullProcessImageNameW(intptr_t proc, uint32_t flags, void *buf, void *size)',
     ),
     CloseHandle: kernel32.func('int32_t CloseHandle(intptr_t handle)'),
+    GetCurrentProcess: kernel32.func('intptr_t GetCurrentProcess()'),
+    GetLastError: kernel32.func('uint32_t GetLastError()'),
+    OpenProcessToken: advapi32.func('int32_t OpenProcessToken(intptr_t proc, uint32_t access, void *token)'),
+    GetTokenInformation: advapi32.func(
+      'int32_t GetTokenInformation(intptr_t token, int32_t cls, void *buf, uint32_t len, void *ret)',
+    ),
     GetCurrentThreadId: kernel32.func('uint32_t GetCurrentThreadId()'),
   };
 }
@@ -322,6 +329,64 @@ function exePathOf(hwnd) {
   }
 }
 
+/**
+ * 令牌是否处于"已提升"状态（TokenElevation=20，返回 DWORD 布尔）。
+ * UIPI（用户界面特权隔离）是这套机制的底层规则：**低完整性进程不能操作高完整性进程的窗口**，
+ * 「以管理员身份运行」的程序令牌是提升的，普通权限的 ttFolio 对它 SetParent 必然被拒。
+ */
+function tokenElevated(token) {
+  try {
+    const buf = Buffer.alloc(4);
+    const ret = Buffer.alloc(4);
+    if (d.GetTokenInformation(token, 20 /* TokenElevation */, buf, 4, ret) === 0) return null;
+    return buf.readInt32LE(0) !== 0;
+  } catch {
+    return null;
+  }
+}
+
+/** 目标窗口所属进程是否以管理员权限运行（查不到返回 null，表示"不确定"）。 */
+function windowElevated(hwnd) {
+  try {
+    const pid = Buffer.alloc(8);
+    d.GetWindowThreadProcessId(hwnd, pid);
+    const proc = Number(
+      d.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, 0, pid.readUInt32LE(0)),
+    );
+    if (proc === 0) return null;
+    try {
+      const token = Buffer.alloc(8);
+      if (d.OpenProcessToken(proc, 0x0008 /* TOKEN_QUERY */, token) === 0) return null;
+      const tok = Number(token.readBigUInt64LE(0));
+      try {
+        return tokenElevated(tok);
+      } finally {
+        d.CloseHandle(tok);
+      }
+    } finally {
+      d.CloseHandle(proc);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** ttFolio 自己是否以管理员权限运行。 */
+function selfElevated() {
+  try {
+    const token = Buffer.alloc(8);
+    if (d.OpenProcessToken(d.GetCurrentProcess(), 0x0008 /* TOKEN_QUERY */, token) === 0) return null;
+    const tok = Number(token.readBigUInt64LE(0));
+    try {
+      return tokenElevated(tok);
+    } finally {
+      d.CloseHandle(tok);
+    }
+  } catch {
+    return null;
+  }
+}
+
 /** GUID 小端 16 字节（koffi 封送 COM 结构体靠手工拼，见文件头铁律②）。 */
 function guidBuf(d1, d2, d3, tail) {
   const b = Buffer.alloc(16);
@@ -429,6 +494,17 @@ function attach(electronHwnd, sourceId, rect) {
   const denied = DENY_CLASSES[className];
   if (denied !== undefined) return fail(denied, 'unsupported');
 
+  // UIPI 前置判定：低完整性进程不能操作高完整性进程的窗口（SetParent 必然 Access Denied）。
+  // 与其让用户看到一句"窗口受保护"，不如在动手前就把原因和出路讲清楚。
+  if (windowElevated(hwnd) === true && selfElevated() !== true) {
+    return fail(
+      '这个窗口是以管理员权限运行的，普通权限的 ttFolio 无法接管它（Windows 的 UIPI 规则：低权限进程不能操作高权限窗口）。' +
+        '可以：① 用「监控」模式只读看它；② 直接关掉这个窗口，用普通权限重新打开（多数程序并不需要管理员）；' +
+        '③ 让 ttFolio 也以管理员身份运行再寄宿（代价是 Windows 会禁止从资源管理器往窗口里拖文件）。',
+      'elevated',
+    );
+  }
+
   // 关键（v0.5.1 修）：最大化/最小化的窗口**不能**直接重挂。
   // 实测：把最大化的 Chrome 直接塞进容器，内容区整片空白（白/黑屏），且分离后窗口会变成
   // 「最大化标志 + 容器尺寸」的畸形状态（用户报的"还原有 bug"）。正确姿势是先还原成正常
@@ -504,11 +580,14 @@ function attach(electronHwnd, sourceId, rect) {
     d.SetParent(hwnd, container);
     const parentNow = d.GetAncestor(hwnd, GA_PARENT);
     if (parentNow !== container) {
-      // 典型原因：目标以管理员权限运行，UIPI 拦死跨完整性级别的窗口重挂
+      // GetLastError 才是真相：5=ERROR_ACCESS_DENIED（UIPI/受保护进程拦死），其余是别的原因
+      const code = Number(d.GetLastError()) || 0;
+      const denied = code === 5;
       throw new Error(
-        parentNow === 0
-          ? '系统拒绝了窗口重挂（目标可能以管理员权限运行）'
-          : '系统拒绝了窗口重挂（窗口受保护）',
+        denied
+          ? `系统拒绝了窗口重挂（Access Denied）：这个窗口所属的进程权限比 ttFolio 高，或受系统保护。` +
+              `管理员窗口需要 ttFolio 也以管理员身份运行才能接管；也可以改用「监控」模式只读看它`
+          : `系统拒绝了窗口重挂（错误码 ${code}）：目标窗口可能已被关闭、正在自我重建，或受保护进程限制`,
       );
     }
     const st = Number(d.GetWindowLongPtrW(hwnd, GWL_STYLE)) >>> 0;
