@@ -14,7 +14,13 @@ import {
   Tooltip,
   App,
 } from 'antd';
-import { InboxOutlined, MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  InboxOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  UserAddOutlined,
+} from '@ant-design/icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
@@ -28,6 +34,7 @@ import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
+import { CollectionAddMembersModal } from './CollectionAddMembersModal';
 import { buildProjectMenu, useArchiveProject, useRemoveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
@@ -49,6 +56,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
     if (!sortTouched.current) setSort(settings.cardSort);
   }, [settings.cardSort]);
   const [addOpen, setAddOpen] = useState(false);
+  // T-130：集合视图「从已登记项目中添加」弹窗开关（仅 collectionId 非空时可开）
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 顶栏/总览「添加项目」信号：nonce 变化即打开弹窗（模块级 lastAddNonce 保证"只消费一次"——
@@ -273,6 +282,18 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                 }
               />
             </Tooltip>
+            {/* T-130：集合视图专属——把已登记项目勾选加入本集合（与「添加项目」=登记新文件夹互补） */}
+            {collectionId !== null && (
+              <Tooltip title="把已登记的项目勾选加入本集合（不登记新文件夹）">
+                <Button
+                  icon={<UserAddOutlined />}
+                  onClick={() => setAddMembersOpen(true)}
+                  data-testid="add-members-btn"
+                >
+                  从已登记项目中添加
+                </Button>
+              </Tooltip>
+            )}
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -335,6 +356,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             )}
           </StateView>
           <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
+          {addMembersOpen && collectionId !== null && (
+            <CollectionAddMembersModal
+              key={collectionId}
+              collectionId={collectionId}
+              onClose={() => setAddMembersOpen(false)}
+            />
+          )}
           {selectedIds.length > 0 && (
             <BatchActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} />
           )}
