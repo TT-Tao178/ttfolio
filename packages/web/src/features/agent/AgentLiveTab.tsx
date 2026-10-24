@@ -6,6 +6,7 @@ import { Alert, App, Button, Empty, Segmented, Switch, Tag, Tooltip } from 'antd
 import {
   DeleteOutlined,
   EditOutlined,
+  FolderOpenOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   VerticalAlignBottomOutlined,
@@ -14,6 +15,7 @@ import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { api } from '@/lib/api';
 import type { FileContent, GitDiff, GitLogEntry, ProjectDetail } from '@ttfolio/shared';
+import { useAppStore } from '@/app/store';
 import { cmTheme, cmHighlight } from '@/theme/codemirror';
 import { langExtension } from '@/features/files/langExt';
 import { ImagePreview } from '@/features/files/ImagePreview';
@@ -104,6 +106,19 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
   const [baseline, setBaseline] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'content' | 'diff'>('content');
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // T-126：动态页接入核心导航——任一条目一步到「文件」页签并定位该文件
+  // （openTab 语义与命令面板同构；刻意不碰 follow 状态：跳转不等于钉住，
+  //  跟随开关保持用户原样，回切动态页不改变其选择）。
+  const projectName = p?.alias ?? p?.diskName ?? '项目';
+  const openInFiles = useCallback(
+    (path: string): void => {
+      useAppStore
+        .getState()
+        .openTab({ kind: 'project', projectId, targetPath: path, subTab: 'files', scroll: 0 }, projectName);
+    },
+    [projectId, projectName],
+  );
 
   const selected = useMemo(
     () => (selectedSeq === null ? null : (events.find((e) => e.seq === selectedSeq) ?? null)),
@@ -318,6 +333,22 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
                         {e.changeCount > 1 && (
                           <Tag style={{ fontSize: 10, marginInlineEnd: 0 }}>×{e.changeCount}</Tag>
                         )}
+                        {/* T-126：显式「打开」——stopPropagation 避开整行点击的钉住语义；
+                            删除墓碑无可打开目标，禁用并如实提示 */}
+                        <Tooltip title={e.kind === 'delete' ? '文件已删除' : '在文件页签打开'}>
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<FolderOpenOutlined style={{ fontSize: 13 }} />}
+                            disabled={e.kind === 'delete'}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              openInFiles(e.path);
+                            }}
+                            style={{ width: 22, height: 22, minWidth: 0, padding: 0, flexShrink: 0 }}
+                            data-testid={`agent-live-open-${e.seq}`}
+                          />
+                        </Tooltip>
                         <span style={{ opacity: 0.55, fontVariantNumeric: 'tabular-nums' }}>
                           {timeOf(e.lastAt)}
                         </span>
@@ -393,6 +424,18 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
                 </Tag>
               )}
               <span style={{ flex: 1 }} />
+              {/* T-126：右栏一键到「文件」页签定位该文件（删除墓碑禁用） */}
+              <Tooltip title={selected.kind === 'delete' ? '文件已删除，无法打开' : '在文件页签打开该文件'}>
+                <Button
+                  size="small"
+                  icon={<FolderOpenOutlined />}
+                  disabled={selected.kind === 'delete'}
+                  onClick={() => openInFiles(selected.path)}
+                  data-testid="agent-live-open-current"
+                >
+                  在编辑器打开
+                </Button>
+              </Tooltip>
               <Segmented
                 size="small"
                 value={viewMode}
