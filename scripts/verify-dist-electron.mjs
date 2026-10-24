@@ -84,9 +84,13 @@ const electronExe = path.join(unpacked, 'TT项目管理工作台.exe');
 if (existsSync(electronExe)) {
   // 最终冒烟走真实路径：完整 GUI 进程（主进程带 asar+unpacked 融合），验证 health 与前端页面。
   // 注意：不要用「asar extract + RUN_AS_NODE」做判据——解包目录没有 .node 真身，也没有 asar 感知，必失败。
+  // 关键：必须剔除 ELECTRON_RUN_AS_NODE。该变量让 Electron 二进制退化成 Node 解释器
+  // （打包版会直接报 "bad option" 或不启动任何服务），在某些宿主环境里是全局预设的。
+  const childEnv = { ...process.env };
+  delete childEnv.ELECTRON_RUN_AS_NODE;
   const child = spawn(electronExe, [], {
     env: {
-      ...process.env,
+      ...childEnv,
       TTFOLIO_PORT: '7949',
       TTFOLIO_DATA_DIR: path.resolve('.tmp-test/asar-smoke-data'),
     },
