@@ -6,7 +6,6 @@ import {
   Card,
   Descriptions,
   Form,
-  Image,
   Input,
   InputNumber,
   List,
@@ -30,8 +29,6 @@ import { TagHub } from './TagHub';
 import { HealthCard } from './HealthCard';
 import { SettingsTransfer } from './SettingsTransfer';
 import { UpdateCheck } from './UpdateCheck';
-import sponsorAlipay from '@/assets/sponsor/alipay.jpg';
-import sponsorWechat from '@/assets/sponsor/wechat.jpg';
 import { SEMANTIC } from '@/theme/tokens';
 import { sectionDomId, sectionTitle } from './sections';
 import { EditorState } from '@codemirror/state';
@@ -684,79 +681,6 @@ curl -X POST -H "x-ttfolio-token: <token>" -H "x-ttfolio-actor: my-agent" \\
   -d "{\\"paths\\": [\\"D:\\\\demo\\\\my-project\\"]}" \\
   http://127.0.0.1:7717/api/projects`}
               </pre>
-            </div>
-            {/* 支持作者（用户需求）：自愿请喝一杯，完全自愿，不影响任何功能 */}
-            <div
-              style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${SEMANTIC.split}` }}
-              data-testid="sponsor"
-            >
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>支持作者</div>
-              <p style={{ fontSize: 12, opacity: 0.75, margin: '0 0 12px' }}>
-                如果 ttFolio 对你有帮助，欢迎请作者喝杯水，赞助完全自愿，不影响任何功能。
-              </p>
-              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-                <figure style={{ margin: 0, textAlign: 'center' }}>
-                  <div
-                    style={{
-                      width: 260,
-                      height: 260,
-                      padding: 10,
-                      background: '#ffffff',
-                      borderRadius: 10,
-                      border: `1px solid ${SEMANTIC.border}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* 体检轮用户反馈：码图太小扫不出——260 容器 + antd Image 点击查看全屏大图 */}
-                    <Image
-                      src={sponsorAlipay}
-                      alt="支付宝收款码"
-                      width={190}
-                      preview={{
-                        imageRender: (originalNode) => (
-                          <div style={{ background: '#fff', padding: 24, borderRadius: 12 }}>
-                            {originalNode}
-                          </div>
-                        ),
-                      }}
-                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                    />
-                  </div>
-                  <figcaption style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>支付宝</figcaption>
-                </figure>
-                <figure style={{ margin: 0, textAlign: 'center' }}>
-                  <div
-                    style={{
-                      width: 260,
-                      height: 260,
-                      padding: 10,
-                      background: '#ffffff',
-                      borderRadius: 10,
-                      border: `1px solid ${SEMANTIC.border}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Image
-                      src={sponsorWechat}
-                      alt="微信收款码"
-                      width={190}
-                      preview={{
-                        imageRender: (originalNode) => (
-                          <div style={{ background: '#fff', padding: 24, borderRadius: 12 }}>
-                            {originalNode}
-                          </div>
-                        ),
-                      }}
-                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                    />
-                  </div>
-                  <figcaption style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>微信</figcaption>
-                </figure>
-              </div>
             </div>
           </Card>
         </SectionAnchor>
