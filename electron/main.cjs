@@ -302,6 +302,18 @@ async function boot() {
   const state = loadWindowState({ width: 1440, height: 900 });
   win = new BrowserWindow(withRememberedBounds(state));
   if (state.maximized === true) win.maximize();
+  // 白屏治理（用户反馈）：窗口 show:false，首帧就绪（ready-to-show）才显示——
+  // 此前窗口默认立即显示、内容要等 loadURL + 首屏 bundle 解析，中间全白。
+  // 8 秒兜底：加载异常时窗口也得出来（宁可白屏不可无窗），并如实打日志。
+  win.once('ready-to-show', () => {
+    if (win !== null && !win.isDestroyed() && !win.isVisible()) win.show();
+  });
+  setTimeout(() => {
+    if (win !== null && !win.isDestroyed() && !win.isVisible()) {
+      process.stdout.write('[ttfolio-electron] ready-to-show timeout, force show\n');
+      win.show();
+    }
+  }, 8000);
   // 'close'（而非 'closed'）时保存——此时 win 引用仍在，getNormalBounds 可读。
   // 寄宿还原必须挂在这里（设计 P0-3）：等到 before-quit 时 BrowserWindow 的 HWND 已销毁，
   // 子窗口会被一起带走，正好命中"退出把用户窗口带走"这个最怕的情况。
@@ -405,6 +417,8 @@ function withRememberedBounds(state) {
     width: state.width,
     height: state.height,
     autoHideMenuBar: true,
+    // 白屏治理：初始隐藏，ready-to-show（首帧就绪）再显示（boot 里有 8s 兜底）
+    show: false,
     title: 'TT项目管理工作台',
     webPreferences: {
       contextIsolation: true,
