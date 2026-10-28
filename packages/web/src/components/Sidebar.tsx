@@ -544,32 +544,48 @@ export function Sidebar(): React.JSX.Element {
       </span>
     ),
   }));
-  // 项目超过 30 个时侧栏折叠：列表保留前 30 项，其后追加「还有 X 个项目 · 查看全部」，
-  // 点击开「全部项目」卡片墙（view:all-projects 经 parseSubTab 未知键回落 status=active 全量视图；
-  // 键名不能复用 view:all——侧栏里它是工作台总览、Workbench 登记成功后又用它切卡片墙）。
-  // 计数如实（=列表总数 − 已展示数）；≤30 时无此行与现状零差别；集合/标签分区在其之前不受影响。
-  const overflowCount = (projects ?? []).length - projectItems.length;
-  const moreRow: SidebarItem | null =
-    overflowCount > 0 ? { key: 'view:all-projects', label: `还有 ${overflowCount} 个项目 · 查看全部` } : null;
+  // 项目超过 30 个时侧栏折叠：列表保留前 30 项，其后追加「还有 X 个项目」折叠行——
+  // 点击**就地展开**剩余项目（用户反馈：跳卡片墙找不到"未显示的项目去哪了"），
+  // 再点收起；展开的条目与主列表同构（点击打开/右键菜单/键后缀随域）。
+  // ≤30 时无此行与现状零差别；集合/标签分区在其之前不受影响。
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowItems = (projects ?? []).slice(30);
+  const overflowCount = overflowItems.length;
+  const expandedRows: SidebarItem[] =
+    overflowOpen === true
+      ? overflowItems
+          .map((p) => projectItems.find((it) => it.key === `proj:${p.id}:files`))
+          .filter((it) => it !== undefined)
+      : [];
+  const overflowRows: SidebarItem[] =
+    overflowCount > 0
+      ? [
+          {
+            key: 'tt-overflow-toggle',
+            label: `${overflowOpen ? '收起' : '还有'} ${overflowCount} 个项目 ${overflowOpen ? '▴' : '▾'}`,
+          },
+          ...expandedRows,
+        ]
+      : [];
   if (domain === 'projects') {
     items.push({ key: 'sep-projects', label: '项目' });
     items.push(...projectItems);
-    if (moreRow !== null) items.push(moreRow);
+    items.push(...overflowRows);
   } else if (domain === 'git') {
     items.push({ key: 'sep-projects', label: '项目 Git' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':git') })));
-    if (moreRow !== null) items.push(moreRow);
+    items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':git') })));
   } else if (domain === 'archives') {
     items.push({ key: 'sep-projects', label: '项目架构图' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
-    if (moreRow !== null) items.push(moreRow);
+    items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:archives`;
   } else if (domain === 'docs') {
     items.push({ key: 'doclib', label: '文档库（跨项目浏览）' });
     items.push({ key: 'sep-projects', label: '项目文档' });
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
-    if (moreRow !== null) items.push(moreRow);
+    items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
       selected = `proj:${activeTab.projectId}:docs`;
     else if (activeTab?.kind === 'doclib') selected = 'doclib';
@@ -577,6 +593,11 @@ export function Sidebar(): React.JSX.Element {
 
   const onClick = (e: { key: string }): void => {
     const key = e.key;
+    if (key === 'tt-overflow-toggle') {
+      // 折叠行：就地展开/收起剩余项目（T-121 交互修订，不再跳卡片墙）
+      setOverflowOpen(!overflowOpen);
+      return;
+    }
     if (key.startsWith('set:')) {
       // 设置分组：kind=settings 的标签 key 不含 subTab，所以会复用同一个设置标签并同步定位
       openTab(
@@ -740,9 +761,6 @@ function viewTitle(key: string): string {
       return '30 天没打开';
     case 'my-archived':
       return '已归档';
-    // T-121 折叠行「查看全部」的目标卡片墙标题（view:all-projects 走 openView 的标题映射）
-    case 'all-projects':
-      return '全部项目';
     default:
       return key;
   }

@@ -316,6 +316,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                   gap: 12,
+                  alignItems: 'start',
                 }}
               >
                 {(projects ?? []).map((p) => (
