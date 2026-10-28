@@ -40,6 +40,8 @@ export const SETTING_KEYS = {
   theme: 'theme', // light | dark | oled（电红色发光） | cyberpunk（赛博朋克） | sketch（极简手绘） | system
   density: 'density', // small | middle | large
   watchEnabled: 'watch_enabled',
+  // 界面动效开关（用户点名 2026-10-24：hover/指向动画，默认开启，可在设置关闭）
+  effectsEnabled: 'effects_enabled',
   watchStabilityMs: 'watch_stability_ms',
   autoSave: 'auto_save',
   trashRetentionDays: 'trash_retention_days',

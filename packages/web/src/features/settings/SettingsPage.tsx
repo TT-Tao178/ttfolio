@@ -208,6 +208,16 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                   ]}
                 />
               </Form.Item>
+              <Form.Item
+                label="界面动效"
+                tooltip="悬停、指向与过渡动画（用户点名默认开启）；关闭后零动画，性能敏感场景可用"
+              >
+                <Switch
+                  data-testid="set-effects"
+                  checked={settings.effectsEnabled}
+                  onChange={(v) => setSetting('effectsEnabled', v)}
+                />
+              </Form.Item>
               <Form.Item label="代码配色">
                 <Segmented
                   data-testid="set-syntax-scheme"

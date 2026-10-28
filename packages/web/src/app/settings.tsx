@@ -37,6 +37,8 @@ export interface SettingsShape {
   theme: ThemeMode;
   density: 'small' | 'middle' | 'large';
   watchEnabled: boolean;
+  /** 界面动效（hover/指向过渡与动画，用户点名默认开、可在设置关闭） */
+  effectsEnabled: boolean;
   watchStabilityMs: number;
   autoSave: boolean;
   trashRetentionDays: number;
@@ -79,7 +81,9 @@ export interface SettingsShape {
 export const DEFAULT_SETTINGS: SettingsShape = {
   theme: 'light',
   density: 'middle',
-  watchEnabled: true,
+  // 与迁移 0013 后的服务端默认一致（监听默认关，手动开启）
+  watchEnabled: false,
+  effectsEnabled: true,
   watchStabilityMs: 300,
   autoSave: false,
   trashRetentionDays: 30,
@@ -109,6 +113,7 @@ const SERVER_KEY: Record<string, string> = {
   theme: 'theme',
   density: 'density',
   watchEnabled: 'watch_enabled',
+  effectsEnabled: 'effects_enabled',
   watchStabilityMs: 'watch_stability_ms',
   autoSave: 'auto_save',
   trashRetentionDays: 'trash_retention_days',
@@ -242,6 +247,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   useLayoutEffect(() => {
     applyThemeVars(resolved);
   }, [resolved]);
+
+  // 界面动效开关（用户点名默认开、可关）：全局唯一 html[data-tt-effects] 标记，
+  // tokens.ts 的 motionRules 全部以此为前缀——关掉时零动画零过渡
+  useEffect(() => {
+    document.documentElement.dataset['ttEffects'] = settings.effectsEnabled ? '1' : '0';
+  }, [settings.effectsEnabled]);
 
   /** 无 toast 的核心实现（toast 需要 AntdApp 上下文，见 SettingsBridge）。 */
   const coreSetSetting = useCallback<SetSetting>(

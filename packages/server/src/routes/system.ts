@@ -98,6 +98,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       theme: all[SETTING_KEYS.theme] ?? 'light',
       density: all[SETTING_KEYS.density] ?? 'middle',
       watchEnabled: (all[SETTING_KEYS.watchEnabled] ?? '0') === '1',
+      effectsEnabled: (all[SETTING_KEYS.effectsEnabled] ?? '1') === '1',
       watchStabilityMs: Number(all[SETTING_KEYS.watchStabilityMs] ?? '300'),
       autoSave: (all[SETTING_KEYS.autoSave] ?? '0') === '1',
       trashRetentionDays: Number(all[SETTING_KEYS.trashRetentionDays] ?? String(TRASH_RETENTION_DAYS)),
@@ -135,6 +136,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       theme: (v) => String(v),
       density: (v) => String(v),
       watch_enabled: (v) => (v === true || v === 'true' ? '1' : '0'),
+      effects_enabled: (v) => (v === true || v === 'true' ? '1' : '0'),
       watch_stability_ms: (v) => {
         // 体检附带：Number(v) 可能 NaN，NaN 落库会让 chokidar awaitWriteFinish 参数非法
         const n = Number(v);
@@ -234,6 +236,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     'theme',
     'density',
     'watch_enabled',
+    'effects_enabled',
     'watch_stability_ms',
     'auto_save',
     'card_sort',

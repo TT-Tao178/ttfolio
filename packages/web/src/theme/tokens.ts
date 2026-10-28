@@ -201,31 +201,40 @@ const VARS_SKETCH: Record<string, string> = {
 
 /**
  * 流光玻璃主题（用户点名，参考图：柔和紫粉蓝渐变底 + 半透明白玻璃卡）：
- * 容器底用半透明白（rgba 经 CSS 变量自动作用到所有 SEMANTIC.containerBg 引用点），
- * 渐变底与 backdrop blur 在 themeVarsCss 的 glass 规则段（html[data-tt-glass="1"]）。
+ * v2（用户反馈"背景太淡、玻璃后面没东西可透、卡片是白底方框"）重做环境光——
+ * 渐变底叠加三个高饱和径向光斑（紫/粉/青，"环境光"），玻璃卡透明度降档 + blur 加强，
+ * 让光斑真实透过玻璃；厚圆角 + 顶部内高光 + 细描边给面板质感。
  * 深浅归属：浅色系（colorScheme=light、标题栏 light）。
  */
 const VARS_GLASS: Record<string, string> = {
   'tt-primary': '#7c5cff',
-  'tt-primary-bg': 'rgba(124,92,255,.12)',
+  'tt-primary-bg': 'rgba(124,92,255,.14)',
   'tt-primary-border': 'rgba(124,92,255,.35)',
   'tt-success': '#18a058',
   'tt-warning': '#d4880f',
   'tt-error': '#e5484d',
-  // layout-bg 是渐变的兜底纯色（供 JS 取值与 antd colorBgLayout 用；渐变本体在 CSS 规则）
-  'tt-layout-bg': '#eef1fb',
-  // 半透明白玻璃卡：作用于所有 SEMANTIC.containerBg 引用点（侧栏/顶栏/详情/终端等自绘容器）
-  'tt-container-bg': 'rgba(255,255,255,.6)',
-  'tt-split': 'rgba(255,255,255,.65)',
-  'tt-border': 'rgba(255,255,255,.9)',
-  'tt-text': 'rgba(28,27,34,.9)',
-  'tt-text-2': 'rgba(28,27,34,.62)',
-  'tt-text-3': 'rgba(28,27,34,.42)',
+  // layout-bg 是渐变的兜底纯色（供 antd colorBgLayout 与 JS 兜底；渐变本体在 CSS 规则）
+  'tt-layout-bg': '#e9edfb',
+  // 半透明白玻璃卡：作用于所有 SEMANTIC.containerBg 引用点（侧栏/顶栏/详情/终端等自绘容器）。
+  // v2 降档到 .42——更透，环境光斑能透过玻璃
+  'tt-container-bg': 'rgba(255,255,255,.42)',
+  'tt-split': 'rgba(255,255,255,.6)',
+  'tt-border': 'rgba(255,255,255,.85)',
+  'tt-text': 'rgba(28,27,34,.92)',
+  'tt-text-2': 'rgba(28,27,34,.64)',
+  'tt-text-3': 'rgba(28,27,34,.44)',
 };
 
-/** 流光玻璃的整页渐变底（applyThemeVars 里 inline 覆写 body background 用）。 */
+/**
+ * 流光玻璃的整页"环境光"底：多层径向光斑叠加线性渐变（fixed 不随滚动）。
+ * v2：光斑饱和度拉高（此前太淡，玻璃后面没有东西可透）。
+ */
 export const GLASS_BG_GRADIENT =
-  'linear-gradient(160deg,#c9d3ff 0%,#e8d6ff 22%,#ffd9ec 45%,#d9f0ff 72%,#c9ecff 100%) fixed';
+  'radial-gradient(1200px 800px at 12% 8%, rgba(124,92,255,.5), transparent 55%),' +
+  'radial-gradient(1000px 700px at 88% 14%, rgba(255,140,205,.45), transparent 55%),' +
+  'radial-gradient(1100px 900px at 75% 85%, rgba(94,214,255,.42), transparent 55%),' +
+  'radial-gradient(900px 700px at 20% 90%, rgba(255,196,140,.3), transparent 55%),' +
+  'linear-gradient(160deg,#dfe6ff 0%,#f2e3ff 35%,#ffe6f2 60%,#e2f2ff 100%) fixed';
 
 export const THEME_STYLE_ID = 'tt-theme-vars';
 
@@ -270,33 +279,52 @@ export function themeVarsCss(): string {
     `html[data-tt-sketch="1"] .ant-modal .ant-modal-content{border-radius:${SKETCH_RADIUS_CARD};border:1.5px solid #c9c0ae;box-shadow:3px 4px 0 rgba(61,58,52,.14)}`,
     `html[data-tt-sketch="1"] .ant-tag{border-radius:${SKETCH_RADIUS_BTN};border-width:1px}`,
   ].join('');
-  // 流光玻璃（glass）：渐变底 + 精准表面的 backdrop blur + 半透明 antd 卡/弹层。
+  // 流光玻璃（glass v2，用户反馈"背景太淡、玻璃后面没东西可透、卡片是白底方框"）：
+  // 环境光透过玻璃 + 厚圆角 + 顶部内高光 + 细描边的面板质感。
   // blur 只挂 .tt-glass-surface（壳层容器）与 antd 少数大表面，不全量铺开（GPU 成本可控）。
   const glassRules = [
-    // 壳层玻璃表面（App 顶栏/域条/路径条/侧栏容器/详情栏/状态栏/终端挂 tt-glass-surface）
-    `html[data-tt-glass="1"] .tt-glass-surface{background:var(--tt-container-bg);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}`,
-    // antd 大表面玻璃化
-    `html[data-tt-glass="1"] .ant-card:not(.ant-card-ghost){background:rgba(255,255,255,.62);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.75);box-shadow:0 8px 32px rgba(93,76,180,.1)}`,
-    `html[data-tt-glass="1"] .ant-modal .ant-modal-content{background:rgba(255,255,255,.88);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border:1px solid rgba(255,255,255,.8);box-shadow:0 18px 60px rgba(93,76,180,.22)}`,
-    `html[data-tt-glass="1"] .ant-table{background:rgba(255,255,255,.5)}`,
-    `html[data-tt-glass="1"] .ant-table-wrapper .ant-table-container table .ant-table-thead>tr>th{background:rgba(255,255,255,.55)}`,
-    // 浮层：下拉/消息/气泡玻璃化（都是短暂出现的表面，blur 开销可接受）
-    `html[data-tt-glass="1"] .ant-select-dropdown,html[data-tt-glass="1"] .ant-dropdown-menu{background:rgba(255,255,255,.86);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}`,
-    `html[data-tt-glass="1"] .ant-message-notice-content,html[data-tt-glass="1"] .ant-notification-notice{background:rgba(255,255,255,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.8);box-shadow:0 10px 40px rgba(93,76,180,.18)}`,
-    // 圆角整体放大一档（玻璃语言的圆角观感）
-    `html[data-tt-glass="1"] .ant-card{border-radius:12px}`,
-    `html[data-tt-glass="1"] .ant-modal .ant-modal-content{border-radius:14px}`,
-    `html[data-tt-glass="1"] .ant-btn{border-radius:8px}`,
-    // 细节：菜单选中项与分割线在半透明底上更柔
-    `html[data-tt-glass="1"] .ant-menu-item-selected{background:rgba(124,92,255,.12)}`,
+    // 壳层玻璃表面（App 顶栏/域条/路径条/状态栏挂 tt-glass-surface）：
+    // 更透（.42）+ blur 24 + saturate 160 + 顶部内高光——"环境光透过玻璃"的核心
+    `html[data-tt-glass="1"] .tt-glass-surface{background:var(--tt-container-bg);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.65)}`,
+    // antd 大表面玻璃化（厚圆角 16 + 内高光 + 柔和大投影）
+    `html[data-tt-glass="1"] .ant-card:not(.ant-card-ghost){background:rgba(255,255,255,.5);backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,.7);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 10px 36px rgba(93,76,180,.14);border-radius:16px}`,
+    `html[data-tt-glass="1"] .ant-modal .ant-modal-content{background:rgba(255,255,255,.86);backdrop-filter:blur(28px) saturate(160%);-webkit-backdrop-filter:blur(28px) saturate(160%);border:1px solid rgba(255,255,255,.8);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 24px 72px rgba(93,76,180,.26);border-radius:18px}`,
+    `html[data-tt-glass="1"] .ant-table{background:rgba(255,255,255,.4)}`,
+    `html[data-tt-glass="1"] .ant-table-wrapper .ant-table-container table .ant-table-thead>tr>th{background:rgba(255,255,255,.5)}`,
+    // 浮层：下拉/消息/气泡玻璃化（短暂表面，blur 开销可接受）
+    `html[data-tt-glass="1"] .ant-select-dropdown,html[data-tt-glass="1"] .ant-dropdown-menu{background:rgba(255,255,255,.85);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.75);border-radius:12px;box-shadow:0 12px 44px rgba(93,76,180,.2)}`,
+    `html[data-tt-glass="1"] .ant-message-notice-content,html[data-tt-glass="1"] .ant-notification-notice{background:rgba(255,255,255,.84);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.8);border-radius:12px;box-shadow:0 12px 44px rgba(93,76,180,.2)}`,
     // 代码/编辑器表面保持实底（可读性优先，玻璃只给壳）
     `html[data-tt-glass="1"] .cm-editor{background:#ffffff}`,
+  ].join('');
+  // 选中与悬停强化（全主题生效——用户反馈默认主题选中不清晰、左侧上半部无选中效果）：
+  // 菜单选中项统一「主色底 + 左侧 2px 指示条」，悬停统一中性底；html 前缀特异性压过 antd 默认。
+  const selectionRules = [
+    `html .ant-menu-item.ant-menu-item-selected{background:var(--tt-primary-bg);box-shadow:inset 2px 0 0 var(--tt-primary)}`,
+    `html .ant-menu-light .ant-menu-item:not(.ant-menu-item-selected):hover,html .ant-menu-light .ant-menu-submenu-title:hover{background:rgba(127,127,127,.1)}`,
+    `html .ant-menu-submenu-title.ant-menu-submenu-selected{color:var(--tt-primary)}`,
+    // Segmented 选中块加重（默认主题下选中不明显的主要抱怨点之一）
+    `html .ant-segmented .ant-segmented-item-selected{box-shadow:0 1px 6px rgba(0,0,0,.14)}`,
+    // 表格行 hover 统一反馈
+    `html .ant-table-wrapper .ant-table-tbody>tr.ant-table-row:hover>td{background:var(--tt-primary-bg)}`,
+  ].join('');
+  // 动效（全局唯一开关 html[data-tt-effects]，默认 1；外观卡可关）：
+  // 全部走 transition/transform（合成层属性）保证流畅；关闭时零动画零过渡。
+  const motionRules = [
+    `html[data-tt-effects="1"] .ant-menu-item,html[data-tt-effects="1"] .ant-menu-submenu-title{transition:background-color .18s cubic-bezier(.2,.7,.3,1),color .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s cubic-bezier(.2,.7,.3,1)}`,
+    `html[data-tt-effects="1"] .ant-btn,html[data-tt-effects="1"] .ant-segmented-item,html[data-tt-effects="1"] .ant-switch,html[data-tt-effects="1"] .ant-input,html[data-tt-effects="1"] .ant-select-selector{transition:all .18s cubic-bezier(.2,.7,.3,1)}`,
+    // 项目卡：hover 上浮 + 阴影加深（data-testid 稳定选择器；受控于动效开关）
+    `html[data-tt-effects="1"] [data-testid="project-card"]{transition:transform .2s cubic-bezier(.2,.8,.25,1),box-shadow .2s cubic-bezier(.2,.8,.25,1),border-color .2s cubic-bezier(.2,.8,.25,1)}`,
+    `html[data-tt-effects="1"] [data-testid="project-card"]:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.14)}`,
+    `html[data-tt-effects="1"] [data-testid="project-card"]:active{transform:translateY(-1px) scale(.995)}`,
+    // Modal 内容出入场更顺的缩放曲线（antd 自带动画仍在，这里只调曲线）
+    `html[data-tt-effects="1"] .ant-modal{transition:transform .22s cubic-bezier(.2,.8,.25,1),opacity .22s ease}`,
   ].join('');
   return (
     `:root{${light}}html[data-tt-dark="1"]{${dark}}` +
     `html[data-tt-oled="1"]{${oled}}html[data-tt-cyber="1"]{${cyber}}` +
     `html[data-tt-sketch="1"]{${sketch}}html[data-tt-glass="1"]{${glass}}` +
-    `${neon}${handDrawn}${glassRules}`
+    `${neon}${handDrawn}${glassRules}${selectionRules}${motionRules}`
   );
 }
 
@@ -415,17 +443,17 @@ export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
     base.token = {
       ...base.token,
       colorBgContainer: '#ffffff',
-      colorBgLayout: '#eef1fb',
+      colorBgLayout: '#e9edfb',
       colorBorder: 'rgba(124,92,255,.22)',
       colorBorderSecondary: 'rgba(255,255,255,.75)',
-      borderRadius: 8,
+      borderRadius: 10,
     };
     base.components = {
       ...base.components,
-      Card: { borderRadiusLG: 12 },
-      Modal: { borderRadiusLG: 14, contentBg: 'rgba(255,255,255,.88)' },
-      Table: { colorBgContainer: 'rgba(255,255,255,.5)', headerBg: 'rgba(255,255,255,.55)' },
-      Button: { borderRadius: 8 },
+      Card: { borderRadiusLG: 16 },
+      Modal: { borderRadiusLG: 18, contentBg: 'rgba(255,255,255,.86)' },
+      Table: { colorBgContainer: 'rgba(255,255,255,.4)', headerBg: 'rgba(255,255,255,.5)' },
+      Button: { borderRadius: 10 },
     };
   }
   return base;
