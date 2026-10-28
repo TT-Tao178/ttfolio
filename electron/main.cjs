@@ -52,7 +52,14 @@ let win = null;
 // 深色主题下标题栏不再恒白。oled 属深色系按 dark 处理；未知值回 system（跟随操作系统），
 // 防渲染层异常值把标题栏钉死。浏览器/Web 模式无此桥，纯网页不受影响。
 ipcMain.on('tt:theme-changed', (_event, mode) => {
-  const map = { light: 'light', dark: 'dark', oled: 'dark', cyberpunk: 'dark', sketch: 'light' };
+  const map = {
+    light: 'light',
+    dark: 'dark',
+    oled: 'dark',
+    cyberpunk: 'dark',
+    sketch: 'light',
+    glass: 'light',
+  };
   nativeTheme.themeSource = map[mode] ?? 'system';
 });
 
@@ -296,7 +303,8 @@ async function boot() {
   let healthy = false;
   while (Date.now() < deadline && !healthy) {
     healthy = await fetchHealth(appPort);
-    if (!healthy) await new Promise((r) => setTimeout(r, 400));
+    // 120ms 粒度：服务通常 1~2s 就绪，轮询粒度直接决定窗口出现延迟（此前 400ms 平均多等 200ms）
+    if (!healthy) await new Promise((r) => setTimeout(r, 120));
   }
 
   const state = loadWindowState({ width: 1440, height: 900 });

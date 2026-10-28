@@ -7,6 +7,7 @@ import Fastify, {
 } from 'fastify';
 import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { readFile as fspReadFile } from 'node:fs/promises';
 import type { AppContext } from './context.js';
 import { toApiError } from './routes/helpers.js';
 import { defaultHttpStatus, AppError } from './core/errors.js';
@@ -218,7 +219,12 @@ export function buildApp(ctx: AppContext): FastifyInstance {
         '.png': 'image/png',
         '.woff2': 'font/woff2',
       };
-      void reply.type(types[ext] ?? 'application/octet-stream').send(readFileSync(full));
+      // 文件名带内容 hash（vite 产物）：一年 immutable——二次启动浏览器直接走磁盘缓存，
+      // 不再回源重拉 5.5MB（此前无缓存头，每次启动全部 304/200 往返）。
+      void reply
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .type(types[ext] ?? 'application/octet-stream')
+        .send(await fspReadFile(full));
       return reply;
     });
   }

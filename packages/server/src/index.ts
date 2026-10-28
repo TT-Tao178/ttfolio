@@ -83,49 +83,12 @@ async function main(): Promise<void> {
     logger.info({ mod: 'boot', msg: `migrations applied: ${mig.applied.map((m) => m.file).join(', ')}` });
   }
 
-  // ---- 缩略图配额（FR-13.5 / T-113）：启动时按 LRU 收敛一次 ----
-  try {
-    const q = enforceQuota(layout.thumbsDir);
-    if (q.removed > 0) {
-      logger.info({ mod: 'boot', msg: `thumb quota: removed ${q.removed} files, freed ${q.freed} bytes` });
-    }
-  } catch {
-    /* 配额清理失败不阻断启动 */
-  }
-
   // ---- 个人主页（FR-13.7）：审计 actor 默认取用户名 ----
   setDefaultActorName(getSetting(db, 'profile_name'));
 
-  // ---- 每日备份（>24h） ----
-  const lastBackup = getSetting(db, SETTING_KEYS.lastBackupAt);
-  const lastMs = lastBackup !== null ? Date.parse(lastBackup) : 0;
-  if (!Number.isFinite(lastMs) || Date.now() - lastMs > 24 * 3600 * 1000) {
-    try {
-      const r = createBackup(layout.dbFile, layout.backupDir);
-      setSetting(db, SETTING_KEYS.lastBackupAt, new Date().toISOString());
-      logger.info({ mod: 'boot', msg: `daily backup -> ${r.file} (integrity: ${r.integrity})` });
-    } catch (err) {
-      logger.warn({ mod: 'boot', msg: `backup failed: ${err instanceof Error ? err.message : String(err)}` });
-    }
-  }
-  // 备份保留可配（FR-13.11 / T-108）：backup_keep_days > 0 时按天数清理过期快照
-  try {
-    const keepDays = Number(getSetting(db, 'backup_keep_days') ?? '0');
-    const removed = applyRetentionByDays(layout.backupDir, keepDays);
-    if (removed > 0) {
-      logger.info({ mod: 'boot', msg: `backup retention(${keepDays}d): removed ${removed}` });
-    }
-  } catch {
-    /* 保留清理失败不阻断启动 */
-  }
-
-  // ---- 任务历史（FR-13.11 / T-108）：启动清 30 天前历史 + 崩溃遗留 running 判死 ----
-  try {
-    purgeOldTaskRuns(db, 30);
-    failStaleRunningTaskRuns(db);
-  } catch {
-    /* 历史清理失败不阻断启动 */
-  }
+  // 启动重活（每日备份 VACUUM INTO 整库复制 / 各项保留清理 / 缩略图配额扫描）已挪到
+  // listen 之后的空闲时段执行（见下方 deferBootMaintenance）——此前全部拦在服务监听之前，
+  // 每天第一次打开必撞 VACUUM INTO 全库复制，是「首启卡、白屏久」的最大单一来源。
 
   // ---- 端口探测 ----
   // token 持久化（DECISIONS.md D-TOKEN）：dev 下 tsx watch 每次改后端代码都会重启进程，
@@ -207,13 +170,6 @@ async function main(): Promise<void> {
       void closeAutoSessionsOnExit(store.get()).finally(() => process.exit(0));
     });
   }
-  // 启动即清一次过期快照
-  try {
-    const pruned = pruneSnapshots(snapshotsRoot);
-    if (pruned > 0) logger.info({ mod: 'boot', msg: `snapshots pruned: ${pruned}` });
-  } catch {
-    /* 忽略 */
-  }
   const trash = new TrashService(layout.trashDir);
   const webDistCandidates = [
     // 桌面版（Electron）由主进程注入 asar 内的产物路径；dev/生产 web 模式走 cwd 相对定位
@@ -253,6 +209,59 @@ async function main(): Promise<void> {
   const app = buildApp(ctx);
   await app.listen({ port, host: '127.0.0.1' });
   await startUserContentServer(ctx);
+
+  // ---- 启动重活延后（首屏优先）：服务已监听、Electron 已开始出首帧，3 秒后再做维护 ----
+  // 全部逐项 try/catch，任何一项失败不影响其余，也不影响已起来的服务。
+  const deferBootMaintenance = (): void => {
+    const t0 = Date.now();
+    const done = (msg: string): void =>
+      logger.info({ mod: 'boot-deferred', msg: `${msg} (${Date.now() - t0}ms)` });
+    // 缩略图配额（FR-13.5 / T-113）：LRU 收敛一次
+    try {
+      const q = enforceQuota(layout.thumbsDir);
+      if (q.removed > 0) done(`thumb quota: removed ${q.removed} files, freed ${q.freed} bytes`);
+    } catch {
+      /* 配额清理失败不阻断 */
+    }
+    // 每日备份（>24h，VACUUM INTO 整库复制——最重的一项）
+    const lastBackup = getSetting(db, SETTING_KEYS.lastBackupAt);
+    const lastMs = lastBackup !== null ? Date.parse(lastBackup) : 0;
+    if (!Number.isFinite(lastMs) || Date.now() - lastMs > 24 * 3600 * 1000) {
+      try {
+        const r = createBackup(layout.dbFile, layout.backupDir);
+        setSetting(db, SETTING_KEYS.lastBackupAt, new Date().toISOString());
+        done(`daily backup -> ${r.file} (integrity: ${r.integrity})`);
+      } catch (err) {
+        logger.warn({
+          mod: 'boot-deferred',
+          msg: `backup failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+    // 备份保留清理（FR-13.11 / T-108）
+    try {
+      const keepDays = Number(getSetting(db, 'backup_keep_days') ?? '0');
+      const removed = applyRetentionByDays(layout.backupDir, keepDays);
+      if (removed > 0) done(`backup retention(${keepDays}d): removed ${removed}`);
+    } catch {
+      /* 保留清理失败不阻断 */
+    }
+    // 任务历史（T-108）：清 30 天前历史 + 崩溃遗留 running 判死
+    try {
+      purgeOldTaskRuns(db, 30);
+      failStaleRunningTaskRuns(db);
+    } catch {
+      /* 历史清理失败不阻断 */
+    }
+    // 可选快照层：过期快照清理
+    try {
+      const pruned = pruneSnapshots(snapshotsRoot);
+      if (pruned > 0) done(`snapshots pruned: ${pruned}`);
+    } catch {
+      /* 忽略 */
+    }
+  };
+  setTimeout(deferBootMaintenance, 3000);
 
   writeRuntime(layout.runtimeFile, {
     pid: process.pid,
