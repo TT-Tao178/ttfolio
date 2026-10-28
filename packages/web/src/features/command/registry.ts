@@ -63,8 +63,8 @@ export interface CommandDef {
   run: (ctx: CommandContext, values: CommandValues) => void | Promise<void>;
 }
 
-/** 主题六种（与 tokens ThemeMode 对齐；命令里循环切换用） */
-const THEMES = ['light', 'dark', 'oled', 'cyberpunk', 'sketch', 'system'] as const;
+/** 主题七种（与 tokens ThemeMode 对齐；命令里循环切换用） */
+const THEMES = ['light', 'dark', 'oled', 'cyberpunk', 'sketch', 'glass', 'system'] as const;
 const SCHEMES = ['classic', 'warm', 'neon'] as const;
 
 function openStoreTab(

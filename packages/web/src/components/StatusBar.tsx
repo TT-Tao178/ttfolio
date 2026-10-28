@@ -106,6 +106,7 @@ export function StatusBar({ sseState }: { sseState: 'connecting' | 'open' | 'clo
 
   return (
     <div
+      className="tt-glass-surface"
       style={{
         display: 'flex',
         alignItems: 'center',

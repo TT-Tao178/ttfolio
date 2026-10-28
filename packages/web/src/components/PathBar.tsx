@@ -105,6 +105,7 @@ export function PathBar(): React.JSX.Element {
 
   return (
     <div
+      className="tt-glass-surface"
       style={{
         display: 'flex',
         alignItems: 'center',

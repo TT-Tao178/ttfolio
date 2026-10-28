@@ -172,6 +172,7 @@ function cachedTheme(): ThemeMode | null {
       c === 'oled' ||
       c === 'cyberpunk' ||
       c === 'sketch' ||
+      c === 'glass' ||
       c === 'system'
       ? c
       : null;
@@ -214,8 +215,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   // 它，可选调用即 no-op。
   useEffect(() => {
     const native = (window as unknown as { ttfolioNative?: { setTheme: (m: string) => void } }).ttfolioNative;
-    // 深色系主题（oled/cyberpunk）让标题栏走深色，sketch 走浅色，其余原样上报
-    native?.setTheme(mode === 'oled' || mode === 'cyberpunk' ? 'dark' : mode === 'sketch' ? 'light' : mode);
+    // 深色系主题（oled/cyberpunk）让标题栏走深色，sketch/glass 走浅色，其余原样上报
+    native?.setTheme(
+      mode === 'oled' || mode === 'cyberpunk'
+        ? 'dark'
+        : mode === 'sketch' || mode === 'glass'
+          ? 'light'
+          : mode,
+    );
   }, [mode]);
 
   // 三态解析：system 由系统深浅解析为 light/dark；oled 独立成态（有自己的变量表与发光规则）。

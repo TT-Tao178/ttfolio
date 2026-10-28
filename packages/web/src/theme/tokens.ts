@@ -2,10 +2,11 @@
 import { theme as antdTheme, type ThemeConfig } from 'antd';
 
 /** 用户可选主题（settings.theme 持久值）；system 跟随操作系统在浅/深间解析。 */
-export type ThemeMode = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch' | 'glass' | 'system';
 
-/** 解析后的实际主题：oled/cyberpunk 按深色系渲染（独立变量表+特效），sketch 为纸感浅色。 */
-export type ResolvedTheme = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch';
+/** 解析后的实际主题：oled/cyberpunk 按深色系渲染（独立变量表+特效），sketch 为纸感浅色，
+ *  glass 为流光玻璃浅色（渐变底+半透明卡片+backdrop blur）。 */
+export type ResolvedTheme = 'light' | 'dark' | 'oled' | 'cyberpunk' | 'sketch' | 'glass';
 
 export const GITHUB_LANG_COLORS: Record<string, string> = {
   TypeScript: '#3178c6',
@@ -198,6 +199,34 @@ const VARS_SKETCH: Record<string, string> = {
   'tt-text-3': 'rgba(45,42,37,.42)',
 };
 
+/**
+ * 流光玻璃主题（用户点名，参考图：柔和紫粉蓝渐变底 + 半透明白玻璃卡）：
+ * 容器底用半透明白（rgba 经 CSS 变量自动作用到所有 SEMANTIC.containerBg 引用点），
+ * 渐变底与 backdrop blur 在 themeVarsCss 的 glass 规则段（html[data-tt-glass="1"]）。
+ * 深浅归属：浅色系（colorScheme=light、标题栏 light）。
+ */
+const VARS_GLASS: Record<string, string> = {
+  'tt-primary': '#7c5cff',
+  'tt-primary-bg': 'rgba(124,92,255,.12)',
+  'tt-primary-border': 'rgba(124,92,255,.35)',
+  'tt-success': '#18a058',
+  'tt-warning': '#d4880f',
+  'tt-error': '#e5484d',
+  // layout-bg 是渐变的兜底纯色（供 JS 取值与 antd colorBgLayout 用；渐变本体在 CSS 规则）
+  'tt-layout-bg': '#eef1fb',
+  // 半透明白玻璃卡：作用于所有 SEMANTIC.containerBg 引用点（侧栏/顶栏/详情/终端等自绘容器）
+  'tt-container-bg': 'rgba(255,255,255,.6)',
+  'tt-split': 'rgba(255,255,255,.65)',
+  'tt-border': 'rgba(255,255,255,.9)',
+  'tt-text': 'rgba(28,27,34,.9)',
+  'tt-text-2': 'rgba(28,27,34,.62)',
+  'tt-text-3': 'rgba(28,27,34,.42)',
+};
+
+/** 流光玻璃的整页渐变底（applyThemeVars 里 inline 覆写 body background 用）。 */
+export const GLASS_BG_GRADIENT =
+  'linear-gradient(160deg,#c9d3ff 0%,#e8d6ff 22%,#ffd9ec 45%,#d9f0ff 72%,#c9ecff 100%) fixed';
+
 export const THEME_STYLE_ID = 'tt-theme-vars';
 
 /** 电光红发光的统一光晕（OLED 黑底上红色 box-shadow 即"发光"观感）。 */
@@ -222,6 +251,7 @@ export function themeVarsCss(): string {
   const oled = toCss(VARS_OLED);
   const cyber = toCss(VARS_CYBERPUNK);
   const sketch = toCss(VARS_SKETCH);
+  const glass = toCss(VARS_GLASS);
   const neon = [
     `html[data-tt-oled="1"] .ant-btn-primary{box-shadow:0 0 10px ${OLED_GLOW}}`,
     `html[data-tt-oled="1"] .ant-btn-primary:not(:disabled):hover{box-shadow:0 0 14px rgba(255,59,71,.6)}`,
@@ -240,10 +270,33 @@ export function themeVarsCss(): string {
     `html[data-tt-sketch="1"] .ant-modal .ant-modal-content{border-radius:${SKETCH_RADIUS_CARD};border:1.5px solid #c9c0ae;box-shadow:3px 4px 0 rgba(61,58,52,.14)}`,
     `html[data-tt-sketch="1"] .ant-tag{border-radius:${SKETCH_RADIUS_BTN};border-width:1px}`,
   ].join('');
+  // 流光玻璃（glass）：渐变底 + 精准表面的 backdrop blur + 半透明 antd 卡/弹层。
+  // blur 只挂 .tt-glass-surface（壳层容器）与 antd 少数大表面，不全量铺开（GPU 成本可控）。
+  const glassRules = [
+    // 壳层玻璃表面（App 顶栏/域条/路径条/侧栏容器/详情栏/状态栏/终端挂 tt-glass-surface）
+    `html[data-tt-glass="1"] .tt-glass-surface{background:var(--tt-container-bg);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}`,
+    // antd 大表面玻璃化
+    `html[data-tt-glass="1"] .ant-card:not(.ant-card-ghost){background:rgba(255,255,255,.62);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.75);box-shadow:0 8px 32px rgba(93,76,180,.1)}`,
+    `html[data-tt-glass="1"] .ant-modal .ant-modal-content{background:rgba(255,255,255,.88);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border:1px solid rgba(255,255,255,.8);box-shadow:0 18px 60px rgba(93,76,180,.22)}`,
+    `html[data-tt-glass="1"] .ant-table{background:rgba(255,255,255,.5)}`,
+    `html[data-tt-glass="1"] .ant-table-wrapper .ant-table-container table .ant-table-thead>tr>th{background:rgba(255,255,255,.55)}`,
+    // 浮层：下拉/消息/气泡玻璃化（都是短暂出现的表面，blur 开销可接受）
+    `html[data-tt-glass="1"] .ant-select-dropdown,html[data-tt-glass="1"] .ant-dropdown-menu{background:rgba(255,255,255,.86);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}`,
+    `html[data-tt-glass="1"] .ant-message-notice-content,html[data-tt-glass="1"] .ant-notification-notice{background:rgba(255,255,255,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.8);box-shadow:0 10px 40px rgba(93,76,180,.18)}`,
+    // 圆角整体放大一档（玻璃语言的圆角观感）
+    `html[data-tt-glass="1"] .ant-card{border-radius:12px}`,
+    `html[data-tt-glass="1"] .ant-modal .ant-modal-content{border-radius:14px}`,
+    `html[data-tt-glass="1"] .ant-btn{border-radius:8px}`,
+    // 细节：菜单选中项与分割线在半透明底上更柔
+    `html[data-tt-glass="1"] .ant-menu-item-selected{background:rgba(124,92,255,.12)}`,
+    // 代码/编辑器表面保持实底（可读性优先，玻璃只给壳）
+    `html[data-tt-glass="1"] .cm-editor{background:#ffffff}`,
+  ].join('');
   return (
     `:root{${light}}html[data-tt-dark="1"]{${dark}}` +
     `html[data-tt-oled="1"]{${oled}}html[data-tt-cyber="1"]{${cyber}}` +
-    `html[data-tt-sketch="1"]{${sketch}}${neon}${handDrawn}`
+    `html[data-tt-sketch="1"]{${sketch}}html[data-tt-glass="1"]{${glass}}` +
+    `${neon}${handDrawn}${glassRules}`
   );
 }
 
@@ -262,6 +315,7 @@ export function applyThemeVars(resolved: ResolvedTheme): void {
   document.documentElement.dataset['ttOled'] = resolved === 'oled' ? '1' : '0';
   document.documentElement.dataset['ttCyber'] = resolved === 'cyberpunk' ? '1' : '0';
   document.documentElement.dataset['ttSketch'] = resolved === 'sketch' ? '1' : '0';
+  document.documentElement.dataset['ttGlass'] = resolved === 'glass' ? '1' : '0';
   // 让浏览器原生控件（滚动条、表单、默认底色）也跟随深浅，避免"深色页面配白滚动条"
   document.documentElement.style.colorScheme = darkLike ? 'dark' : 'light';
   const vars =
@@ -273,8 +327,11 @@ export function applyThemeVars(resolved: ResolvedTheme): void {
           ? VARS_CYBERPUNK
           : resolved === 'sketch'
             ? VARS_SKETCH
-            : VARS_DARK;
-  const bg = vars['tt-layout-bg'] ?? '';
+            : resolved === 'glass'
+              ? VARS_GLASS
+              : VARS_DARK;
+  // glass 的整页底是渐变（inline 优先级高于 CSS 规则段，必须在这里写）
+  const bg = resolved === 'glass' ? GLASS_BG_GRADIENT : (vars['tt-layout-bg'] ?? '');
   document.documentElement.style.background = bg;
   document.body.style.background = bg;
 }
@@ -305,9 +362,11 @@ export function langColor(language: string): string {
 
 export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
   // oled/cyberpunk 沿用 darkAlgorithm（组件明暗关系一致），只是换一套真实 hex 让 AntD
-  // 推导派生色；sketch 是纸感浅色，走 defaultAlgorithm
+  // 推导派生色；sketch 是纸感浅色，glass 是流光玻璃浅色，走 defaultAlgorithm
   const algorithm =
-    resolved === 'light' || resolved === 'sketch' ? antdTheme.defaultAlgorithm : antdTheme.darkAlgorithm;
+    resolved === 'light' || resolved === 'sketch' || resolved === 'glass'
+      ? antdTheme.defaultAlgorithm
+      : antdTheme.darkAlgorithm;
   // 这里必须给真实 hex（AntD 要用它推导 hover/active 等派生色，传 var() 会算不出派生色）；
   // 取值与上面的变量表同源，保证「AntD 组件底色」与「自绘容器底色」是同一套色。
   const v =
@@ -319,8 +378,10 @@ export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
           ? VARS_CYBERPUNK
           : resolved === 'sketch'
             ? VARS_SKETCH
-            : VARS_DARK;
-  return {
+            : resolved === 'glass'
+              ? { ...VARS_GLASS, 'tt-container-bg': '#ffffff' }
+              : VARS_DARK;
+  const base: ThemeConfig = {
     algorithm,
     token: {
       colorPrimary: v['tt-primary'],
@@ -348,6 +409,26 @@ export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
       Layout: { bodyBg: v['tt-layout-bg'] },
     },
   };
+  // glass：色板给半透明的 surface 全部走不透明白（AntD 对 rgba 派生不可靠），
+  // 玻璃化交给 themeVarsCss 的 glassRules（CSS 直控 Card/Modal/Table 底色与 blur）
+  if (resolved === 'glass') {
+    base.token = {
+      ...base.token,
+      colorBgContainer: '#ffffff',
+      colorBgLayout: '#eef1fb',
+      colorBorder: 'rgba(124,92,255,.22)',
+      colorBorderSecondary: 'rgba(255,255,255,.75)',
+      borderRadius: 8,
+    };
+    base.components = {
+      ...base.components,
+      Card: { borderRadiusLG: 12 },
+      Modal: { borderRadiusLG: 14, contentBg: 'rgba(255,255,255,.88)' },
+      Table: { colorBgContainer: 'rgba(255,255,255,.5)', headerBg: 'rgba(255,255,255,.55)' },
+      Button: { borderRadius: 8 },
+    };
+  }
+  return base;
 }
 
 export function componentSizeOf(density: string): 'small' | 'middle' | 'large' {

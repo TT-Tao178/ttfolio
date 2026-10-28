@@ -191,6 +191,7 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                     { label: '电红色发光', value: 'oled' },
                     { label: '赛博朋克', value: 'cyberpunk' },
                     { label: '极简手绘', value: 'sketch' },
+                    { label: '流光玻璃', value: 'glass' },
                     { label: '跟随系统', value: 'system' },
                   ]}
                 />

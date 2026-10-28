@@ -326,6 +326,7 @@ function Shell(): React.JSX.Element {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* 顶栏：标签 + 搜索/导入/设置（品牌区 logo+名称已去除——与系统窗口标题栏/任务栏重复，第 27 轮）。高度对齐《界面原型-AntD.html》#top = 56px */}
       <div
+        className="tt-glass-surface"
         style={{
           display: 'flex',
           alignItems: 'center',

@@ -67,6 +67,7 @@ export function DomainRail(): React.JSX.Element {
   const setSidebar = useAppStore((s) => s.setSidebar);
   return (
     <div
+      className="tt-glass-surface"
       style={{
         // 宽度/padding/gap 对齐原型 #body 第一列（56px）与 #rail（padding 12px 0, gap 4）
         width: 56,
