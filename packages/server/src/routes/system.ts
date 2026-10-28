@@ -97,7 +97,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
     return ok({
       theme: all[SETTING_KEYS.theme] ?? 'light',
       density: all[SETTING_KEYS.density] ?? 'middle',
-      watchEnabled: (all[SETTING_KEYS.watchEnabled] ?? '1') === '1',
+      watchEnabled: (all[SETTING_KEYS.watchEnabled] ?? '0') === '1',
       watchStabilityMs: Number(all[SETTING_KEYS.watchStabilityMs] ?? '300'),
       autoSave: (all[SETTING_KEYS.autoSave] ?? '0') === '1',
       trashRetentionDays: Number(all[SETTING_KEYS.trashRetentionDays] ?? String(TRASH_RETENTION_DAYS)),

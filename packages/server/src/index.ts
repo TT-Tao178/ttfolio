@@ -288,8 +288,8 @@ async function main(): Promise<void> {
     /* 首次启动无项目 */
   }
 
-  // ---- Watcher（默认全项目，忽略规则生效；设置可关） ----
-  const watchEnabled = getSetting(db, 'watch_enabled') !== '0';
+  // ---- Watcher（默认关闭——0013 迁移翻转存量，本判定按显式 '1' 才启用；设置里手动开启） ----
+  const watchEnabled = getSetting(db, 'watch_enabled') === '1';
   if (watchEnabled) {
     const rows = getAll<{ id: string; dir_path: string }>(
       db,
