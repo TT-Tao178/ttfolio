@@ -2,6 +2,38 @@
 
 # PROGRESS
 
+## 第 87 轮：卡片尺寸统一 + 总览屏全部项目入口 + 项目自定义头像（未出包）
+
+- 用户三条反馈：①项目卡片大小不一不好看；②总览屏打不开「最近打开那种」的全量
+  项目卡片平铺；③项目卡片首字母方向对，增加自定义上传项目头像（可选，不上传
+  维持首字母）。
+- **卡片尺寸统一（4e3d3a4）**：根因复盘——第 84 轮的顶对齐修复解决了「中部空洞」
+  但引入行间高低不齐；真正的根因是总览屏 gridMinH 高度锁定机制（撑满视口把行均
+  匀拉伸出空洞）。本轮**整体移除 gridMinH 机制**（state/测量 effect/ref/属性），
+  网格按内容自然排布 + 同行等高（grid 默认 stretch）——两个诉求同时满足。
+- **总览屏入口（4e3d3a4）**：「项目」分区标题行右侧新增「卡片墙 · 全部项目」按钮，
+  打开全量卡片墙标签（view:all-projects，parseSubTab 回落全量视图）。
+- **项目头像全链（a57b0fc）**：
+  - 存储：数据目录 avatars/<projectId>.png，**零迁移**（文件存在即有头像）；软删
+    保留（同路径再登记复活）、硬删级联清理；绝不写项目目录。core/projectAvatar.ts
+    集中路径/校验/读写（id 白名单字符集防注入；C-02 绕行：dataURL 前缀用 slice
+    比较——规则禁 startsWith 不分场景，已注释）。
+  - API：POST/DELETE /api/projects/:id/avatar（前端 canvas 居中裁 256×256 PNG，
+    仅 PNG 约 512KB 上限；L1 审计 project.avatar.set/clear）；列表响应按文件存在
+    附 hasAvatar+avatarV(mtime)；userContent 新增只读 GET /pavatar/:id（短缓存）。
+  - web：ProjectCard Avatar 有图显图/无图回落首字母（antd 原生降级）；三处右键
+    菜单（卡片/表格/侧栏）加「设置头像…」「清除头像」；新 ProjectAvatarModal 复用
+    个人头像 cropToSquarePng。
+- 踩坑两记录：①projectMenu handlers 增必填项后 Workbench 调用点同步补齐（TS 拦截）；
+  ②Dashboard viewportW 在移除 gridMinH 后失去消费者（lint 拦截），连同 resize
+  listener 一并删除。
+- 验证：门禁三绿（284 条，退出码实查）。未出包——待用户验收后随 0.5.5 发布。
+- 手测提醒：总览屏卡片同一行等高、无中部空洞；「卡片墙 · 全部项目」按钮打开全量
+  卡片墙；项目右键「设置头像…」上传图片后卡片左上显示图片（侧栏集合成员行同步
+  可达）、「清除头像」恢复首字母；上传的图存数据目录 avatars/，不碰项目目录。
+
+# PROGRESS
+
 ## 第 86 轮：v0.5.4 发布（玻璃 v2 + 动效 + UI 重设 + 配色重设计 + 排版统一）
 
 - 用户验收第 84/85 轮改动后点名「给我打包」。范围：玻璃 v2（环境光/厚圆角/质感）、
