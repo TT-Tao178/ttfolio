@@ -432,16 +432,19 @@ export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
       colorText: v['tt-text'],
       colorTextSecondary: v['tt-text-2'],
       colorTextTertiary: v['tt-text-3'],
-      borderRadius: 6,
-      fontSize: 14,
-      lineHeight: 1.5715,
+      // 排版语言（用户给参考图后全局统一）：更小更精的字号 + 宽松行距 + 大圆角——
+      // 参考图（文档式 UI）的舒服观感 = 13px 级正文、1.65 行距、8~14px 圆角、留白宽松
+      fontSize: 13,
+      lineHeight: 1.65,
+      borderRadius: 8,
     },
     components: {
-      Card: { borderRadiusLG: 8 },
-      Modal: { borderRadiusLG: 8 },
-      Menu: { itemBorderRadius: 8, itemBg: 'transparent' },
+      Card: { borderRadiusLG: 12 },
+      Modal: { borderRadiusLG: 14 },
+      Menu: { itemBorderRadius: 8, itemBg: 'transparent', itemHeight: 36 },
       Tag: { borderRadiusSM: 4 },
-      Segmented: { borderRadiusSM: 4 },
+      Segmented: { borderRadiusSM: 6 },
+      Button: { borderRadius: 8 },
       Layout: { bodyBg: v['tt-layout-bg'] },
     },
   };

@@ -365,7 +365,7 @@ export function Dashboard(): React.JSX.Element {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: 12,
+                gap: 16,
                 minHeight: gridMinH > 0 ? gridMinH : undefined,
                 // 用户反馈"卡片中部大片空白"：minHeight 撑高容器时默认 stretch 把内容少的
                 // 卡拉出大片空白——改为顶对齐，卡片按内容收缩，留白落在容器底部

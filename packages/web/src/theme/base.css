@@ -6,6 +6,16 @@ body,
   margin: 0;
 }
 
+/* 排版语言（用户给参考图后全局统一）：现代无衬线栈 + 微调字距；
+   等宽场景沿用 .tt-mono 的 JetBrains Mono 栈（参考图的 mono 气质来源） */
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC',
+    'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 * {
   box-sizing: border-box;
 }
