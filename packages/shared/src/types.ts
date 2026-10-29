@@ -59,6 +59,10 @@ export interface ProjectSummary {
   collections: string[];
   /** 项目外链收藏（FR-13.12 / T-110，迁移 0009）：wiki / 仓库 / 文档站 */
   externalLinks: Array<{ label: string; url: string }>;
+  /** 项目头像（可选功能 2026-10-29）：存在 avatars/<id>.png 时为 true；
+   *  avatarV = 文件 mtime（缓存穿透参数），URL 由前端经用户内容端口拼装 */
+  hasAvatar?: boolean;
+  avatarV?: number;
 }
 
 export interface ExternalLink {

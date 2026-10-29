@@ -174,6 +174,12 @@ export function avatarUrl(): string {
   return `${userContentBase()}/avatar?token=${encodeURIComponent(token())}`;
 }
 
+/** 项目头像（可选功能 2026-10-29）：avatars/<id>.png 经用户内容端口伺服；
+ *  v = 文件 mtime，上传/清除后变化以穿透浏览器缓存。 */
+export function projectAvatarUrl(projectId: string, v: number): string {
+  return `${userContentBase()}/pavatar/${projectId}?token=${encodeURIComponent(token())}&v=${v}`;
+}
+
 /** 数据目录缩略图（FR-13.5）：sha1(相对路径).png，由渲染层生成后经服务端落盘。 */
 /** 缩略图 URL（FR-13.5 / T-113）：带源文件 mtime 作版本参数，配合服务端 immutable 缓存。 */
 export function thumbUrl(projectId: string, thumbName: string, version?: string | null): string {

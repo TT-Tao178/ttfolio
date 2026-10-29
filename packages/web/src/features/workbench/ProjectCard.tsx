@@ -6,7 +6,7 @@
 import { App, Avatar, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
 import { LoadingOutlined, MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
@@ -21,6 +21,8 @@ import {
   useRemoveProject,
   downloadProjectReport,
 } from '@/features/workbench/projectMenu';
+import { ProjectAvatarModal } from '@/features/workbench/ProjectAvatarModal';
+import { projectAvatarUrl } from '@/lib/api';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({
@@ -42,7 +44,10 @@ export function ProjectCard({
   onToggleSelect?: () => void;
 }): React.JSX.Element {
   const { message } = App.useApp();
+  const queryClient2 = useQueryClient();
   const [relocateOpen, setRelocateOpen] = useState(false);
+  // 项目头像弹窗（可选功能 2026-10-29）
+  const [avatarOpen, setAvatarOpen] = useState(false);
   // 归属集合徽标（评审：归属结果不可见——加完集合必须去侧栏/集合视图才能确认）。
   // p.collections 只有 id，集合名走共享的 ['collections'] 缓存映射；最多展示 2 个 + 溢出计数。
   const { data: collections } = useQuery({
@@ -57,6 +62,13 @@ export function ProjectCard({
   const [pickerOpen, setPickerOpen] = useState(false);
   // 移除登记/移除并删除（T-129 收敛到共享 hook，与侧栏右键/表格同源；弹窗在 hook 内）
   const removeProject = useRemoveProject();
+  const clearAvatar = useMutation({
+    mutationFn: () => api.del(`/api/projects/${p.id}/avatar`),
+    onSuccess: () => {
+      void message.success('已恢复默认首字母');
+      void queryClient2?.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
 
   // 「打开文件页」强制 files；「打开项目」跟随默认页签设置（onOpen）
   const openFiles = (): void => {
@@ -81,6 +93,8 @@ export function ProjectCard({
     onRelocate: () => setRelocateOpen(true),
     onUnregister: () => removeProject(p, 'unregister'),
     onDelete: () => removeProject(p, 'delete'),
+    onSetAvatar: () => setAvatarOpen(true),
+    onClearAvatar: () => clearAvatar.mutate(),
     onReport: () => {
       void downloadProjectReport(p)
         .then((m) => void message.success(m))
@@ -157,7 +171,11 @@ export function ProjectCard({
               }}
             />
           )}
-          <Avatar style={{ background: SEMANTIC.primary, flexShrink: 0 }} size={24}>
+          <Avatar
+            style={{ background: SEMANTIC.primary, flexShrink: 0 }}
+            size={24}
+            src={p.hasAvatar === true ? projectAvatarUrl(p.id, p.avatarV ?? 0) : undefined}
+          >
             {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
           </Avatar>
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
@@ -271,6 +289,7 @@ export function ProjectCard({
           </Tag>
         )}
       </div>
+      {avatarOpen && <ProjectAvatarModal key={p.id} project={p} onClose={() => setAvatarOpen(false)} />}
       <RelocateModal
         projectId={p.id}
         name={p.alias ?? p.diskName}

@@ -198,6 +198,26 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
     return reply;
   });
 
+  // GET /pavatar/:projectId（项目头像，可选功能 2026-10-29）：数据目录 avatars/<id>.png，
+  // 只读；id 白名单字符集防路径注入；短缓存（前端带 ?v=mtime 穿透）
+  server.get('/pavatar/:projectId', async (req, reply) => {
+    const { projectId } = req.params as { projectId: string };
+    if (/^[A-Za-z0-9_-]{1,64}$/.test(projectId) === false) {
+      void reply.code(404).send('not found');
+      return reply;
+    }
+    try {
+      const buf = await fsp.readFile(path.join(ctx.layout.dataDir, 'avatars', `${projectId}.png`));
+      reply.header('Content-Type', 'image/png');
+      reply.header('Cache-Control', 'private, max-age=300');
+      reply.header('X-Content-Type-Options', 'nosniff');
+      void reply.send(buf);
+    } catch {
+      void reply.code(404).send('not found');
+    }
+    return reply;
+  });
+
   // GET /thumbs/:projectId/:name（数据目录缩略图；文件名白名单，防穿越）
   server.get('/thumbs/:projectId/:name', async (req, reply) => {
     const { projectId, name } = req.params as { projectId: string; name: string };

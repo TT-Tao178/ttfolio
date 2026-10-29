@@ -34,6 +34,7 @@ import {
   listCollections,
   type ListFilters,
 } from '../db/repo/projectsRepo.js';
+import { avatarInfo, isSafeProjectId, removeAvatar, saveAvatar } from '../core/projectAvatar.js';
 import {
   logActivity,
   recordRecentFile,
@@ -85,7 +86,15 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       q: q.q,
       sort: q.sort as ListFilters['sort'],
     };
-    return ok(listProjects(ctx.db(), filters));
+    const list = listProjects(ctx.db(), filters);
+    // 项目头像（可选功能）：存在 avatars/<id>.png 才附 hasAvatar/avatarV（mtime 作缓存穿透）
+    const withAvatar = await Promise.all(
+      list.map(async (p) => {
+        const mtime = await avatarInfo(ctx.layout.dataDir, p.id);
+        return mtime === null ? p : { ...p, hasAvatar: true, avatarV: mtime };
+      }),
+    );
+    return ok(withAvatar);
   });
 
   app.post('/api/projects', async (req) => {
@@ -259,6 +268,8 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     softDeleteProject(db, id);
     // 缩略图是派生数据：移除登记即级联清理（需重开项目时按需重建）
     clearProjectThumbs(ctx.layout.thumbsDir, id);
+    // 头像：unregister 保留（同路径再登记复活）；硬删（remove_and_delete）一并清理
+    if (mode === 'delete') await removeAvatar(ctx.layout.dataDir, id);
     logActivity(db, {
       kind: mode === 'delete' ? 'project.remove_and_delete' : 'project.unregister',
       level: mode === 'delete' ? 'L3' : 'L1',
@@ -267,6 +278,50 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     });
     ctx.sse.publish('project.updated', { projectId: id });
     return ok({ removed: true, mode });
+  });
+
+  // ---- 项目头像（可选功能，用户需求 2026-10-29）----
+  // POST 上传：前端 canvas 裁成 256×256 PNG dataURL（复用个人头像的裁剪函数），
+  // 仅接受 PNG、约 512KB 上限；写数据目录 avatars/<id>.png（L1 审计）。
+  app.post('/api/projects/:id/avatar', async (req) => {
+    const { id } = req.params as { id: string };
+    if (isSafeProjectId(id) === false) return fail('BAD_REQUEST', '非法项目 id');
+    const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as {
+      dataUrl?: unknown;
+    };
+    if (typeof body.dataUrl !== 'string' || body.dataUrl.length === 0) {
+      return fail('BAD_REQUEST', '缺少图片数据');
+    }
+    const db = ctx.db();
+    if (getProjectRow(db, id) === undefined) return fail('NOT_FOUND', '项目不存在', 404);
+    try {
+      const mtime = await saveAvatar(ctx.layout.dataDir, id, body.dataUrl);
+      logActivity(db, {
+        kind: 'project.avatar.set',
+        level: 'L1',
+        projectId: id,
+        targetPath: getProjectRow(db, id)?.dir_path ?? '',
+      });
+      return ok({ hasAvatar: true, avatarV: mtime });
+    } catch (err) {
+      return fail('BAD_REQUEST', err instanceof Error ? err.message : '头像保存失败');
+    }
+  });
+
+  // DELETE 清除头像（幂等；L1 审计）
+  app.delete('/api/projects/:id/avatar', async (req) => {
+    const { id } = req.params as { id: string };
+    if (isSafeProjectId(id) === false) return fail('BAD_REQUEST', '非法项目 id');
+    const db = ctx.db();
+    if (getProjectRow(db, id) === undefined) return fail('NOT_FOUND', '项目不存在', 404);
+    await removeAvatar(ctx.layout.dataDir, id);
+    logActivity(db, {
+      kind: 'project.avatar.clear',
+      level: 'L1',
+      projectId: id,
+      targetPath: getProjectRow(db, id)?.dir_path ?? '',
+    });
+    return ok({ hasAvatar: false });
   });
 
   app.post('/api/projects/:id/open', async (req) => {

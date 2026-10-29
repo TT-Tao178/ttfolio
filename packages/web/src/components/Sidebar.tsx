@@ -26,6 +26,7 @@ import { CollectionPickerModal } from '@/features/workbench/CollectionPickerModa
 import { CollectionEditModal, type CollectionEditTarget } from '@/features/workbench/CollectionEditModal';
 import { CustomViewModal } from '@/features/workbench/CustomViewModal';
 import { downloadProjectReport, useRemoveProject } from '@/features/workbench/projectMenu';
+import { ProjectAvatarModal } from '@/features/workbench/ProjectAvatarModal';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
@@ -126,6 +127,16 @@ export function Sidebar(): React.JSX.Element {
   // T-129：右键直出「移除登记 / 删除文件」——确认链路与卡片菜单同源（共享 hook，
   // 移除=L1 仅索引库软删；删除=L3 整目录进回收站，审计在服务端）
   const removeProject = useRemoveProject();
+  // 项目头像（可选功能）：右键设/清
+  const clearAvatarM = useMutation({
+    mutationFn: (id: string) => api.del(`/api/projects/${id}/avatar`),
+    onSuccess: () => {
+      void message.success('已恢复默认首字母');
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
+  });
+  const [avatarProject, setAvatarProject] = useState<ProjectSummary | null>(null);
 
   // 项目项右侧的「最后打开」相对时间会随时间流逝变档（1分钟内 → N分钟前 → …），
   // 打开项目后由 SSE 失效 projects 查询即时刷新；这里再 30s 心跳覆盖"挂着不动"的场景，
@@ -225,6 +236,10 @@ export function Sidebar(): React.JSX.Element {
           { key: 'explorer', label: '在资源管理器中显示', disabled: ctxProject.pathOk === false },
           { key: 'analyze', label: '重新分析', disabled: ctxProject.pathOk === false },
           { key: 'report', label: '导出 Markdown 报告', icon: <DownloadOutlined /> },
+          { type: 'divider' as const },
+          // 项目头像（可选功能 2026-10-29）
+          ...(ctxProject.hasAvatar === true ? [{ key: 'avatar-clear', label: '清除头像' }] : []),
+          { key: 'avatar', label: '设置头像…' },
           { type: 'divider' as const },
           // T-129：与卡片菜单同款两项直出（danger 配色，位置收敛在末尾不与既有项冲突）
           { key: 'unregister', label: '仅从 ttFolio 移除登记' },
@@ -359,6 +374,12 @@ export function Sidebar(): React.JSX.Element {
           void downloadProjectReport(p)
             .then((msg) => message.success(msg))
             .catch(() => message.error('导出报告失败'));
+          break;
+        case 'avatar':
+          setAvatarProject(p);
+          break;
+        case 'avatar-clear':
+          clearAvatarM.mutate(p.id);
           break;
         case 'unregister':
           removeProject(p, 'unregister');
@@ -758,6 +779,13 @@ export function Sidebar(): React.JSX.Element {
           key={pickerProject.id}
           project={pickerProject}
           onClose={() => setPickerProject(null)}
+        />
+      )}
+      {avatarProject !== null && (
+        <ProjectAvatarModal
+          key={avatarProject.id}
+          project={avatarProject}
+          onClose={() => setAvatarProject(null)}
         />
       )}
       <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />

@@ -15,6 +15,8 @@ import {
   InboxOutlined,
   BranchesOutlined,
   CopyOutlined,
+  DeleteOutlined,
+  FileImageOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   ReloadOutlined,
@@ -120,6 +122,10 @@ export interface ProjectMenuHandlers {
   onUnregister: () => void;
   /** 移除并删除文件（消费方负责确认弹窗 + 请求） */
   onDelete: () => void;
+  /** 设置项目头像（打开上传弹窗；可选功能 2026-10-29） */
+  onSetAvatar: () => void;
+  /** 清除项目头像（仅 hasAvatar 时显示菜单项） */
+  onClearAvatar: () => void;
   /** 导出 Markdown 报告（FR-13.12 / T-110，可选：未注入则不显示菜单项） */
   onReport?: () => void;
   message: { success: (msg: string) => void };
@@ -155,6 +161,8 @@ export function buildProjectMenu(
     ...(h.onReport !== undefined
       ? [{ key: 'report', label: '导出 Markdown 报告', icon: <FileMarkdownOutlined /> }]
       : []),
+    ...(p.hasAvatar === true ? [{ key: 'avatar-clear', label: '清除头像', icon: <DeleteOutlined /> }] : []),
+    { key: 'avatar', label: '设置头像…', icon: <FileImageOutlined /> },
     { type: 'divider' as const },
     { key: 'unregister', label: '仅从 ttFolio 移除登记' },
     { key: 'delete', label: '移除并删除文件（进回收站）', danger: true, disabled: p.pathOk === false },
@@ -202,6 +210,12 @@ export function buildProjectMenu(
         break;
       case 'report':
         h.onReport?.();
+        break;
+      case 'avatar':
+        h.onSetAvatar();
+        break;
+      case 'avatar-clear':
+        h.onClearAvatar();
         break;
       case 'unregister':
         h.onUnregister();
