@@ -105,20 +105,28 @@ export const GITHUB_LANG_COLORS: Record<string, string> = {
  * 每个引用点都要改（连带面大、易漏）；改为 var(--tt-*) 后，组件代码一行都不用动，
  * 只由 SettingsProvider 在根元素上切换 `html[data-tt-dark]` 即可整体换肤。
  */
+/**
+ * 默认浅色主题（v2，用户反馈"配色不好看"后按同类产品重设计，主色蓝保留）：
+ * 灰阶骨架取 GitHub Primer 浅色主题（canvas-inset #f6f8fa / border-default #d0d7de /
+ * fg 三级 #1f2328·#57606a·#8b949e），语义三色取 Primer success/attention/error
+ * （#1a7f37 / #9a6700 / #cf222e，比 AntD 原色压暗一档，浅底小面积更稳）。
+ * 与旧版的关键差异：全部灰阶带冷蓝色温（纯中性灰显脏）、发丝线与重边框分层
+ * （卡片是浮在底上的，不是被框住的）、选中底/边与新灰阶同色温（不再断裂）。
+ */
 const VARS_LIGHT: Record<string, string> = {
   'tt-primary': '#1677ff',
-  'tt-primary-bg': '#e6f4ff',
-  'tt-primary-border': '#91caff',
-  'tt-success': '#52c41a',
-  'tt-warning': '#faad14',
-  'tt-error': '#ff4d4f',
-  'tt-layout-bg': '#f5f5f5',
+  'tt-primary-bg': '#e9f1ff',
+  'tt-primary-border': '#a5c8ff',
+  'tt-success': '#1a7f37',
+  'tt-warning': '#9a6700',
+  'tt-error': '#cf222e',
+  'tt-layout-bg': '#f6f8fa',
   'tt-container-bg': '#ffffff',
-  'tt-split': '#f0f0f0',
-  'tt-border': '#d9d9d9',
-  'tt-text': 'rgba(0,0,0,.88)',
-  'tt-text-2': 'rgba(0,0,0,.65)',
-  'tt-text-3': 'rgba(0,0,0,.45)',
+  'tt-split': '#e7ecf0',
+  'tt-border': '#d0d7de',
+  'tt-text': '#1f2328',
+  'tt-text-2': '#57606a',
+  'tt-text-3': '#8b949e',
 };
 
 const VARS_DARK: Record<string, string> = {
