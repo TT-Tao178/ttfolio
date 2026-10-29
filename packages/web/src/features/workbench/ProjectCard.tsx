@@ -161,11 +161,14 @@ export function ProjectCard({
             {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
           </Avatar>
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
-          {p.alias !== null && <Tag style={{ flexShrink: 0 }}>别名</Tag>}
+          {/* v2 降噪：已固定从标签改为标题栏星标；「别名」标签删除（下方有原名行） */}
+          {p.isPinned && <StarFilled style={{ color: SEMANTIC.warning, flexShrink: 0, fontSize: 12 }} />}
           {p.pathOk === false ? (
             <Tag style={{ flexShrink: 0 }} color="error" icon={<WarningOutlined />}>
               目录失效
             </Tag>
+          ) : p.status === 'archived' ? (
+            <Tag style={{ flexShrink: 0 }}>已归档</Tag>
           ) : p.analyzedAt === null ? (
             // 「分析中」（T-119）：已登记尚未完成首次分析——完成经 project.analyzed SSE 刷新消失
             <Tag style={{ flexShrink: 0 }} color="processing" icon={<LoadingOutlined spin />}>
@@ -185,52 +188,88 @@ export function ProjectCard({
         </Dropdown>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {/* 起了别名时同时展示原名（用户要求：别名与原始名都要能看到）；无别名时不重复显示 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* v2 降噪重排（用户反馈"项目多了显得乱"）：彩色标签堆 → 轻量信息行。
+            标题栏只留一个类型/状态标签；固定=星标；原名=灰显小字；git/语言/打开时间/
+            文档/架构图全部走低饱和信息行，集合保留最小 chips。 */}
         {p.alias !== null && (
-          <div className="tt-ellipsis" style={{ fontSize: 12, opacity: 0.75 }}>
-            原名 <span className="tt-mono">{p.diskName}</span>
+          <div
+            className="tt-ellipsis tt-mono"
+            style={{ fontSize: 11, opacity: 0.6, marginTop: -2 }}
+            title={`原名：${p.diskName}`}
+          >
+            {p.diskName}
           </div>
         )}
         <LanguageBar languages={p.languages} />
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          {p.primaryLanguage ?? '未分析'}
-          {p.languages.length > 0 && ` · ${p.languages[0]?.percent}%`}
+        {p.techStack.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {p.techStack.slice(0, 3).map((t) => (
+              <Tag key={t} style={{ marginInlineEnd: 0 }}>
+                {t}
+              </Tag>
+            ))}
+            {p.techStack.length > 3 && <Tag style={{ marginInlineEnd: 0 }}>+{p.techStack.length - 3}</Tag>}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, opacity: 0.8 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              className="tt-ellipsis"
+              style={{ flex: '0 1 auto', minWidth: 0 }}
+              title={p.gitIsRepo ? `分支：${p.gitBranch ?? '（无分支）'}` : '该目录不是 git 仓库'}
+            >
+              {p.gitIsRepo ? `${p.gitBranch ?? '（无分支）'}${p.gitDirty ? ' · 有改动' : ''}` : '非 git 仓库'}
+            </span>
+            <span style={{ opacity: 0.7, flexShrink: 0 }}>{relTime(p.gitLastCommitAt)}</span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span>
+              {p.primaryLanguage ?? '未分析'}
+              {p.languages.length > 0 && p.languages[0] !== undefined ? ` · ${p.languages[0].percent}%` : ''}
+            </span>
+            <span
+              style={{
+                color: p.hasDocs ? SEMANTIC.success : undefined,
+                opacity: p.hasDocs ? undefined : 0.5,
+              }}
+            >
+              文档{p.hasDocs ? ' ✓' : ' ✗'}
+            </span>
+            <span
+              style={{
+                color: p.hasArch ? SEMANTIC.success : undefined,
+                opacity: p.hasArch ? undefined : 0.5,
+              }}
+            >
+              架构图{p.hasArch ? ' ✓' : ' ✗'}
+            </span>
+          </span>
+          <span style={{ opacity: 0.7 }}>
+            {relTime(p.lastOpenedAt)} · 打开 {p.openCount} 次
+          </span>
         </div>
-        <div>
-          {p.techStack.slice(0, 3).map((t) => (
-            <Tag key={t} style={{ marginRight: 4 }}>
-              {t}
-            </Tag>
-          ))}
-          {p.techStack.length > 3 && <Tag>+{p.techStack.length - 3}</Tag>}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.75, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span>{p.gitIsRepo ? `${p.gitBranch ?? ''}${p.gitDirty ? ' ⚠有改动' : ' ✓干净'}` : '非 git'}</span>
-          <span>{relTime(p.gitLastCommitAt)}</span>
-        </div>
-        <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {collectionNames.slice(0, 2).map((n) => (
-            <Tag key={n} color="purple" style={{ marginRight: 0 }}>
-              📁{n}
-            </Tag>
-          ))}
-          {collectionNames.length > 2 && (
-            <Tag style={{ marginRight: 0 }}>+{collectionNames.length - 2} 集合</Tag>
-          )}
-          <Tag color={p.hasDocs ? 'success' : 'default'}>文档{p.hasDocs ? ' ✓' : ' ✗'}</Tag>
-          <Tag color={p.hasArch ? 'success' : 'default'}>架构图{p.hasArch ? ' ✓' : ' ✗'}</Tag>
-          {p.pathOk === false && (
-            <Tag color="error" icon={<WarningOutlined />}>
-              路径失效
-            </Tag>
-          )}
-          {p.isPinned && <Tag icon={<StarFilled />}>已固定</Tag>}
-          {p.status === 'archived' && <Tag>已归档</Tag>}
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.6 }}>
-          {relTime(p.lastOpenedAt)} · 打开 {p.openCount} 次
-        </div>
+        {collectionNames.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {collectionNames.slice(0, 2).map((n) => (
+              <Tag key={n} color="purple" style={{ marginInlineEnd: 0 }}>
+                📁{n}
+              </Tag>
+            ))}
+            {collectionNames.length > 2 && (
+              <Tag style={{ marginInlineEnd: 0 }}>+{collectionNames.length - 2} 集合</Tag>
+            )}
+          </div>
+        )}
+        {p.pathOk === false && (
+          <Tag
+            color="error"
+            icon={<WarningOutlined />}
+            style={{ marginInlineEnd: 0, alignSelf: 'flex-start' }}
+          >
+            路径失效
+          </Tag>
+        )}
       </div>
       <RelocateModal
         projectId={p.id}

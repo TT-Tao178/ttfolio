@@ -1,5 +1,5 @@
 /** 侧栏（3.2）：内容随域切换，动作走「打开标签/视图」。 */
-import { App as AntdApp, Menu } from 'antd';
+import { App as AntdApp, Input, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   AppstoreOutlined,
@@ -32,10 +32,12 @@ import { openAgo } from '@/lib/format';
 
 type MenuKey = string;
 
-/** 侧栏条目：集合项带 children（可折叠成员列表，第 30 轮），其余为平面项 */
+/** 侧栏条目：集合项带 children（可折叠成员列表，第 30 轮），其余为平面项；
+ *  过滤框条目带 className（去菜单外观，样式见 base.css tt-proj-filter-item）。 */
 type SidebarItem = {
   key: MenuKey;
   label: React.ReactNode;
+  className?: string;
   children?: Array<{ key: MenuKey; label: React.ReactNode }>;
 };
 
@@ -501,38 +503,37 @@ export function Sidebar(): React.JSX.Element {
     selected = cur !== undefined && cur.kind === 'settings' && cur.subTab !== null ? `set:${cur.subTab}` : '';
   }
 
-  const projectItems = (projects ?? []).slice(0, 30).map((p) => ({
+  // ---- 项目区（UI 重设，用户反馈"项目多了特别乱"）----
+  // 单行条目：名称（别名）+ 别名时的原名灰显 + 悬停显形的相对时间（信息降噪，悬停/选中才现）；
+  // 过滤框：输入即筛名称/别名/路径，非空时忽略 30 项折叠直接列全部匹配；
+  // 折叠：超 30 项默认保留前 30 + 「还有 X 个项目 ▾」就地展开/收起（T-121 交互修订）。
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [projFilter, setProjFilter] = useState('');
+  const filterKw = projFilter.trim().toLowerCase();
+  const matchedProjects = (projects ?? []).filter(
+    (p) =>
+      filterKw === '' ||
+      p.diskName.toLowerCase().includes(filterKw) ||
+      (p.alias ?? '').toLowerCase().includes(filterKw) ||
+      p.dirPath.toLowerCase().includes(filterKw),
+  );
+  const filtering = filterKw !== '';
+  const visibleProjects = filtering ? matchedProjects : matchedProjects.slice(0, 30);
+  const overflowCount = filtering ? 0 : matchedProjects.length - visibleProjects.length;
+  const overflowItems = filtering ? [] : matchedProjects.slice(30);
+  const projectItems = visibleProjects.map((p) => ({
     key: `proj:${p.id}:files`,
     // data-project-id 供 document 级右键委托定位项目（第 29 轮）
-    // 用户要求：起了别名时别名与原始名都要看到 → 两行展示（上=别名，下=原名）；无别名只显示原名。
-    // 第 34 轮：右侧补「最后打开」相对时间（左名称自适应收窄、时间不换行；悬浮 title 给精确时刻）
     label: (
       <span
         data-project-id={p.id}
-        className={p.alias !== null ? 'tt-proj-2line' : undefined}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 190 }}
+        className="tt-proj-row"
+        title={`${p.alias ?? p.diskName}${p.alias !== null ? `\n原名：${p.diskName}` : ''}\n${p.dirPath}`}
       >
-        <span style={{ flex: 1, minWidth: 0 }}>
-          {p.alias !== null ? (
-            <>
-              <span className="tt-ellipsis" style={{ display: 'block' }}>
-                {p.alias}
-              </span>
-              <span
-                className="tt-ellipsis tt-mono tt-proj-diskname"
-                style={{ display: 'block', fontSize: 11, opacity: 0.6 }}
-              >
-                {p.diskName}
-              </span>
-            </>
-          ) : (
-            <span className="tt-ellipsis" style={{ display: 'block' }}>
-              {p.diskName}
-            </span>
-          )}
-        </span>
+        <span className="tt-ellipsis tt-proj-name">{p.alias ?? p.diskName}</span>
+        {p.alias !== null && <span className="tt-ellipsis tt-mono tt-proj-disk">{p.diskName}</span>}
         <span
-          style={{ flexShrink: 0, fontSize: 11, opacity: 0.55, whiteSpace: 'nowrap' }}
+          className="tt-proj-ago"
           title={
             p.lastOpenedAt === null
               ? '从未打开'
@@ -544,13 +545,6 @@ export function Sidebar(): React.JSX.Element {
       </span>
     ),
   }));
-  // 项目超过 30 个时侧栏折叠：列表保留前 30 项，其后追加「还有 X 个项目」折叠行——
-  // 点击**就地展开**剩余项目（用户反馈：跳卡片墙找不到"未显示的项目去哪了"），
-  // 再点收起；展开的条目与主列表同构（点击打开/右键菜单/键后缀随域）。
-  // ≤30 时无此行与现状零差别；集合/标签分区在其之前不受影响。
-  const [overflowOpen, setOverflowOpen] = useState(false);
-  const overflowItems = (projects ?? []).slice(30);
-  const overflowCount = overflowItems.length;
   const expandedRows: SidebarItem[] =
     overflowOpen === true
       ? overflowItems
@@ -567,16 +561,36 @@ export function Sidebar(): React.JSX.Element {
           ...expandedRows,
         ]
       : [];
+  // 过滤框条目（容器非动作：className 去掉菜单 hover/选中外观，onClick 有守卫）
+  const filterRow: SidebarItem = {
+    key: 'tt-proj-filter',
+    className: 'tt-proj-filter-item',
+    label: (
+      <Input
+        size="small"
+        allowClear
+        placeholder="筛选项目…"
+        value={projFilter}
+        onChange={(e) => setProjFilter(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        data-testid="sidebar-project-filter"
+      />
+    ),
+  };
   if (domain === 'projects') {
     items.push({ key: 'sep-projects', label: '项目' });
+    items.push(filterRow);
     items.push(...projectItems);
     items.push(...overflowRows);
   } else if (domain === 'git') {
     items.push({ key: 'sep-projects', label: '项目 Git' });
+    items.push(filterRow);
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':git') })));
     items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':git') })));
   } else if (domain === 'archives') {
     items.push({ key: 'sep-projects', label: '项目架构图' });
+    items.push(filterRow);
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
     items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':archives') })));
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
@@ -584,6 +598,7 @@ export function Sidebar(): React.JSX.Element {
   } else if (domain === 'docs') {
     items.push({ key: 'doclib', label: '文档库（跨项目浏览）' });
     items.push({ key: 'sep-projects', label: '项目文档' });
+    items.push(filterRow);
     items.push(...projectItems.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
     items.push(...overflowRows.map((it) => ({ ...it, key: it.key.replace(':files', ':docs') })));
     if (activeTab?.kind === 'project' && activeTab.projectId !== null)
@@ -591,11 +606,26 @@ export function Sidebar(): React.JSX.Element {
     else if (activeTab?.kind === 'doclib') selected = 'doclib';
   }
 
+  // 选中键集合：当前选中行之外，活动项目所属集合的成员行同样点亮
+  // （用户反馈：从集合里打开项目后，集合分区没有选中标识）
+  const selectedKeys: string[] = selected !== '' ? [selected] : [];
+  if (domain === 'projects' && activeTab?.kind === 'project' && activeTab.projectId !== null) {
+    for (const c of collections ?? []) {
+      if (c.projectIds.includes(activeTab.projectId)) {
+        selectedKeys.push(`colproj:${c.id}:${activeTab.projectId}`);
+      }
+    }
+  }
+
   const onClick = (e: { key: string }): void => {
     const key = e.key;
     if (key === 'tt-overflow-toggle') {
       // 折叠行：就地展开/收起剩余项目（T-121 交互修订，不再跳卡片墙）
       setOverflowOpen(!overflowOpen);
+      return;
+    }
+    if (key === 'tt-proj-filter') {
+      // 过滤框条目是容器不是动作（输入框自身已 stopPropagation，双保险）
       return;
     }
     if (key.startsWith('set:')) {
@@ -684,9 +714,11 @@ export function Sidebar(): React.JSX.Element {
         <Menu
           mode="inline"
           inlineCollapsed={false}
-          selectedKeys={[selected]}
+          selectedKeys={selectedKeys}
           items={items.map((it) =>
-            it.key.startsWith('sep-') ? { key: it.key, type: 'group', label: it.label } : it,
+            it.key.startsWith('sep-')
+              ? { key: it.key, type: 'group', label: <span className="tt-side-label">{it.label}</span> }
+              : it,
           )}
           onClick={onClick}
           style={{ borderInlineEnd: 'none' }}
