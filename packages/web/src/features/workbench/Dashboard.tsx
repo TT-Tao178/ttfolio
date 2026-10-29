@@ -4,7 +4,7 @@
  * 总览收敛为「KPI 一眼看全局 + 项目卡片直达」。
  */
 import { App, Button, Card, Empty, List, Pagination, Statistic, Tag, Typography } from 'antd';
-import { CheckOutlined, PlusOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CheckOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { api, ApiClientError } from '@/lib/api';
@@ -71,27 +71,9 @@ export function Dashboard(): React.JSX.Element {
 
   // 分页器防漂移：以第 1 页（最满页）的卡片栅格实际高度锁定项目区最小高度——
   // 翻到内容不满的页时分页器纹丝不动（用户反馈：不满页时「共 N 个项目」会被往上顶）。
-  // 高度锁定只对产生它的窗口宽度有效：宽度一变（全屏↔窗口）立即失效清零，
-  // 停在/翻回第 1 页时按新列数重新校准——绝不沿用旧宽度的高度（那是切换窗口后大空白的根因）。
-  const gridRef = React.useRef<HTMLDivElement | null>(null);
-  const [gridMinH, setGridMinH] = useState(0);
-  const [viewportW, setViewportW] = useState(() => window.innerWidth);
-  React.useEffect(() => {
-    const onResize = (): void => setViewportW(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  React.useEffect(() => {
-    setGridMinH(0);
-  }, [viewportW]);
-  React.useEffect(() => {
-    if (page !== 1) return;
-    const id = window.setTimeout(() => {
-      const h = gridRef.current?.getBoundingClientRect().height ?? 0;
-      if (h > 0) setGridMinH((prev) => (Math.abs(prev - h) > 2 ? Math.round(h) : prev));
-    }, 80);
-    return () => window.clearTimeout(id);
-  }, [page, viewportW]);
+  // 高度锁定机制（gridMinH）已移除（用户反馈：卡片大小不一/中部空白）——
+  // 该机制把网格撑满视口，行被均匀拉伸、内容少的卡片内部出现大空洞。
+  // 现在网格按内容自然排布，同一行卡片等高（grid 默认 stretch），无强制空洞。
 
   // 与卡片墙一致的动作（Workbench 同款实现，保持两处行为相同）：
   const openProject = (p: ProjectSummary): void => {
@@ -333,6 +315,27 @@ export function Dashboard(): React.JSX.Element {
           <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
             共 {total} 个 · 每页 {PAGE_SIZE} 个
           </span>
+          <span style={{ marginLeft: 'auto' }}>
+            <Button
+              size="small"
+              icon={<AppstoreOutlined />}
+              data-testid="dash-all-projects"
+              onClick={() =>
+                useAppStore.getState().openTab(
+                  {
+                    kind: 'overview',
+                    projectId: null,
+                    targetPath: null,
+                    subTab: 'view:all-projects',
+                    scroll: 0,
+                  },
+                  '全部项目',
+                )
+              }
+            >
+              卡片墙 · 全部项目
+            </Button>
+          </span>
         </div>
         {total === 0 ? (
           <Card size="small">
@@ -360,16 +363,11 @@ export function Dashboard(): React.JSX.Element {
         ) : (
           <>
             <div
-              ref={gridRef}
               data-testid="dashboard-project-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 gap: 16,
-                minHeight: gridMinH > 0 ? gridMinH : undefined,
-                // 用户反馈"卡片中部大片空白"：minHeight 撑高容器时默认 stretch 把内容少的
-                // 卡拉出大片空白——改为顶对齐，卡片按内容收缩，留白落在容器底部
-                alignItems: 'start',
               }}
             >
               {pageItems.map((p) => (

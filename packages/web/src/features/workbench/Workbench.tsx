@@ -35,6 +35,7 @@ import { typeLabel } from '@/components/DetailPanel';
 import { RelocateModal } from './RelocateModal';
 import { CollectionPickerModal } from './CollectionPickerModal';
 import { CollectionAddMembersModal } from './CollectionAddMembersModal';
+import { ProjectAvatarModal } from './ProjectAvatarModal';
 import { buildProjectMenu, useArchiveProject, useRemoveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
@@ -125,6 +126,16 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
 
   // 移除登记/移除并删除（T-129 收敛到共享 hook：与卡片菜单/侧栏右键同源，弹窗在 hook 内）
   const removeProject = useRemoveProject();
+  // 项目头像（可选功能）：表格行菜单同样可设/清
+  const clearAvatar = useMutation({
+    mutationFn: (p: ProjectSummary) => api.del(`/api/projects/${p.id}/avatar`),
+    onSuccess: () => {
+      void message.success('已恢复默认首字母');
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
+  });
+  const [avatarProject, setAvatarProject] = useState<ProjectSummary | null>(null);
 
   const openFilesTab = (p: ProjectSummary): void => {
     useAppStore.getState().requestAutoOpenProject(p.id);
@@ -148,6 +159,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       onRelocate: () => setRelocateProject(p),
       onUnregister: () => removeProject(p, 'unregister'),
       onDelete: () => removeProject(p, 'delete'),
+      onSetAvatar: () => setAvatarProject(p),
+      onClearAvatar: () => clearAvatar.mutate(p),
       onReport: () => {
         void downloadProjectReport(p)
           .then((m) => void message.success(m))
@@ -316,7 +329,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                   gap: 16,
-                  alignItems: 'start',
                 }}
               >
                 {(projects ?? []).map((p) => (
@@ -362,6 +374,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               key={collectionId}
               collectionId={collectionId}
               onClose={() => setAddMembersOpen(false)}
+            />
+          )}
+          {avatarProject !== null && (
+            <ProjectAvatarModal
+              key={avatarProject.id}
+              project={avatarProject}
+              onClose={() => setAvatarProject(null)}
             />
           )}
           {selectedIds.length > 0 && (
