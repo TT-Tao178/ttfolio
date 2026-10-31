@@ -1,7 +1,10 @@
 /**
  * 首次启动新手导览（T-120 / P2-3）：一切可选——每一步都可点右上角 × 跳过，
  * 看完/跳过即记入 localStorage，此后不再自动出现；设置→关于可重新查看。
- * 触发条件：无已登记项目 && 未看过（老用户升级后不会被弹）。
+ * 触发条件：未看过 && 这个使用环境从未有过项目（2026-10-31 报障修正：老用户
+ * 一直有项目所以「看过」标记从未写入，一旦清空全部项目会被误判成新用户弹导览——
+ * 补「曾有项目」门槛，出现过项目就永远不再自动弹）。纯 UI 状态记 localStorage，
+ * 与 seen 标记同类（C-29 例外延续）。
  * 用 antd 自带 Tour（5.12+），不自研浮层；视觉跟随主题 token，六主题自适应。
  */
 import { Button, Tour, type TourProps } from 'antd';
@@ -12,12 +15,29 @@ import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
 
 const SEEN_KEY = 'tt-onboarding-seen';
+const HAD_PROJECTS_KEY = 'tt-onboarding-had-projects';
 
 function seen(): boolean {
   try {
     return localStorage.getItem(SEEN_KEY) === '1';
   } catch {
     return true; // 存储不可用（隐私模式等）时绝不反复弹
+  }
+}
+
+function hadProjects(): boolean {
+  try {
+    return localStorage.getItem(HAD_PROJECTS_KEY) === '1';
+  } catch {
+    return true; // 存储不可用时绝不弹（宁可不导览不可骚扰）
+  }
+}
+
+function markHadProjects(): void {
+  try {
+    localStorage.setItem(HAD_PROJECTS_KEY, '1');
+  } catch {
+    /* 存储不可用：仅影响导览触发判定，无功能影响 */
   }
 }
 
@@ -30,9 +50,14 @@ export function OnboardingTour(): React.JSX.Element {
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active' }),
   });
 
-  // 首启自动触发：未看过 && 已登记项目为空（查询就绪后稍等片刻，让界面先稳定）
+  // 「曾有项目」标记：任何时刻见到非空项目列表就落旗（此后清空库也不再自动弹）
   useEffect(() => {
-    if (seen() || projects === undefined || projects.length > 0) return undefined;
+    if (projects !== undefined && projects.length > 0) markHadProjects();
+  }, [projects]);
+
+  // 首启自动触发：未看过 && 从未有项目 && 当前为空（查询就绪后稍等片刻，让界面先稳定）
+  useEffect(() => {
+    if (seen() || hadProjects() || projects === undefined || projects.length > 0) return undefined;
     const t = setTimeout(() => setOpen(true), 900);
     return () => clearTimeout(t);
   }, [projects]);
