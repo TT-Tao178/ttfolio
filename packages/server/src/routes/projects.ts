@@ -585,6 +585,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
         .prepare<[], { id: string; name: string; color: string | null; projectCount: number }>(
           `SELECT t.id, t.name, t.color, COUNT(pt.project_id) AS projectCount
            FROM tags t LEFT JOIN project_tags pt ON pt.tag_id = t.id
+             AND pt.project_id IN (SELECT id FROM projects WHERE deleted_at IS NULL)
            GROUP BY t.id ORDER BY t.name`,
         )
         .all(),

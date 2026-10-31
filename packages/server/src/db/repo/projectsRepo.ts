@@ -384,14 +384,21 @@ export interface CollectionMeta extends CollectionInfo {
 export function listCollections(db: Database.Database): CollectionMeta[] {
   const rows = getAll<CollectionRow>(db, 'SELECT * FROM collections ORDER BY sort_order, created_at');
   return rows.map((r) => {
+    // 用户报障（2026-10-31）：移除登记后侧栏集合计数（n）不归零——成员行是孤儿
+    // （softDeleteProject 只写 deleted_at；成员行保留，同路径重新登记时归属可恢复），
+    // 这里 JOIN projects 过滤已删项目，计数与成员列表口径一致
     const members = getAll<{ project_id: string }>(
       db,
-      'SELECT project_id FROM collection_members WHERE collection_id = ?',
+      `SELECT cm.project_id FROM collection_members cm
+       JOIN projects p ON p.id = cm.project_id
+       WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
       [r.id],
     );
     const c = getOne<{ c: number }>(
       db,
-      'SELECT COUNT(*) AS c FROM collection_members WHERE collection_id = ?',
+      `SELECT COUNT(*) AS c FROM collection_members cm
+       JOIN projects p ON p.id = cm.project_id
+       WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
       [r.id],
     );
     return {

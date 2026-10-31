@@ -79,7 +79,9 @@ export function useRemoveProject(): (p: ProjectSummary, mode: 'unregister' | 'de
       api.del(`/api/projects/${p.id}${mode === 'delete' ? '?mode=delete&confirm=1' : '?mode=unregister'}`),
     onSuccess: () => {
       void message.success('已移除');
+      // 移除登记会改变侧栏集合计数口径（2026-10-31 报障）：['collections'] 与 ['projects'] 同发
       void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['collections'] });
     },
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '操作失败'),
   });

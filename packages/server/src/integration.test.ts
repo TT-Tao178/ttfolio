@@ -206,6 +206,45 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     const list = listProjects(db, { status: 'active' });
     expect([...(list.find((p) => p.id === proj.id)?.collections ?? [])].sort()).toEqual(['col-a', 'col-b']);
   });
+
+  it('移除登记（软删）后集合/标签计数归零、成员列表不含已删项目（2026-10-31 报障回归）', () => {
+    const now = new Date().toISOString();
+    // 隔离项目：不软删共享 demo 项目（后续用例还要用）
+    const dirGone = path.join(root, 'orphan 项目');
+    fs.mkdirSync(dirGone, { recursive: true });
+    const gone = insertProject(db, {
+      dirPath: dirGone,
+      dirPathKey: pathKey(dirGone),
+      diskName: 'orphan 项目',
+      defaultArchDir: '架构图',
+    });
+    db.prepare(
+      'INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, NULL, 0, ?, ?)',
+    ).run('col-gone', '孤儿集合', now, now);
+    db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, NULL)').run('tag-orphan', '孤儿标签');
+    db.prepare(
+      'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+    ).run('col-gone', gone.id);
+    db.prepare('INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)').run(
+      gone.id,
+      'tag-orphan',
+    );
+    // 软删前：计数 1
+    expect(listCollections(db).find((c) => c.id === 'col-gone')?.memberCount).toBe(1);
+    expect(listTagsWithCount(db).find((t) => t.id === 'tag-orphan')?.projectCount).toBe(1);
+    // 软删（= 移除登记的 repo 层动作）：成员行保留（同路径复活归属可恢复），但计数/列表不再含它
+    softDeleteProject(db, gone.id);
+    const col = listCollections(db).find((c) => c.id === 'col-gone');
+    expect(col?.memberCount).toBe(0);
+    expect(col?.projectIds).toEqual([]);
+    expect(listTagsWithCount(db).find((t) => t.id === 'tag-orphan')?.projectCount).toBe(0);
+    // 清理自建行：共享库有全局断言（如标签中枢的 project_tags 全表计数），不留痕
+    db.prepare('DELETE FROM project_tags WHERE project_id = ?').run(gone.id);
+    db.prepare('DELETE FROM tags WHERE id = ?').run('tag-orphan');
+    db.prepare('DELETE FROM collection_members WHERE project_id = ?').run(gone.id);
+    db.prepare('DELETE FROM collections WHERE id = ?').run('col-gone');
+    db.prepare('DELETE FROM projects WHERE id = ?').run(gone.id);
+  });
 });
 
 describe('打开时静默重分析判定（KNOWN-GAPS #3，第 36 轮 A1）', () => {

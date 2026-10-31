@@ -10,10 +10,13 @@ export interface TagWithCount {
 }
 
 export function listTagsWithCount(db: Database.Database): TagWithCount[] {
+  // 与 listCollections 同款孤儿过滤（2026-10-31 报障同因）：已移除登记的项目
+  // 不计入标签计数（成员关系行保留，重新登记后计数恢复）
   return getAll<TagWithCount>(
     db,
     `SELECT t.id, t.name, t.color, COUNT(pt.project_id) AS projectCount
      FROM tags t LEFT JOIN project_tags pt ON pt.tag_id = t.id
+       AND pt.project_id IN (SELECT id FROM projects WHERE deleted_at IS NULL)
      GROUP BY t.id ORDER BY t.name`,
   );
 }

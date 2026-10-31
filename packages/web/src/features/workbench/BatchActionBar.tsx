@@ -65,6 +65,10 @@ export function BatchActionBar({
       }),
     onSuccess: async (res, vars) => {
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      // 移除登记/归档会改变侧栏集合计数（2026-10-31 报障）：集合失效与 CollectionAddMembersModal 同款双失效
+      if (vars.action === 'unregister' || vars.action === 'archive' || vars.action === 'unarchive') {
+        await queryClient.invalidateQueries({ queryKey: ['collections'] });
+      }
       const label = ACTION_LABELS[vars.action] ?? vars.action;
       if (res.failed.length > 0) {
         void message.warning(`${label}：成功 ${res.done} 个，失败 ${res.failed.length} 个`);
