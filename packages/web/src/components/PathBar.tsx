@@ -110,7 +110,9 @@ export function PathBar(): React.JSX.Element {
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        height: 40,
+        // 第 89 轮：40→44 与顶栏行高统一（头部块 = 顶栏 44 + 本行 44，仅本行底部一条
+        // 边界；顶栏 44 与 electron/main.cjs 的 overlay.height 同步改）
+        height: 44,
         padding: '0 12px',
         borderBottom: `1px solid ${SEMANTIC.split}`,
       }}

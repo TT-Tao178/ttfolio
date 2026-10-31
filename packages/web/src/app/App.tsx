@@ -1,5 +1,5 @@
 /** 应用壳（3.1）：顶栏(标签) + 路径条 + 域条/侧栏/内容/详情 + 状态栏；SSE、快捷键、会话恢复。 */
-import { Button, Space, Tooltip, Alert, App as AntdApp } from 'antd';
+import { Button, Tooltip, Alert, App as AntdApp } from 'antd';
 import {
   CodeOutlined,
   ExperimentOutlined,
@@ -324,33 +324,77 @@ function Shell(): React.JSX.Element {
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* 顶栏：标签 + 搜索/导入/设置（品牌区 logo+名称已去除——与系统窗口标题栏/任务栏重复，第 27 轮）。高度对齐《界面原型-AntD.html》#top = 56px */}
+      {/* 顶栏（第 89 轮重设）：隐藏系统标题栏后本行升格为窗口标题栏——根容器 app-region
+          drag（空白处可拖动/双击最大化），原生 ─□× 由 titleBarOverlay 画在右端，
+          paddingRight 140 预留窗控区；height 44 与 electron/main.cjs 的 overlay.height
+          必须同步改。头部块 = 本行 + PathBar 同底色，仅 PathBar 底部一条边界。
+          原「对齐《界面原型-AntD.html》#top = 56px」基线偏离：用户 2026-10-31 点名
+          （参照 PS/Apipost 头部一体化），偏离记录见 PROGRESS 第 89 轮（C-49）。
+          交互元素（品牌钮/标签/右端控件）显式 no-drag，否则 drag 区吞掉鼠标事件。 */}
       <div
         className="tt-glass-surface"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          height: 56,
-          padding: '0 12px',
-          borderBottom: `1px solid ${SEMANTIC.split}`,
-        }}
+        style={
+          {
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            height: 44,
+            padding: '0 140px 0 12px',
+            WebkitAppRegion: 'drag',
+          } as React.CSSProperties
+        }
       >
-        <Space size={6}>
-          <span style={{ fontSize: 12, opacity: 0.6 }}>a local project workbench</span>
-        </Space>
-        <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
+        <Tooltip title="工作台总览">
+          <Button
+            type="primary"
+            data-testid="brand-mark"
+            onClick={() =>
+              openTab(
+                { kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 },
+                '工作台',
+              )
+            }
+            style={
+              {
+                width: 24,
+                height: 24,
+                minWidth: 24,
+                padding: 0,
+                fontSize: 10,
+                fontWeight: 700,
+                lineHeight: 1,
+                borderRadius: 6,
+                flexShrink: 0,
+                WebkitAppRegion: 'no-drag',
+              } as React.CSSProperties
+            }
+          >
+            TT
+          </Button>
+        </Tooltip>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <TabBar />
         </div>
-        <Space size={8}>
-          {/* 搜索 pill（对齐原型 3.1）：点击等价 Ctrl+K */}
+        <div
+          style={
+            {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              WebkitAppRegion: 'no-drag',
+            } as React.CSSProperties
+          }
+        >
+          {/* 搜索 pill（对齐原型 3.1）：点击等价 Ctrl+K；窄窗时收缩到 180 保标签区可用 */}
           <Button
             onClick={() => setPalette(true)}
             data-testid="palette-btn"
             icon={<SearchOutlined />}
             style={{
               width: 300,
+              minWidth: 180,
               justifyContent: 'flex-start',
+              overflow: 'hidden',
               color: SEMANTIC.textTertiary,
               background: SEMANTIC.layoutBg,
               borderColor: SEMANTIC.split,
@@ -363,6 +407,7 @@ function Shell(): React.JSX.Element {
             <Button
               icon={<PlusOutlined />}
               data-testid="top-add-btn"
+              style={{ flexShrink: 0 }}
               onClick={() => {
                 openTab(
                   { kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 },
@@ -378,6 +423,7 @@ function Shell(): React.JSX.Element {
             <Button
               type={terminalOpen ? 'primary' : 'text'}
               icon={<CodeOutlined />}
+              style={{ flexShrink: 0 }}
               onClick={() => useAppStore.getState().setTerminalOpen(!useAppStore.getState().terminalOpen)}
               data-testid="terminal-toggle"
             />
@@ -386,6 +432,7 @@ function Shell(): React.JSX.Element {
             <Button
               type={embedOpen ? 'primary' : 'text'}
               icon={<ExperimentOutlined />}
+              style={{ flexShrink: 0 }}
               onClick={() => useAppStore.getState().setEmbedOpen(!useAppStore.getState().embedOpen)}
               data-testid="embed-toggle"
             />
@@ -394,6 +441,7 @@ function Shell(): React.JSX.Element {
             <Button
               type="text"
               icon={<SettingOutlined />}
+              style={{ flexShrink: 0 }}
               onClick={() =>
                 openTab(
                   { kind: 'settings', projectId: null, targetPath: null, subTab: null, scroll: 0 },
@@ -402,7 +450,7 @@ function Shell(): React.JSX.Element {
               }
             />
           </Tooltip>
-        </Space>
+        </div>
       </div>
 
       <PathBar />

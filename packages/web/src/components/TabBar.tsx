@@ -71,24 +71,29 @@ function SortableTab({
     <div
       ref={setNodeRef}
       data-active={active ? '1' : '0'}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 1,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '0 8px 0 12px',
-        height: 34,
-        borderRadius: 8,
-        cursor: 'pointer',
-        userSelect: 'none',
-        whiteSpace: 'nowrap',
-        background: active ? SEMANTIC.primaryBg : 'transparent',
-        border: active ? `1px solid ${SEMANTIC.primaryBorder}` : '1px solid transparent',
-        color: tab.invalid !== null ? SEMANTIC.error : 'inherit',
-        maxWidth: 200,
-      }}
+      style={
+        {
+          transform: CSS.Transform.toString(transform),
+          transition,
+          zIndex: isDragging ? 10 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 8px 0 12px',
+          height: 34,
+          borderRadius: 8,
+          cursor: 'pointer',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          background: active ? SEMANTIC.primaryBg : 'transparent',
+          border: active ? `1px solid ${SEMANTIC.primaryBorder}` : '1px solid transparent',
+          color: tab.invalid !== null ? SEMANTIC.error : 'inherit',
+          maxWidth: 200,
+          // 顶栏根容器是窗口拖拽区（第 89 轮）：标签必须显式 no-drag，
+          // 否则点击/右键菜单/拖动排序/中键关闭全被拖拽区吞掉
+          WebkitAppRegion: 'no-drag',
+        } as React.CSSProperties
+      }
       onClick={onActivate}
       onAuxClick={(e) => {
         if (e.button === 1) onClose();
