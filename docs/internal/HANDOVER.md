@@ -35,7 +35,9 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 91 轮（**未出包**；两报障修复——①移除登记后集合/标签
+> ⚠ 本节状态截至第 91 轮（**v0.5.8 已发布**（安装包已出回移 dist-electron/，
+> Release 资产 v0.5.4~v0.5.8 共五页待用户拖传；git 直连层实测通，push/tag/
+> Release 全走直连）；两报障修复——①移除登记后集合/标签
 > 计数不归零：listCollections 与标签计数 SQL 补 `deleted_at IS NULL` 孤儿过滤
 > （成员行保留、复活归属恢复）+ 前端补 ['collections'] 失效；②清空项目后
 > 导览误弹：OnboardingTour 补「曾有项目」localStorage 门槛。测试 285 条。
