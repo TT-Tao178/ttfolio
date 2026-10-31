@@ -35,12 +35,12 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 90 轮（**未出包**；卡片墙/总览选择模式——右上角「选择」
+> ⚠ 本节状态截至第 90 轮（**v0.5.7 已发布**（安装包已出回移 dist-electron/，
+> Release 资产待用户拖传；本轮网络三路抖动——git 直连层实测通，push/tag/Release
+> 全走直连；curl 400 不代表 git 不通）；卡片墙/总览选择模式——右上角「选择」
 > 显式入口 + Shift 范围选 + 底部固定选择条（BatchActionBar 浮岛改 docked
 > sticky），非模式零选择入口；全站统一（全部 view:* 墙 + 总览）。服务端零改动。
-> 第 89 轮 v0.5.6 已发布（安装包已出并回移 dist-electron/，Release 资产待用户
-> 拖传；push/tag/Release 全走 7897 代理——本轮直连 400、57780 死）；顶栏外壳
-> 改造——隐藏系统标题栏
+> 第 89 轮 v0.5.6 已发布（资产待拖传）；顶栏外壳改造——隐藏系统标题栏
 > （titleBarOverlay 原生 ─□× 画进顶栏行内、颜色随七主题走）+ 顶栏升格为标题栏：
 > 顶栏/路径条 44/44 行高、删标语换 24px TT 小标记（brand-mark）、顶栏 app-region
 > drag、右端控件降噪。链路：tokens 表 tt-titlebar-bg/fg → settings.tsx 上报
