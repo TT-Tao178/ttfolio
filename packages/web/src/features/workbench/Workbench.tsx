@@ -15,6 +15,7 @@ import {
   App,
 } from 'antd';
 import {
+  CheckSquareOutlined,
   InboxOutlined,
   MoreOutlined,
   PlusOutlined,
@@ -77,10 +78,17 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
   const [relocateProject, setRelocateProject] = useState<ProjectSummary | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; projectId: string } | null>(null);
-  // 批量多选（FR-13.10 / T-107）：卡片 Ctrl+点选 / 勾选角标与表格行选择框共享同一份选中集
+  // 批量多选（FR-13.10 / T-107；第 90 轮收敛为显式选择模式，用户 2026-10-31 点名）：
+  // 右上角「选择」按钮进入；非模式零选择入口（无 hover 复选框、Ctrl+点即打开）。
+  // 卡片点选 / 表格行选择框共享同一份选中集；Shift+点击从锚点做范围选（T-128 同手势）。
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const toggleSelect = (id: string): void =>
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const [selectMode, setSelectMode] = useState(false);
+  const selectAnchorRef = useRef<string | null>(null);
+  const exitSelect = (): void => {
+    setSelectMode(false);
+    setSelectedIds([]);
+    selectAnchorRef.current = null;
+  };
 
   const pinnedOnly = subTab === 'view:pinned';
   const filters = parseSubTab(subTab, settings.customViews);
@@ -96,6 +104,24 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   });
 
   const projects = (allProjects ?? []).filter((p) => !pinnedOnly || p.isPinned);
+
+  // 范围选（Shift）：以当前视图顺序（projects）为准；普通点击更新锚点
+  const toggleSelect = (id: string, opts?: { shift?: boolean }): void => {
+    if (opts?.shift === true && selectAnchorRef.current !== null) {
+      const ids = projects.map((p) => p.id);
+      const a = ids.indexOf(selectAnchorRef.current);
+      const b = ids.indexOf(id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        setSelectedIds((prev) => Array.from(new Set([...prev, ...ids.slice(lo, hi + 1)])));
+        return;
+      }
+    }
+    selectAnchorRef.current = id;
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+  const allIds = projects.map((p) => p.id);
+  const allSelected = projects.length > 0 && allIds.every((id) => selectedIds.includes(id));
 
   const openProjectTab = (p: ProjectSummary): void => {
     // 默认落点跟随设置 default_project_tab（原先硬编码 files，设置里改了不生效）
@@ -273,6 +299,15 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               onChange={(v) => setView(v as 'card' | 'table')}
             />
             <div style={{ flex: 1 }} />
+            {/* 显式选择模式（第 90 轮）：进入后卡片可点选/Shift 范围选，底条常驻 */}
+            <Button
+              type={selectMode ? 'primary' : 'default'}
+              icon={<CheckSquareOutlined />}
+              data-testid="select-mode-btn"
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+            >
+              {selectMode ? '退出选择' : '选择'}
+            </Button>
             <Tooltip title="重建分析（全部项目）">
               <Button icon={<ReloadOutlined />} onClick={() => analyze.mutate([])} />
             </Tooltip>
@@ -339,8 +374,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                     onPin={() => pin.mutate(p)}
                     onAnalyze={() => analyze.mutate([p.id])}
                     selected={selectedIds.includes(p.id)}
-                    selectMode={selectedIds.length > 0}
-                    onToggleSelect={() => toggleSelect(p.id)}
+                    selectMode={selectMode}
+                    onToggleSelect={(opts) => toggleSelect(p.id, opts)}
                   />
                 ))}
               </div>
@@ -351,10 +386,14 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                 dataSource={projects ?? []}
                 size="middle"
                 pagination={{ pageSize: 30 }}
-                rowSelection={{
-                  selectedRowKeys: selectedIds,
-                  onChange: (keys) => setSelectedIds(keys as string[]),
-                }}
+                rowSelection={
+                  selectMode
+                    ? {
+                        selectedRowKeys: selectedIds,
+                        onChange: (keys) => setSelectedIds(keys as string[]),
+                      }
+                    : undefined
+                }
                 onRow={(p) => ({
                   onContextMenu: (e) => {
                     e.preventDefault();
@@ -383,8 +422,14 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               onClose={() => setAvatarProject(null)}
             />
           )}
-          {selectedIds.length > 0 && (
-            <BatchActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} />
+          {selectMode && (
+            <BatchActionBar
+              selectedIds={selectedIds}
+              onClear={() => setSelectedIds([])}
+              onExit={exitSelect}
+              onToggleAll={() => setSelectedIds(allSelected ? [] : allIds)}
+              allSelected={allSelected}
+            />
           )}
           {pickerProject !== null && (
             <CollectionPickerModal

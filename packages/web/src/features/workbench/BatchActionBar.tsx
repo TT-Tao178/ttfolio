@@ -1,5 +1,10 @@
-/** 批量操作条（FR-13.10 / T-107）：选中 N 个项目后的浮动操作条（打标签/入集合/归档/重分析/移除登记）。 */
-import { App, Button, Select, Space, Tag } from 'antd';
+/**
+ * 批量操作条（FR-13.10 / T-107；第 90 轮改版）：选择模式下的底部固定操作条
+ * （打标签/入集合/归档/重分析/移除登记，走 POST /api/projects/batch-action）。
+ * 第 90 轮（用户点名）：由悬浮圆岛改为页面内固定底条（文件页多选 T-128 同款范式）——
+ * sticky 贴滚动容器底、进选择模式常驻，含 全选/清空/完成；0 选中时批量操作禁用。
+ */
+import { App, Button, Select, Tag } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
@@ -25,14 +30,24 @@ const ACTION_LABELS: Record<string, string> = {
 export function BatchActionBar({
   selectedIds,
   onClear,
+  onExit,
+  onToggleAll,
+  allSelected,
 }: {
   selectedIds: string[];
+  /** 只清空选中集（保留选择模式） */
   onClear: () => void;
+  /** 退出选择模式（清空选中 + 收条） */
+  onExit: () => void;
+  /** 全选/取消全选当前视图 */
+  onToggleAll: () => void;
+  allSelected: boolean;
 }): React.JSX.Element {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const [tagId, setTagId] = useState<string | undefined>();
   const [collectionId, setCollectionId] = useState<string | undefined>();
+  const none = selectedIds.length === 0;
   const { data: tags } = useQuery({
     queryKey: ['tags'],
     queryFn: () => api.get<TagInfo[]>('/api/tags'),
@@ -90,68 +105,87 @@ export function BatchActionBar({
     <div
       data-testid="batch-bar"
       style={{
-        position: 'fixed',
-        bottom: 44,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 900,
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 800,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
         background: SEMANTIC.layoutBg,
-        border: `1px solid ${SEMANTIC.split}`,
-        borderRadius: 10,
-        boxShadow: '0 6px 20px rgba(0, 0, 0, 0.18)',
-        padding: '8px 12px',
+        borderTop: `1px solid ${SEMANTIC.split}`,
+        padding: '8px 2px',
+        fontSize: 12,
       }}
     >
-      <Space wrap size={8}>
-        <Tag color="processing" style={{ marginInlineEnd: 0 }}>
-          已选 {selectedIds.length} 个
-        </Tag>
-        <Select
-          placeholder="选择标签"
-          style={{ minWidth: 130 }}
-          value={tagId}
-          onChange={setTagId}
-          showSearch
-          optionFilterProp="label"
-          options={(tags ?? []).map((t) => ({ value: t.id, label: t.name }))}
-        />
-        <Button
-          disabled={tagId === undefined}
-          loading={run.isPending}
-          onClick={() => {
-            if (tagId !== undefined) run.mutate({ action: 'tag', tagId });
-          }}
-        >
-          打标签
-        </Button>
-        <Select
-          placeholder="选择集合"
-          style={{ minWidth: 130 }}
-          value={collectionId}
-          onChange={setCollectionId}
-          showSearch
-          optionFilterProp="label"
-          options={(collections ?? []).map((c) => ({ value: c.id, label: c.name }))}
-        />
-        <Button
-          disabled={collectionId === undefined}
-          onClick={() => {
-            if (collectionId !== undefined) run.mutate({ action: 'collection', collectionId });
-          }}
-        >
-          加入
-        </Button>
-        <Button onClick={confirmArchive}>归档</Button>
-        <Button icon={<ReloadOutlined />} loading={analyze.isPending} onClick={() => analyze.mutate()}>
-          重新分析
-        </Button>
-        <Button danger onClick={confirmUnregister}>
-          移除登记
-        </Button>
-        <Button type="text" onClick={onClear}>
-          取消
-        </Button>
-      </Space>
+      <Tag color="processing" style={{ marginInlineEnd: 0 }}>
+        已选 {selectedIds.length} 个
+      </Tag>
+      <Button size="small" onClick={onToggleAll}>
+        {allSelected ? '取消全选' : '全选'}
+      </Button>
+      <Select
+        placeholder="选择标签"
+        size="small"
+        style={{ minWidth: 130 }}
+        value={tagId}
+        onChange={setTagId}
+        disabled={none}
+        showSearch
+        optionFilterProp="label"
+        options={(tags ?? []).map((t) => ({ value: t.id, label: t.name }))}
+      />
+      <Button
+        size="small"
+        disabled={none || tagId === undefined}
+        loading={run.isPending}
+        onClick={() => {
+          if (tagId !== undefined) run.mutate({ action: 'tag', tagId });
+        }}
+      >
+        打标签
+      </Button>
+      <Select
+        placeholder="选择集合"
+        size="small"
+        style={{ minWidth: 130 }}
+        value={collectionId}
+        onChange={setCollectionId}
+        disabled={none}
+        showSearch
+        optionFilterProp="label"
+        options={(collections ?? []).map((c) => ({ value: c.id, label: c.name }))}
+      />
+      <Button
+        size="small"
+        disabled={none || collectionId === undefined}
+        onClick={() => {
+          if (collectionId !== undefined) run.mutate({ action: 'collection', collectionId });
+        }}
+      >
+        加入
+      </Button>
+      <Button size="small" disabled={none} onClick={confirmArchive}>
+        归档
+      </Button>
+      <Button
+        size="small"
+        icon={<ReloadOutlined />}
+        disabled={none}
+        loading={analyze.isPending}
+        onClick={() => analyze.mutate()}
+      >
+        重新分析
+      </Button>
+      <Button size="small" danger disabled={none} onClick={confirmUnregister}>
+        移除登记
+      </Button>
+      <Button size="small" type="text" onClick={onClear}>
+        清空
+      </Button>
+      <Button size="small" type="primary" onClick={onExit} data-testid="batch-bar-done">
+        完成
+      </Button>
     </div>
   );
 }

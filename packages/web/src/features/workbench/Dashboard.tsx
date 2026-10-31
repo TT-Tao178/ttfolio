@@ -4,9 +4,9 @@
  * 总览收敛为「KPI 一眼看全局 + 项目卡片直达」。
  */
 import { App, Button, Card, Empty, List, Pagination, Statistic, Tag, Typography } from 'antd';
-import { AppstoreOutlined, CheckOutlined, PlusOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CheckOutlined, CheckSquareOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { api, ApiClientError } from '@/lib/api';
 import type { ProjectSummary, TodoItem } from '@ttfolio/shared';
 import { relTime } from '@/lib/format';
@@ -33,10 +33,30 @@ export function Dashboard(): React.JSX.Element {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  // 批量多选（T-117）：与卡片墙同款交互——Ctrl/⌘+点选或勾选角标，共享 BatchActionBar
+  // 批量多选（T-117；第 90 轮收敛为显式选择模式，用户 2026-10-31 点名）：与卡片墙同款——
+  // 「选择」按钮进入、点卡片/Shift 范围选、底部固定条操作；非模式零选择入口
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const toggleSelect = (id: string): void =>
+  const [selectMode, setSelectMode] = useState(false);
+  const selectAnchorRef = useRef<string | null>(null);
+  const exitSelect = (): void => {
+    setSelectMode(false);
+    setSelectedIds([]);
+    selectAnchorRef.current = null;
+  };
+  const toggleSelect = (id: string, opts?: { shift?: boolean }): void => {
+    if (opts?.shift === true && selectAnchorRef.current !== null) {
+      const ids = list.map((p) => p.id);
+      const a = ids.indexOf(selectAnchorRef.current);
+      const b = ids.indexOf(id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        setSelectedIds((prev) => Array.from(new Set([...prev, ...ids.slice(lo, hi + 1)])));
+        return;
+      }
+    }
+    selectAnchorRef.current = id;
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', 'dashboard', settings.cardSort],
     queryFn: () => api.get<ProjectSummary[]>('/api/projects', { status: 'active', sort: settings.cardSort }),
@@ -48,6 +68,8 @@ export function Dashboard(): React.JSX.Element {
   });
 
   const list = React.useMemo(() => projects ?? [], [projects]);
+  const allIds = list.map((p) => p.id);
+  const allSelected = list.length > 0 && allIds.every((id) => selectedIds.includes(id));
   const dirty = list.filter((p) => p.gitIsRepo && p.gitDirty).length;
   const noDocs = list.filter((p) => !p.hasDocs).length;
   const noArch = list.filter((p) => !p.hasArch).length;
@@ -315,7 +337,17 @@ export function Dashboard(): React.JSX.Element {
           <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
             共 {total} 个 · 每页 {PAGE_SIZE} 个
           </span>
-          <span style={{ marginLeft: 'auto' }}>
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
+            {/* 显式选择模式（第 90 轮，与卡片墙统一）：进入后卡片可点选，底条常驻 */}
+            <Button
+              size="small"
+              type={selectMode ? 'primary' : 'default'}
+              icon={<CheckSquareOutlined />}
+              data-testid="dash-select-mode-btn"
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+            >
+              {selectMode ? '退出选择' : '选择'}
+            </Button>
             <Button
               size="small"
               icon={<AppstoreOutlined />}
@@ -378,8 +410,8 @@ export function Dashboard(): React.JSX.Element {
                   onPin={() => pin.mutate(p)}
                   onAnalyze={() => analyze.mutate([p.id])}
                   selected={selectedIds.includes(p.id)}
-                  selectMode={selectedIds.length > 0}
-                  onToggleSelect={() => toggleSelect(p.id)}
+                  selectMode={selectMode}
+                  onToggleSelect={(opts) => toggleSelect(p.id, opts)}
                 />
               ))}
             </div>
@@ -397,8 +429,14 @@ export function Dashboard(): React.JSX.Element {
                 showTotal={(n) => `共 ${n} 个项目`}
               />
             </div>
-            {selectedIds.length > 0 && (
-              <BatchActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} />
+            {selectMode && (
+              <BatchActionBar
+                selectedIds={selectedIds}
+                onClear={() => setSelectedIds([])}
+                onExit={exitSelect}
+                onToggleAll={() => setSelectedIds(allSelected ? [] : allIds)}
+                allSelected={allSelected}
+              />
             )}
           </>
         )}

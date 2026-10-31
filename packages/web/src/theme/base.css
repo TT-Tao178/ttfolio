@@ -118,13 +118,11 @@ body {
   opacity: 0.55;
 }
 
-/* 批量多选（FR-13.10）：卡片勾选角标默认隐藏，悬浮卡片或已选中时出现 */
+/* 批量多选（FR-13.10；第 90 轮收敛为显式选择模式）：勾选角标仅在选择模式下渲染
+   （组件侧条件渲染），这里保留显形规则——模式类/已勾选恒可见，不再有 hover 悬停显形 */
 .tt-card-check {
   opacity: 0;
   transition: opacity 0.15s;
-}
-.ant-card:hover .tt-card-check {
-  opacity: 1;
 }
 .tt-card-check-on,
 .tt-card-check.ant-checkbox-wrapper-checked,

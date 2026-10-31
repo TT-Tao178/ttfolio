@@ -38,10 +38,13 @@ export function ProjectCard({
   onOpen: () => void;
   onPin: () => void;
   onAnalyze: () => void;
-  /** 批量多选（FR-13.10 / T-107）：三 props 同源提供才启用勾选角标与 Ctrl+点选 */
+  /**
+   * 批量多选（FR-13.10 / T-107；第 90 轮收敛）：selectMode 为真才启用勾选角标与点选
+   * （显式选择模式，用户 2026-10-31 点名——非模式零选择入口）；shift 透传给上层做范围选
+   */
   selected?: boolean;
   selectMode?: boolean;
-  onToggleSelect?: () => void;
+  onToggleSelect?: (opts?: { shift?: boolean }) => void;
 }): React.JSX.Element {
   const { message } = App.useApp();
   const queryClient2 = useQueryClient();
@@ -139,9 +142,10 @@ export function ProjectCard({
         if ((e.target as HTMLElement).closest('[data-testid="project-ctx-menu"]') !== null) return;
         // 3) Modal 弹窗内按钮：portal 到 body，DOM 上不在卡片内——用 contains 识别
         if (!e.currentTarget.contains(e.target as Node)) return;
-        // Ctrl/⌘+点选（FR-13.10 批量多选）：切换选中而不打开
-        if (onToggleSelect !== undefined && (e.ctrlKey || e.metaKey)) {
-          onToggleSelect();
+        // 选择模式（第 90 轮收敛）：点击（含 Ctrl/⌘/Shift）一律切换选中、不打开项目，
+        // Shift 交给上层做范围选；非模式点卡片就是打开项目（无任何选择分支）
+        if (selectMode === true && onToggleSelect !== undefined) {
+          onToggleSelect({ shift: e.shiftKey });
           return;
         }
         onOpen();
@@ -159,11 +163,9 @@ export function ProjectCard({
       data-testid="project-card"
       title={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
-          {onToggleSelect !== undefined && (
+          {selectMode === true && onToggleSelect !== undefined && (
             <Checkbox
-              className={`tt-card-check${selected === true ? ' tt-card-check-on' : ''}${
-                selectMode === true ? ' tt-card-check-mode' : ''
-              }`}
+              className={`tt-card-check${selected === true ? ' tt-card-check-on' : ''} tt-card-check-mode`}
               checked={selected === true}
               onClick={(e) => {
                 e.stopPropagation();
