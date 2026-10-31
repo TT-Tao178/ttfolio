@@ -35,9 +35,13 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 90 轮（**v0.5.7 已发布**（安装包已出回移 dist-electron/，
-> Release 资产待用户拖传；本轮网络三路抖动——git 直连层实测通，push/tag/Release
-> 全走直连；curl 400 不代表 git 不通）；卡片墙/总览选择模式——右上角「选择」
+> ⚠ 本节状态截至第 91 轮（**未出包**；两报障修复——①移除登记后集合/标签
+> 计数不归零：listCollections 与标签计数 SQL 补 `deleted_at IS NULL` 孤儿过滤
+> （成员行保留、复活归属恢复）+ 前端补 ['collections'] 失效；②清空项目后
+> 导览误弹：OnboardingTour 补「曾有项目」localStorage 门槛。测试 285 条。
+> 第 90 轮 v0.5.7 已发布（安装包已出回移 dist-electron/，Release 资产待用户
+> 拖传；本轮网络三路抖动——git 直连层实测通，push/tag/Release 全走直连；
+> curl 400 不代表 git 不通）；卡片墙/总览选择模式——右上角「选择」
 > 显式入口 + Shift 范围选 + 底部固定选择条（BatchActionBar 浮岛改 docked
 > sticky），非模式零选择入口；全站统一（全部 view:* 墙 + 总览）。服务端零改动。
 > 第 89 轮 v0.5.6 已发布（资产待拖传）；顶栏外壳改造——隐藏系统标题栏
