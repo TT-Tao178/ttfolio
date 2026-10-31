@@ -35,7 +35,9 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 89 轮（**未出包**；顶栏外壳改造——隐藏系统标题栏
+> ⚠ 本节状态截至第 89 轮（**v0.5.6 已发布**（安装包已出并回移 dist-electron/，
+> Release 资产待用户拖传；push/tag/Release 全走 7897 代理——本轮直连 400、
+> 57780 死）；顶栏外壳改造——隐藏系统标题栏
 > （titleBarOverlay 原生 ─□× 画进顶栏行内、颜色随七主题走）+ 顶栏升格为标题栏：
 > 顶栏/路径条 44/44 行高、删标语换 24px TT 小标记（brand-mark）、顶栏 app-region
 > drag、右端控件降噪。链路：tokens 表 tt-titlebar-bg/fg → settings.tsx 上报

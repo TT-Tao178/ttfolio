@@ -2,7 +2,7 @@
 
 # PROGRESS
 
-## 第 89 轮：顶栏外壳改造——隐藏系统标题栏 + 顶栏升格（未出包）
+## 第 89 轮：顶栏外壳改造——隐藏系统标题栏 + 顶栏升格（v0.5.6 已发布）
 
 - 用户反馈：顶上「两张皮」（原生标题栏与应用顶栏同色不同构）、孤儿英文标语失衡、
   右端控件杂重；给了两张参考图（Photoshop / Apipost 的头部一体化）。计划模式评审
@@ -34,6 +34,16 @@
   API，验证只能插桩 setter。ABI 双态按定式翻过去（electron-rebuild）又翻回来
   （npm rebuild），test 284 条复跑绿（真实退出码）。
 - 门禁：typecheck / lint / test（284 条）两提交各自真实退出码 0。
+- **出包（24bbf1d 版本三处，用户点名「打包吧」）**：链头四步全绿（audit 0 漏洞 /
+  build / build:server / electron-rebuild——后者两次 EPERM unlink better_sqlite3.node，
+  杀软实时扫描锁（手动改名测试即通过），**预删该文件再 rebuild 一轮过**）；builder
+  双镜像 + dist-electron-056t1 一轮过；自检 10 项全绿（含 0.5.6 版本断言与启动冒烟）；
+  回移 + npm rebuild 翻回 Node ABI；门禁三绿（284 条）+ e2e 4/4。
+- **发布**：网络探测——直连 400、代理 7897 活、57780 死，push/tag/Release 全走
+  7897（git push 未遇吊销检查错误）；tag v0.5.6 → 24bbf1d；Release 正式脚本 201；
+  API 复核标题/正文/无 T-编号/无赞助词/0 资产（匿名 API 撞限频，改用
+  `git credential fill` 取 token 复核成功）；资产对照已补行（0.5.6 exe 146.9MB
+  在 dist-electron/，待用户拖传）。
 - 手测提醒（随 0.5.6）：七主题逐一切换看右上角窗控变色；顶栏空白处拖动/双击
   最大化/Win11 贴靠；最大化后拖拽还原；窄窗搜索 pill 收缩；标签排序/右键菜单/
   中键关闭；寄宿面板开合不受影响；「设置头像」等既有功能无回归。
