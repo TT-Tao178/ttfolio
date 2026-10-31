@@ -2,6 +2,44 @@
 
 # PROGRESS
 
+## 第 89 轮：顶栏外壳改造——隐藏系统标题栏 + 顶栏升格（未出包）
+
+- 用户反馈：顶上「两张皮」（原生标题栏与应用顶栏同色不同构）、孤儿英文标语失衡、
+  右端控件杂重；给了两张参考图（Photoshop / Apipost 的头部一体化）。计划模式评审
+  后用户批准路线 A+B 一次到位。
+- **框架合并（8efdab3）**：BrowserWindow 加 `titleBarStyle:'hidden'` + `titleBarOverlay`
+  （默认浅色 #f6f8fa/#1f2328，height 44 与顶栏行高必须同步改）；`tt:theme-changed`
+  扩展第二参 overlay（#rrggbb 校验后 `setTitleBarOverlay`，异常忽略不 throw）；
+  preload `setTheme(mode, overlay)` 透传；tokens.ts 六主题表新增 `tt-titlebar-bg/fg`
+  （OS 窗控限实色，glass 取渐变近似），抽 `varsFor` 助手 + 新导出
+  `titleBarOverlayColors`（C-50 单一来源不变）；settings.tsx 上报 effect 依赖改
+  `[mode, resolved]`——初始/切换/跟随系统翻转三时机全覆盖。寄宿容器（embed-host）
+  不读写宿主窗口样式，不受影响；verify-dist-electron 断言不含窗口选项。
+- **顶栏重设（f4df62c）**：顶栏 56→44、删自身 borderBottom（头部块唯一边界留在
+  PathBar 底）；删标语 `a local project workbench`，换 24px TT 小标记
+  （data-testid=brand-mark，点击回工作台——第 27 轮删的是与系统标题栏重复的文字，
+  框架合并后该理由消失；计划批准含此项，不满意可单独撤）；根容器 app-region drag
+  + paddingRight 140 预留原生窗控；标签/右端控件显式 no-drag（drag 区吞鼠标事件）；
+  搜索 pill minWidth 180 可收缩（窄窗 960 保标签可用）；PathBar 40→44 行高统一。
+- **偏离记录（C-49）**：①原型 #top=56px 基线→44（用户 2026-10-31 点名，App.tsx
+  注释同步）；②e2e 按用户既定口径延后至出包轮（开发规范 9.4「UI 改动必跑」的
+  偏离，本轮只跑日常门禁）。
+- **隔离冒烟（探针 .tmp-test/probe/smoke-titlebar.cjs，不入库）**：
+  TTFOLIO_DATA_DIR 隔离 + TTFOLIO_PORT=7947 起 Electron（**必须剔除
+  ELECTRON_RUN_AS_NODE**）；断言全中——顶栏 44 / 路径条 44 / brand-mark / 标语已删
+  / 顶栏 drag / 标签 no-drag；PATCH theme=dark 后进程内插桩捕获
+  `setTitleBarOverlay({color:'#141414', symbolColor:'#d4d4d4'})`（渲染层→preload→
+  IPC→校验→应用全链实证）+ nativeTheme.themeSource=dark；截图目检无系统标题栏、
+  右端原生窗控就位、头部成块。探针教训：Electron 44 无 getTitleBarOverlay 读取
+  API，验证只能插桩 setter。ABI 双态按定式翻过去（electron-rebuild）又翻回来
+  （npm rebuild），test 284 条复跑绿（真实退出码）。
+- 门禁：typecheck / lint / test（284 条）两提交各自真实退出码 0。
+- 手测提醒（随 0.5.6）：七主题逐一切换看右上角窗控变色；顶栏空白处拖动/双击
+  最大化/Win11 贴靠；最大化后拖拽还原；窄窗搜索 pill 收缩；标签排序/右键菜单/
+  中键关闭；寄宿面板开合不受影响；「设置头像」等既有功能无回归。
+- 环境备忘：%TEMP% 下 ttfolio-link-*/ttfolio-reg-* 等数百个目录是历轮 vitest
+  残留（非本轮产物），未代删。
+
 ## 第 88 轮：v0.5.5 发布（项目自定义头像 + 卡片统一 + 全部项目入口）
 
 - 用户验收第 87 轮后点名「打包」。范围：项目自定义头像全链、卡片尺寸统一（移除

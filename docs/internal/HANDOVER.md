@@ -35,7 +35,15 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 88 轮（**v0.5.5 已发布**；项目自定义头像全链、卡片尺寸统一
+> ⚠ 本节状态截至第 89 轮（**未出包**；顶栏外壳改造——隐藏系统标题栏
+> （titleBarOverlay 原生 ─□× 画进顶栏行内、颜色随七主题走）+ 顶栏升格为标题栏：
+> 顶栏/路径条 44/44 行高、删标语换 24px TT 小标记（brand-mark）、顶栏 app-region
+> drag、右端控件降噪。链路：tokens 表 tt-titlebar-bg/fg → settings.tsx 上报
+> （[mode, resolved] 三时机）→ tt:theme-changed → setTitleBarOverlay。偏离记录：
+> 原型 56px→44（C-49）、e2e 延后出包轮（C-44 偏离）。隔离冒烟全绿（探针
+> .tmp-test/probe/smoke-titlebar.cjs，含 IPC 全链插桩实证）；手测清单见 PROGRESS
+> 第 89 轮。新增能力边界入 KNOWN-GAPS 功能级 #11）。
+> ⚠ 历史状态截至第 88 轮（**v0.5.5 已发布**；项目自定义头像全链、卡片尺寸统一
 > （gridMinH 机制移除）、总览屏「卡片墙 · 全部项目」入口随包发布；push/tag/Release
 > 本轮直连全通）。
 > ⚠ 历史状态截至第 87 轮（未出包；卡片尺寸统一（移除 gridMinH 机制）、总览屏
