@@ -26,6 +26,7 @@ import {
   applyThemeVars,
   componentSizeOf,
   SEMANTIC,
+  titleBarOverlayColors,
   type ResolvedTheme,
   type ThemeMode,
 } from '@/theme/tokens';
@@ -215,21 +216,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     }
   }, [mode]);
 
-  // Electron 桌面版：主题变化上报主进程切 nativeTheme，让原生窗口标题栏跟随深浅
-  // （第 34 轮）。oled 属深色系按 dark 上报；桥由 preload 注入，浏览器/Web 模式没有
-  // 它，可选调用即 no-op。
-  useEffect(() => {
-    const native = (window as unknown as { ttfolioNative?: { setTheme: (m: string) => void } }).ttfolioNative;
-    // 深色系主题（oled/cyberpunk）让标题栏走深色，sketch/glass 走浅色，其余原样上报
-    native?.setTheme(
-      mode === 'oled' || mode === 'cyberpunk'
-        ? 'dark'
-        : mode === 'sketch' || mode === 'glass'
-          ? 'light'
-          : mode,
-    );
-  }, [mode]);
-
   // 三态解析：system 由系统深浅解析为 light/dark；oled 独立成态（有自己的变量表与发光规则）。
   // dark 布尔保留在上下文里（= resolved !== 'light'）供既有消费方兼容。
   const [resolved, setResolved] = useState<ResolvedTheme>(() =>
@@ -242,6 +228,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
     mq.addEventListener('change', compute);
     return () => mq.removeEventListener('change', compute);
   }, [mode]);
+
+  // Electron 桌面版：主题变化上报主进程切 nativeTheme，让原生窗口标题栏跟随深浅
+  // （第 34 轮）。oled 属深色系按 dark 上报；桥由 preload 注入，浏览器/Web 模式没有
+  // 它，可选调用即 no-op。第 89 轮起同时上报 titleBarOverlay 窗控区配色——依赖
+  // [mode, resolved]：初始、切换、跟随系统翻转（matchMedia 监听驱动 resolved）三个
+  // 时机都会走到；取色走 tokens.ts 的 titleBarOverlayColors（C-50 单一来源）。
+  // 位置在 resolved 声明之后（作用域需要）。
+  useEffect(() => {
+    const native = (
+      window as unknown as {
+        ttfolioNative?: { setTheme: (m: string, overlay?: { color: string; symbolColor: string }) => void };
+      }
+    ).ttfolioNative;
+    // 深色系主题（oled/cyberpunk）让标题栏走深色，sketch/glass 走浅色，其余原样上报
+    native?.setTheme(
+      mode === 'oled' || mode === 'cyberpunk'
+        ? 'dark'
+        : mode === 'sketch' || mode === 'glass'
+          ? 'light'
+          : mode,
+      titleBarOverlayColors(resolved),
+    );
+  }, [mode, resolved]);
 
   // useLayoutEffect：早于绘制写入变量，避免先亮后暗闪一下
   useLayoutEffect(() => {

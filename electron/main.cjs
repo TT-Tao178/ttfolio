@@ -47,11 +47,15 @@ if (!ELEVATED_RETRY && !app.requestSingleInstanceLock()) {
 
 let win = null;
 
-// 主题跟随（第 34 轮）：渲染层在主题设置变化/首帧时经 preload 桥上报，主进程切
+// 主题跟随（第 34 轮；第 89 轮扩展）：渲染层在主题设置变化/首帧时经 preload 桥上报，主进程切
 // nativeTheme.themeSource——Windows 原生标题栏颜色随 shouldUseDarkColors 走，
 // 深色主题下标题栏不再恒白。oled 属深色系按 dark 处理；未知值回 system（跟随操作系统），
 // 防渲染层异常值把标题栏钉死。浏览器/Web 模式无此桥，纯网页不受影响。
-ipcMain.on('tt:theme-changed', (_event, mode) => {
+// 第 89 轮起窗口用 titleBarOverlay（系统 ─□× 画在顶栏行内），overlay 的底色/符号色
+// 随第二参数同步（渲染层从 theme/tokens.ts 取色，保持 C-50 单一来源）；校验只收
+// 不透明 #rrggbb，异常值忽略不动，绝不 throw（沿用本文件 handler 惯例）。
+const TITLEBAR_HEX_RE = /^#[0-9a-fA-F]{6}$/;
+ipcMain.on('tt:theme-changed', (_event, mode, overlay) => {
   const map = {
     light: 'light',
     dark: 'dark',
@@ -61,6 +65,20 @@ ipcMain.on('tt:theme-changed', (_event, mode) => {
     glass: 'light',
   };
   nativeTheme.themeSource = map[mode] ?? 'system';
+  if (
+    overlay &&
+    typeof overlay === 'object' &&
+    TITLEBAR_HEX_RE.test(String(overlay.color ?? '')) &&
+    TITLEBAR_HEX_RE.test(String(overlay.symbolColor ?? ''))
+  ) {
+    try {
+      if (win !== null && !win.isDestroyed() && typeof win.setTitleBarOverlay === 'function') {
+        win.setTitleBarOverlay({ color: overlay.color, symbolColor: overlay.symbolColor });
+      }
+    } catch {
+      /* overlay 更新失败不影响主题切换（如平台不支持） */
+    }
+  }
 });
 
 /**
@@ -425,6 +443,12 @@ function withRememberedBounds(state) {
     width: state.width,
     height: state.height,
     autoHideMenuBar: true,
+    // 第 89 轮（用户点名顶栏观感，参照 PS/Apipost）：隐藏系统标题栏，应用顶栏升格为
+    // 标题栏——titleBarOverlay 让原生 ─□× 画在顶栏行内（height 与 App.tsx 顶栏 44 对齐，
+    // 改一处必须同步另一处）。默认色与 VARS_LIGHT 的 tt-titlebar-bg/fg 一致；非浅色主题
+    // 首帧短暂同色误差由渲染层主题解析后经 tt:theme-changed 校正（KNOWN-GAPS 功能级 #11）。
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#f6f8fa', symbolColor: '#1f2328', height: 44 },
     // 白屏治理：初始隐藏，ready-to-show（首帧就绪）再显示（boot 里有 8s 兜底）
     show: false,
     title: 'TT项目管理工作台',

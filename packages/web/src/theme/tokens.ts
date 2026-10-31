@@ -127,6 +127,9 @@ const VARS_LIGHT: Record<string, string> = {
   'tt-text': '#1f2328',
   'tt-text-2': '#57606a',
   'tt-text-3': '#8b949e',
+  // titleBarOverlay 窗控区配色（第 89 轮）：OS 窗控限实色 hex，随主题上报主进程
+  'tt-titlebar-bg': '#f6f8fa',
+  'tt-titlebar-fg': '#1f2328',
 };
 
 const VARS_DARK: Record<string, string> = {
@@ -143,6 +146,8 @@ const VARS_DARK: Record<string, string> = {
   'tt-text': 'rgba(255,255,255,.85)',
   'tt-text-2': 'rgba(255,255,255,.65)',
   'tt-text-3': 'rgba(255,255,255,.45)',
+  'tt-titlebar-bg': '#141414',
+  'tt-titlebar-fg': '#d4d4d4',
 };
 
 /**
@@ -164,6 +169,8 @@ const VARS_OLED: Record<string, string> = {
   'tt-text': 'rgba(255,255,255,.88)',
   'tt-text-2': 'rgba(255,255,255,.62)',
   'tt-text-3': 'rgba(255,255,255,.42)',
+  'tt-titlebar-bg': '#000000',
+  'tt-titlebar-fg': '#d4d4d4',
 };
 
 /**
@@ -184,6 +191,8 @@ const VARS_CYBERPUNK: Record<string, string> = {
   'tt-text': 'rgba(235,242,255,.9)',
   'tt-text-2': 'rgba(215,226,255,.62)',
   'tt-text-3': 'rgba(195,208,240,.42)',
+  'tt-titlebar-bg': '#0a0a12',
+  'tt-titlebar-fg': '#cfd6ff',
 };
 
 /**
@@ -205,6 +214,8 @@ const VARS_SKETCH: Record<string, string> = {
   'tt-text': 'rgba(45,42,37,.92)',
   'tt-text-2': 'rgba(45,42,37,.62)',
   'tt-text-3': 'rgba(45,42,37,.42)',
+  'tt-titlebar-bg': '#faf7f2',
+  'tt-titlebar-fg': '#2d2a25',
 };
 
 /**
@@ -231,6 +242,9 @@ const VARS_GLASS: Record<string, string> = {
   'tt-text': 'rgba(28,27,34,.92)',
   'tt-text-2': 'rgba(28,27,34,.64)',
   'tt-text-3': 'rgba(28,27,34,.44)',
+  // glass 的窗控区是渐变底的近似实色（OS 窗控不支持透明，KNOWN-GAPS #11）
+  'tt-titlebar-bg': '#e7eafa',
+  'tt-titlebar-fg': '#1c1b22',
 };
 
 /**
@@ -336,6 +350,21 @@ export function themeVarsCss(): string {
   );
 }
 
+/** 六套变量表选取（applyThemeVars 与 titleBarOverlayColors 共用，保持取色单一来源）。 */
+function varsFor(resolved: ResolvedTheme): Record<string, string> {
+  return resolved === 'light'
+    ? VARS_LIGHT
+    : resolved === 'oled'
+      ? VARS_OLED
+      : resolved === 'cyberpunk'
+        ? VARS_CYBERPUNK
+        : resolved === 'sketch'
+          ? VARS_SKETCH
+          : resolved === 'glass'
+            ? VARS_GLASS
+            : VARS_DARK;
+}
+
 /** 把变量表写入文档（幂等；只创建一次 <style>，之后仅切换 html 上的 data-tt-*）。 */
 export function applyThemeVars(resolved: ResolvedTheme): void {
   if (typeof document === 'undefined') return;
@@ -354,22 +383,21 @@ export function applyThemeVars(resolved: ResolvedTheme): void {
   document.documentElement.dataset['ttGlass'] = resolved === 'glass' ? '1' : '0';
   // 让浏览器原生控件（滚动条、表单、默认底色）也跟随深浅，避免"深色页面配白滚动条"
   document.documentElement.style.colorScheme = darkLike ? 'dark' : 'light';
-  const vars =
-    resolved === 'light'
-      ? VARS_LIGHT
-      : resolved === 'oled'
-        ? VARS_OLED
-        : resolved === 'cyberpunk'
-          ? VARS_CYBERPUNK
-          : resolved === 'sketch'
-            ? VARS_SKETCH
-            : resolved === 'glass'
-              ? VARS_GLASS
-              : VARS_DARK;
+  const vars = varsFor(resolved);
   // glass 的整页底是渐变（inline 优先级高于 CSS 规则段，必须在这里写）
   const bg = resolved === 'glass' ? GLASS_BG_GRADIENT : (vars['tt-layout-bg'] ?? '');
   document.documentElement.style.background = bg;
   document.body.style.background = bg;
+}
+
+/**
+ * titleBarOverlay 窗控区配色（第 89 轮）：主题解析后经 preload 桥上报主进程
+ * setTitleBarOverlay，让系统 ─□× 随七主题变色。OS 窗控限实色 hex，glass 取近似实色；
+ * 兜底值与 VARS_LIGHT 的 titlebar 两键一致（与 main.cjs 构造默认对齐）。
+ */
+export function titleBarOverlayColors(resolved: ResolvedTheme): { color: string; symbolColor: string } {
+  const vars = varsFor(resolved);
+  return { color: vars['tt-titlebar-bg'] ?? '#f6f8fa', symbolColor: vars['tt-titlebar-fg'] ?? '#1f2328' };
 }
 
 /** 语义色常量（组件内唯一允许的取色来源，值与深浅无关，实际色值随 html[data-tt-dark] 切换）。 */

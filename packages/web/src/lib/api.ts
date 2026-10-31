@@ -7,9 +7,9 @@ declare global {
     __TTFOLIO_PORT__?: string;
     __TTFOLIO_API_BASE__?: string;
     __TTFOLIO_CONTENT_BASE__?: string;
-    /** Electron preload 桥（桌面版才有）：T-113 缩略图原生解码快速路径。 */
+    /** Electron preload 桥（桌面版才有）：主题上报 + T-113 缩略图原生解码快速路径。 */
     ttfolioNative?: {
-      setTheme?: (mode: string) => void;
+      setTheme?: (mode: string, overlay?: { color: string; symbolColor: string }) => void;
       /** 主进程 nativeImage 解码并按最长边缩放，返回 dataURL；失败返回 null。 */
       thumbDecode?: (absPath: string, maxPx: number) => Promise<string | null>;
       /** 拖拽登记（T-118）：DataTransfer 的 File → 绝对路径；仅桌面版存在。 */
