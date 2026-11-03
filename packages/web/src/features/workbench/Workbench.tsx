@@ -17,6 +17,7 @@ import { useAppStore, useTabScroll } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { Dashboard } from './Dashboard';
 import { ProjectCard } from './ProjectCard';
+import { StatsView } from './StatsView';
 import { StateView } from '@/components/StateView';
 import { fmtBytes, relTime } from '@/lib/format';
 import { typeLabel } from '@/components/DetailPanel';
@@ -244,11 +245,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       data-testid="workbench"
     >
       <div ref={wbRef} style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 16 }}>
-        {/* 工作台总览（subTab=null）与卡片墙是两个屏：前者回答"哪里需要我"，后者用于筛选/浏览项目 */}
+        {/* 工作台总览（subTab=null）/ 统计面板（view:stats）/ 卡片墙是三类屏：前者回答"哪里需要我"，统计回答"全景什么样"，后者用于筛选/浏览项目 */}
         {subTab === null ? (
           <>
             <Dashboard />
           </>
+        ) : subTab === 'view:stats' ? (
+          <StatsView />
         ) : (
           <>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>

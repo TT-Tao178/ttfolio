@@ -16,6 +16,7 @@ import { normalizeActorHeader, enterActor } from './core/actor.js';
 import { systemRoutes } from './routes/system.js';
 import { eventsRoute } from './routes/events.js';
 import { projectsRoutes } from './routes/projects.js';
+import { statsRoutes } from './routes/stats.js';
 import { fsRoutes } from './routes/fs.js';
 import { gitRoutes } from './routes/git.js';
 import { docsRoutes } from './routes/docs.js';
@@ -178,6 +179,7 @@ export function buildApp(ctx: AppContext): FastifyInstance {
   app.register(mediaRoutes);
   app.register(profileRoutes);
   app.register(changesRoutes);
+  app.register(statsRoutes);
   app.register(pluginsRoutes);
 
   // 静态托管 web/dist（token 注入 index.html）

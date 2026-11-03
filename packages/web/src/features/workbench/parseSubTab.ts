@@ -13,6 +13,10 @@ export function parseSubTab(
   if (subTab === null) return { status: 'active' };
   if (subTab === 'view:recent') return { status: 'active', sort: 'last_opened' };
   if (subTab === 'view:pinned') return { status: 'active' };
+  if (subTab === 'view:stats') {
+    // 项目统计面板（FR-15.3 / T-144）：数据面独立接口，列表查询仅兜底
+    return { status: 'active' };
+  }
   if (subTab.startsWith('view:custom:')) {
     const id = subTab.slice('view:custom:'.length);
     const view = customViews?.find((v) => v.id === id);

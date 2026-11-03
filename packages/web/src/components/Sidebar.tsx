@@ -5,6 +5,7 @@ import {
   AppstoreOutlined,
   ArrowDownOutlined,
   ArrowUpOutlined,
+  BarChartOutlined,
   BranchesOutlined,
   CopyOutlined,
   DeleteOutlined,
@@ -525,6 +526,18 @@ export function Sidebar(): React.JSX.Element {
     items.push({ key: 'sep-views', label: '我的视图' });
     items.push({ key: 'view:my-dirty', label: viewRowLabel('有未提交改动') });
     items.push({ key: 'view:my-nodocs', label: viewRowLabel('缺文档') });
+    // 项目统计（FR-15.3 / T-144）：视图组末位（柱图图标区分于眼睛过滤视图）
+    items.push({
+      key: 'view:stats',
+      label: (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <BarChartOutlined style={{ fontSize: 12, opacity: 0.6, flexShrink: 0 }} />
+          <span className="tt-ellipsis" style={{ maxWidth: 160 }}>
+            项目统计
+          </span>
+        </span>
+      ),
+    });
     for (const v of settings.customViews) {
       items.push({
         key: `view:custom:${v.id}`,
@@ -1050,6 +1063,9 @@ function viewTitle(key: string): string {
       return '30 天没打开';
     case 'my-archived':
       return '已归档';
+    case 'stats':
+      // 项目统计面板（FR-15.3 / T-144）
+      return '项目统计';
     default:
       return key;
   }

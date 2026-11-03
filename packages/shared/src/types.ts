@@ -522,6 +522,21 @@ export interface CollectionInfo {
   projectIds: string[];
 }
 
+/** 项目统计面板（FR-15.3 / T-144）：GET /api/stats/overview，现表聚合零迁移 */
+export interface StatsOverview {
+  totalProjects: number;
+  /** 语言分布：按字节占比降序，前 12 + 「其他」合并 */
+  languages: Array<{ language: string; bytes: number; share: number }>;
+  /** 打开频率 Top N（open_count 降序） */
+  openTop: Array<{ id: string; name: string; openCount: number }>;
+  /** 近 28 天提交活跃，按 7 天分 4 桶（最右为最近一周） */
+  weeklyCommits: Array<{ label: string; count: number }>;
+  /** 体量分布 4 桶：<1MB / 1–10MB / 10–100MB / ≥100MB */
+  sizeBuckets: Array<{ label: string; count: number }>;
+  /** 组织覆盖度：total=登记中项目数；unassigned=未入任何集合；noTags=无标签；archived=已归档 */
+  coverage: { total: number; unassigned: number; noTags: number; archived: number };
+}
+
 /** 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5）：存 settings.custom_views_json。 */
 export interface CustomView {
   id: string;
