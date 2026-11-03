@@ -12,10 +12,12 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
+  FolderFilled,
   FolderOpenOutlined,
   PlusOutlined,
   StarFilled,
   StarOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useAppStore, type TabLocation } from '@/app/store';
@@ -445,20 +447,49 @@ export function Sidebar(): React.JSX.Element {
         label: viewRowLabel(v.name, v.id),
       });
     }
-    // 集合 = 平面条目（2026-11-03 拍板反转第 30 轮子菜单）：点集合名直接打开该集合的
-    // 卡片墙（成员在那里看，侧栏不再重复列成员）；计数随行。右键菜单保留
-    // 上移/下移/编辑/删除（打开视图由左键直出，右键不再重复此项）。
-    for (const c of collections ?? []) {
-      items.push({
-        key: `col:${c.id}`,
-        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
-        label: <span data-collection-id={c.id}>{`${c.name}（${c.memberCount}）`}</span>,
-      });
+    // 集合（2026-11-03 对齐期望图）：补分组标题 + 行首文件夹图标 + 半角计数括号；
+    // 无集合时不落空标题。点条目直开该集合卡片墙（见 onClick）。
+    if ((collections ?? []).length > 0) {
+      items.push({ key: 'sep-collections', label: '集合' });
+      for (const c of collections ?? []) {
+        items.push({
+          key: `col:${c.id}`,
+          // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
+          label: (
+            <span
+              data-collection-id={c.id}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+            >
+              <FolderFilled style={{ fontSize: 13, color: SEMANTIC.warning, opacity: 0.7, flexShrink: 0 }} />
+              <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
+            </span>
+          ),
+        });
+      }
     }
     // 标签 = 平面条目（第 36 轮 A2）：点击开该标签的卡片墙（subTab=tag:<id>），
-    // 计数与集合条目同口径；无项目数 0 的标签仍显示，便于发现空标签
-    for (const t of tags ?? []) {
-      items.push({ key: `tag:${t.id}`, label: `${t.name}（${t.projectCount}）` });
+    // 计数与集合条目同口径；行首标签图标随标签色（未设色淡显）；项目数 0 的标签
+    // 仍显示，便于发现空标签。分组标题仅在有标签时出现（2026-11-03 对齐期望图）。
+    if ((tags ?? []).length > 0) {
+      items.push({ key: 'sep-tags', label: '标签' });
+      for (const t of tags ?? []) {
+        items.push({
+          key: `tag:${t.id}`,
+          label: (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <TagsOutlined
+                style={{
+                  fontSize: 12,
+                  color: t.color ?? undefined,
+                  opacity: t.color !== null ? 0.9 : 0.5,
+                  flexShrink: 0,
+                }}
+              />
+              <span className="tt-ellipsis">{`${t.name} (${t.projectCount})`}</span>
+            </span>
+          ),
+        });
+      }
     }
     if (activeTab !== undefined) {
       if (activeTab.kind === 'overview') {
