@@ -5,9 +5,9 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { AppContext } from '../context.js';
 import { ok, fail } from './helpers.js';
 import { getProjectRow } from '../db/repo/projectsRepo.js';
-import { listMedia } from '../db/repo/mediaRepo.js';
+import { listMedia, setMediaDerivative } from '../db/repo/mediaRepo.js';
 import { logActivity } from '../db/repo/metaRepo.js';
-import { mediaThumbPostSchema } from '@ttfolio/shared';
+import { mediaThumbPostSchema, mediaDerivativeSchema } from '@ttfolio/shared';
 import {
   THUMB_QUOTA_BYTES,
   isWebp,
@@ -120,5 +120,26 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     logActivity(db, { kind: 'media.thumb.write', level: 'L1', projectId, detail: { file: name } });
     // 只返回文件名：前端 thumbUrl(projectId, name) 负责拼 /thumbs/:projectId/:name
     return ok({ thumb: name });
+  });
+
+  /**
+   * 派生数据回填（FR-15.4 / T-145）：渲染层从既有缩略图算出 aHash + 主色 12 桶占比
+   * 后落库（渐进回填，算过的跳过）。按 project+path 定位（路径跨重分析稳定，id 会
+   * 全量重写）；纯索引库写入，绝不触项目目录。
+   */
+  app.post('/api/projects/:projectId/media/derivative', async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    const parsed = mediaDerivativeSchema.safeParse(req.body);
+    if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
+    const db = ctx.db();
+    if (getProjectRow(db, projectId) === undefined) return fail('NOT_FOUND', '项目不存在', 404);
+    setMediaDerivative(
+      db,
+      projectId,
+      parsed.data.path,
+      parsed.data.phash,
+      JSON.stringify(parsed.data.colors),
+    );
+    return ok({ saved: true });
   });
 };

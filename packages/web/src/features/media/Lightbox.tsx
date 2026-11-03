@@ -26,6 +26,8 @@ export function Lightbox({
   loop,
   thumbs,
   requestPreview,
+  onFindSimilar,
+  findingSimilar,
 }: {
   projectId: string;
   items: MediaItem[];
@@ -35,6 +37,9 @@ export function Lightbox({
   loop: boolean;
   thumbs: Map<string, ThumbState>;
   requestPreview: (path: string) => void;
+  /** 找相似（FR-15.4 / T-145）：对当前条目发起感知哈希相似检索（父组件负责计算与过滤） */
+  onFindSimilar?: (item: MediaItem) => void;
+  findingSimilar?: boolean;
 }): React.JSX.Element | null {
   const item = items[index];
   const dark = false; // 灯箱固定深底，与主题无关
@@ -138,6 +143,19 @@ export function Lightbox({
           {index + 1}/{items.length} · {KIND_LABEL[item.kind]}
         </span>
         <span style={{ flex: 1 }} />
+        {item.kind !== 'audio' && onFindSimilar !== undefined && (
+          <Tooltip title="按画面感知哈希找相似图（汉明距离 ≤10）">
+            <Button
+              size="small"
+              ghost
+              loading={findingSimilar === true}
+              onClick={() => onFindSimilar(item)}
+              data-testid="lightbox-find-similar"
+            >
+              找相似
+            </Button>
+          </Tooltip>
+        )}
         {item.kind === 'image' && (
           <>
             <Button

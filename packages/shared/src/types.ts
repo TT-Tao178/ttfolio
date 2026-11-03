@@ -399,6 +399,10 @@ export interface MediaItem {
   w: number | null;
   h: number | null;
   durationMs: number | null;
+  /** 派生数据（FR-15.4 / T-145）：aHash 64bit 十六进制；null=尚未回填 */
+  phash: string | null;
+  /** 主色 12 色桶占比（键 '0'..'11'，值 0..1）；null=尚未回填 */
+  colors: Record<string, number> | null;
 }
 
 /** 资源仓库会话（FR-13.3，T-097）。endedAt 为 null 表示记录中。 */

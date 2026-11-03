@@ -247,4 +247,7 @@ export interface MediaFileRow {
   w: number | null;
   h: number | null;
   duration_ms: number | null;
+  /** 派生数据（FR-15.4 / T-145）：主色 12 桶占比 JSON / aHash 64bit 十六进制 */
+  colors_json: string | null;
+  phash: string | null;
 }

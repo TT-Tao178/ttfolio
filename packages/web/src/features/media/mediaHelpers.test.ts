@@ -15,7 +15,17 @@ import {
 import type { MediaItem } from '@ttfolio/shared';
 
 function item(path: string, kind: 'image' | 'video' | 'audio' = 'image'): MediaItem {
-  return { path, kind, bytes: 10, mtime: null, w: null, h: null, durationMs: null };
+  return {
+    path,
+    kind,
+    bytes: 10,
+    mtime: null,
+    w: null,
+    h: null,
+    durationMs: null,
+    phash: null,
+    colors: null,
+  };
 }
 
 describe('groupByFolder（按目录分组）', () => {

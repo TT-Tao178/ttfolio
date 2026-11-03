@@ -7,6 +7,16 @@ import { ulid } from '../../core/ulid.js';
 import type { MediaFileRow } from '../rowTypes.js';
 
 function mapItem(r: MediaFileRow): MediaItem {
+  // FR-15.4：派生数据回读（colors_json 解析失败视为未回填，不炸清单）
+  let colors: Record<string, number> | null = null;
+  if (r.colors_json !== null) {
+    try {
+      const parsed: unknown = JSON.parse(r.colors_json);
+      if (parsed !== null && typeof parsed === 'object') colors = parsed as Record<string, number>;
+    } catch {
+      colors = null;
+    }
+  }
   return {
     path: r.path,
     kind: r.kind as MediaKind,
@@ -15,6 +25,8 @@ function mapItem(r: MediaFileRow): MediaItem {
     w: r.w,
     h: r.h,
     durationMs: r.duration_ms,
+    phash: r.phash,
+    colors,
   };
 }
 
@@ -35,6 +47,22 @@ export function listMedia(db: Database.Database, projectId: string): MediaItem[]
   return getAll<MediaFileRow>(db, 'SELECT * FROM media_files WHERE project_id = ? ORDER BY path', [
     projectId,
   ]).map(mapItem);
+}
+
+/** 派生数据回填（FR-15.4 / T-145）：按 project+path 定位（路径跨重分析稳定，id 会全量重写）。 */
+export function setMediaDerivative(
+  db: Database.Database,
+  projectId: string,
+  path: string,
+  phash: string,
+  colorsJson: string,
+): void {
+  run(db, 'UPDATE media_files SET phash = ?, colors_json = ? WHERE project_id = ? AND path = ?', [
+    phash,
+    colorsJson,
+    projectId,
+    path,
+  ]);
 }
 
 export function mediaCount(db: Database.Database, projectId: string): number {

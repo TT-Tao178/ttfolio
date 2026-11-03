@@ -193,6 +193,13 @@ export const collectionPatchSchema = z.object({
 });
 /** 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：按传入顺序全量重排 sort_order */
 export const collectionReorderSchema = z.object({ ids: z.array(z.string()).min(1) });
+
+/** 媒体派生数据回填（FR-15.4 / T-145）：aHash 16 位十六进制 + 主色 12 桶占比（'0'..'11'） */
+export const mediaDerivativeSchema = z.object({
+  path: z.string().min(1),
+  phash: z.string().regex(/^[0-9a-f]{16}$/),
+  colors: z.record(z.string().regex(/^(?:1[0-1]|[0-9])$/), z.number().min(0).max(1)),
+});
 export const collectionMembersSchema = z.object({
   projectIds: z.array(z.string()).min(0),
   replace: z.boolean().default(false),
