@@ -15,6 +15,8 @@ export interface ListFilters {
   status?: ProjectStatus | 'all';
   type?: ProjectType | 'all';
   collectionId?: string;
+  /** true = 只列不属于任何集合的项目（侧栏「未分配」虚拟分组） */
+  unassigned?: boolean;
   tagId?: string;
   dirty?: boolean;
   hasDocs?: boolean;
@@ -222,6 +224,10 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
   if (filters.collectionId !== undefined) {
     where.push('id IN (SELECT project_id FROM collection_members WHERE collection_id = ?)');
     params.push(filters.collectionId);
+  }
+  if (filters.unassigned === true) {
+    // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的登记项目
+    where.push('id NOT IN (SELECT project_id FROM collection_members)');
   }
   if (filters.tagId !== undefined) {
     where.push('id IN (SELECT project_id FROM project_tags WHERE tag_id = ?)');

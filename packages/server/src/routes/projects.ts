@@ -68,6 +68,7 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
       type: q.type as ListFilters['type'],
       collectionId: q.collection,
+      unassigned: q.unassigned === '1' ? true : undefined,
       tagId: q.tag,
       dirty:
         q.dirty === '1' || q.dirty === 'true'

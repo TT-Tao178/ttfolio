@@ -261,6 +261,34 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     db.prepare('DELETE FROM collections WHERE id = ?').run('col-gone');
     db.prepare('DELETE FROM projects WHERE id = ?').run(gone.id);
   });
+
+  it('unassigned 过滤只列不属于任何集合的项目（第 93 轮「未分配」虚拟分组回归）', () => {
+    const dirFree = path.join(root, 'unassigned 项目');
+    fs.mkdirSync(dirFree, { recursive: true });
+    const free = insertProject(db, {
+      dirPath: dirFree,
+      dirPathKey: pathKey(dirFree),
+      diskName: 'unassigned 项目',
+      defaultArchDir: '架构图',
+    });
+    const before = listProjects(db, { status: 'active', unassigned: true }).some((p) => p.id === free.id);
+    expect(before).toBe(true);
+    // 入集合后从「未分配」消失
+    const now = new Date().toISOString();
+    db.prepare(
+      'INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, NULL, 0, ?, ?)',
+    ).run('col-u', '未分配验证集合', now, now);
+    db.prepare(
+      'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+    ).run('col-u', free.id);
+    expect(listProjects(db, { status: 'active', unassigned: true }).some((p) => p.id === free.id)).toBe(
+      false,
+    );
+    // 清理自建行
+    db.prepare('DELETE FROM collection_members WHERE project_id = ?').run(free.id);
+    db.prepare('DELETE FROM collections WHERE id = ?').run('col-u');
+    db.prepare('DELETE FROM projects WHERE id = ?').run(free.id);
+  });
 });
 
 describe('打开时静默重分析判定（KNOWN-GAPS #3，第 36 轮 A1）', () => {
