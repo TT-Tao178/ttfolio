@@ -33,13 +33,12 @@ import { openAgo } from '@/lib/format';
 
 type MenuKey = string;
 
-/** 侧栏条目：集合项带 children（可折叠成员列表，第 30 轮），其余为平面项；
+/** 侧栏条目：集合为平面项（2026-11-03 拍板：点名直开卡片墙，不再折叠子菜单）；
  *  过滤框条目带 className（去菜单外观，样式见 base.css tt-proj-filter-item）。 */
 type SidebarItem = {
   key: MenuKey;
   label: React.ReactNode;
   className?: string;
-  children?: Array<{ key: MenuKey; label: React.ReactNode }>;
 };
 
 export function Sidebar(): React.JSX.Element {
@@ -252,8 +251,7 @@ export function Sidebar(): React.JSX.Element {
         ]
       : ctxCollection !== undefined
         ? [
-            { key: 'openview', label: '打开集合视图', icon: <FolderOpenOutlined /> },
-            { type: 'divider' as const },
+            // 左键即开集合视图（2026-11-03 拍板），右键不再重复「打开集合视图」项
             {
               key: 'moveup',
               label: '上移',
@@ -392,9 +390,6 @@ export function Sidebar(): React.JSX.Element {
     }
     if (col !== undefined) {
       switch (key) {
-        case 'openview':
-          openCollectionView(col.id);
-          break;
         case 'moveup':
         case 'movedown': {
           // 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：与相邻集合交换位置，全量重排
@@ -453,32 +448,14 @@ export function Sidebar(): React.JSX.Element {
       });
     }
     items.push({ key: 'view-new', label: '新建视图…' });
-    // 集合 = 可折叠子菜单（第 30 轮，用户需求：加入集合的项目要在侧栏能展开/收起查看）——
-    // 点集合名=展开/收起成员列表；子项首位「打开集合视图」保留原平面条目的卡片墙入口；
-    // 成员项目可直接点开，且带 data-project-id 可用右键整套菜单。收起为默认态。
+    // 集合 = 平面条目（2026-11-03 拍板反转第 30 轮子菜单）：点集合名直接打开该集合的
+    // 卡片墙（成员在那里看，侧栏不再重复列成员）；计数随行。右键菜单保留
+    // 上移/下移/编辑/删除（打开视图由左键直出，右键不再重复此项）。
     for (const c of collections ?? []) {
-      const members = c.projectIds
-        .map((pid) => (projects ?? []).find((p) => p.id === pid))
-        .filter((p): p is ProjectSummary => p !== undefined);
       items.push({
         key: `col:${c.id}`,
-        // data-collection-id 供 document 级右键委托定位集合（第 31 轮：集合可右键编辑/删除）
+        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
         label: <span data-collection-id={c.id}>{`${c.name}（${c.memberCount}）`}</span>,
-        children: [
-          { key: `colview:${c.id}`, label: '打开集合视图' },
-          ...members.map((p) => ({
-            key: `colproj:${c.id}:${p.id}`,
-            label: (
-              <span
-                data-project-id={p.id}
-                className="tt-ellipsis"
-                style={{ display: 'block', maxWidth: 150 }}
-              >
-                {p.alias ?? p.diskName}
-              </span>
-            ),
-          })),
-        ],
       });
     }
     // 标签 = 平面条目（第 36 轮 A2）：点击开该标签的卡片墙（subTab=tag:<id>），
@@ -627,16 +604,9 @@ export function Sidebar(): React.JSX.Element {
     else if (activeTab?.kind === 'doclib') selected = 'doclib';
   }
 
-  // 选中键集合：当前选中行之外，活动项目所属集合的成员行同样点亮
-  // （用户反馈：从集合里打开项目后，集合分区没有选中标识）
+  // 选中键：卡片墙/总览由 subTab 直接映射；项目页签高亮主列表对应行
+  // （集合行同键位 col:<id>，打开集合视图后自然点亮）
   const selectedKeys: string[] = selected !== '' ? [selected] : [];
-  if (domain === 'projects' && activeTab?.kind === 'project' && activeTab.projectId !== null) {
-    for (const c of collections ?? []) {
-      if (c.projectIds.includes(activeTab.projectId)) {
-        selectedKeys.push(`colproj:${c.id}:${activeTab.projectId}`);
-      }
-    }
-  }
 
   const onClick = (e: { key: string }): void => {
     const key = e.key;
@@ -708,18 +678,8 @@ export function Sidebar(): React.JSX.Element {
       return;
     }
     if (key.startsWith('col:')) {
-      // 集合标题点击=antd 子菜单原生展开/收起（第 30 轮），这里不再开标签，直接吞掉
-      return;
-    }
-    if (key.startsWith('colview:')) {
-      openCollectionView(key.slice(8));
-      return;
-    }
-    if (key.startsWith('colproj:')) {
-      // 集合成员项目直接点开（files 页签），与主列表点项目一致
-      const pid = key.split(':')[2];
-      const p = (projects ?? []).find((x) => x.id === pid);
-      if (p !== undefined) openProject(p, 'files');
+      // 集合条目点击 = 直接打开该集合的卡片墙（2026-11-03 拍板：替代原子菜单+「打开集合视图」）
+      openCollectionView(key.slice(4));
       return;
     }
     if (key.startsWith('proj:')) {
