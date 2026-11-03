@@ -109,16 +109,16 @@ export function BatchActionBar({
     <div
       data-testid="batch-bar"
       style={{
-        position: 'sticky',
-        bottom: 0,
-        zIndex: 800,
+        // 2026-11-03（用户反馈「不要浮动」）：由滚动区 sticky 悬浮改为布局级停靠——
+        // 调用方把它放在滚动区之下的 flex 列末位，天然贴底、不压任何内容
+        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
         flexWrap: 'wrap',
         background: SEMANTIC.layoutBg,
         borderTop: `1px solid ${SEMANTIC.split}`,
-        padding: '8px 2px',
+        padding: '8px 16px',
         fontSize: 12,
       }}
     >

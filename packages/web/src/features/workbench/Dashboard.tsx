@@ -202,327 +202,343 @@ export function Dashboard(): React.JSX.Element {
   return (
     // flex column：项目区 flex:1 吃掉剩余高度，分页器 margin-top:auto 恒贴其底——
     // 翻到内容不满一屏的页时分页器不再被顶得上下跳（用户反馈）
+    // 2026-11-03（用户反馈「选择条不要浮动」）：根改 flex 列——内层滚动区 + 底部
+    // 停靠 BatchActionBar（选择模式常驻贴底、不压内容）；分页器贴底逻辑在内层保留
     <div
-      style={{ overflow: 'auto', height: '100%', paddingRight: 4, display: 'flex', flexDirection: 'column' }}
+      style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}
       data-testid="dashboard"
     >
-      {/* 总览屏也必须能直接添加项目：原先入口只在卡片墙分支里，默认落总览时"找不到添加入口" */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          工作台总览
-        </Typography.Title>
-        <div style={{ flex: 1 }} />
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          data-testid="add-project-btn"
-          onClick={() => useAppStore.getState().requestAddProject()}
-        >
-          添加项目
-        </Button>
-      </div>
-
-      {/* 「继续上次」：最近打开的项目 chips，一键直达 */}
-      {recent.length > 0 && (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}
-          data-testid="dash-recent"
-        >
-          <span style={{ fontSize: 12, color: SEMANTIC.textTertiary, flexShrink: 0 }}>继续上次：</span>
-          {recent.map((p) => (
-            <Button key={p.id} size="small" onClick={() => openProject(p)}>
-              {p.alias ?? p.diskName}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {/* KPI 卡片（第 39 轮）：可点的五张 hoverable + onClick 跳对应视图/锚点，
-          「平均分析耗时」无对应项目集合保持静态；跳转复用「需要关注」条的 goView */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        <Card size="small" hoverable onClick={scrollToProjects} data-testid="kpi-total">
-          <Statistic title="项目总数" value={list.length} loading={isLoading} />
-        </Card>
-        <Card size="small" hoverable onClick={() => goView('recent')} data-testid="kpi-opened-today">
-          <Statistic title="今天动过" value={openedToday} loading={isLoading} />
-        </Card>
-        <Card size="small" hoverable onClick={() => goView('my-dirty')} data-testid="kpi-dirty">
-          <Statistic
-            title="有未提交改动"
-            value={dirty}
-            loading={isLoading}
-            valueStyle={dirty > 0 ? { color: SEMANTIC.warning } : undefined}
-          />
-        </Card>
-        <Card size="small" hoverable onClick={() => goView('my-nodocs')} data-testid="kpi-nodocs">
-          <Statistic title="缺设计文档" value={noDocs} loading={isLoading} />
-        </Card>
-        <Card size="small" hoverable onClick={() => goView('my-noarch')} data-testid="kpi-noarch">
-          <Statistic title="缺架构图" value={noArch} loading={isLoading} />
-        </Card>
-        <Card size="small">
-          <Statistic title="平均分析耗时" value={avgMs} suffix="ms" loading={isLoading} />
-        </Card>
-      </div>
-
-      {/* 「需要关注」行动条：只显示计数 > 0 的项，点击跳对应卡片墙视图 */}
-      {attention.length > 0 && (
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}
-          data-testid="dash-attention"
-        >
-          <span style={{ fontSize: 12, color: SEMANTIC.warning, flexShrink: 0 }}>⚠ 需要关注：</span>
-          {attention.map((a) => (
-            <Tag
-              key={a.key}
-              color="warning"
-              style={{ cursor: 'pointer', marginInlineEnd: 0 }}
-              onClick={() => goView(a.key)}
-            >
-              {a.label} {a.count}
-            </Tag>
-          ))}
-        </div>
-      )}
-
-      {/* 聚合语言占比：全部项目按字节聚合（GitHub 风格色条 + 图例） */}
-      {langAgg !== null && (
-        <div style={{ marginTop: 12 }} data-testid="dash-langs">
-          <div style={{ fontSize: 12, color: SEMANTIC.textTertiary, marginBottom: 4 }}>
-            语言构成（全部项目聚合）
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              height: 8,
-              borderRadius: 4,
-              overflow: 'hidden',
-              background: SEMANTIC.split,
-            }}
-          >
-            {langAgg.map((r) => (
-              <div
-                key={r.language}
-                style={{ width: `${r.percent}%`, background: langColor(r.language) }}
-                title={`${r.language} ${r.percent}%`}
-              />
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-            {langAgg.map((r) => (
-              <span key={r.language} style={{ fontSize: 12 }}>
-                <i
-                  style={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 8,
-                    borderRadius: 2,
-                    background: langColor(r.language),
-                    marginRight: 4,
-                  }}
-                />
-                {r.language} {r.percent}%
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 项目区：flex:1 吃掉剩余高度，分页器恒贴本区底部 */}
-      <div ref={projectsSectionRef} style={{ marginTop: 16, scrollMarginTop: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            项目
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          paddingRight: 4,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* 总览屏也必须能直接添加项目：原先入口只在卡片墙分支里，默认落总览时"找不到添加入口" */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            工作台总览
           </Typography.Title>
-          <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
-            共 {total} 个 · 每页 {PAGE_SIZE} 个
-          </span>
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
-            {/* 显式选择模式（第 90 轮，与卡片墙统一）：进入后卡片可点选，底条常驻 */}
-            <Button
-              size="small"
-              type={selectMode ? 'primary' : 'default'}
-              icon={<CheckSquareOutlined />}
-              data-testid="dash-select-mode-btn"
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-            >
-              {selectMode ? '退出选择' : '选择'}
-            </Button>
-            <Button
-              size="small"
-              icon={<AppstoreOutlined />}
-              data-testid="dash-all-projects"
-              onClick={() =>
-                useAppStore.getState().openTab(
-                  {
-                    kind: 'overview',
-                    projectId: null,
-                    targetPath: null,
-                    subTab: 'view:all-projects',
-                    scroll: 0,
-                  },
-                  '全部项目',
-                )
-              }
-            >
-              卡片墙 · 全部项目
-            </Button>
-          </span>
+          <div style={{ flex: 1 }} />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            data-testid="add-project-btn"
+            onClick={() => useAppStore.getState().requestAddProject()}
+          >
+            添加项目
+          </Button>
         </div>
-        {total === 0 ? (
-          <Card size="small">
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <>
-                  还没有登记项目
-                  <br />
-                  <span style={{ fontSize: 12, opacity: 0.65 }}>
-                    ① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索
-                  </span>
-                </>
-              }
-            >
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => useAppStore.getState().requestAddProject()}
-              >
-                添加项目
+
+        {/* 「继续上次」：最近打开的项目 chips，一键直达 */}
+        {recent.length > 0 && (
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}
+            data-testid="dash-recent"
+          >
+            <span style={{ fontSize: 12, color: SEMANTIC.textTertiary, flexShrink: 0 }}>继续上次：</span>
+            {recent.map((p) => (
+              <Button key={p.id} size="small" onClick={() => openProject(p)}>
+                {p.alias ?? p.diskName}
               </Button>
-            </Empty>
+            ))}
+          </div>
+        )}
+
+        {/* KPI 卡片（第 39 轮）：可点的五张 hoverable + onClick 跳对应视图/锚点，
+          「平均分析耗时」无对应项目集合保持静态；跳转复用「需要关注」条的 goView */}
+        <div
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}
+        >
+          <Card size="small" hoverable onClick={scrollToProjects} data-testid="kpi-total">
+            <Statistic title="项目总数" value={list.length} loading={isLoading} />
           </Card>
-        ) : (
-          <>
+          <Card size="small" hoverable onClick={() => goView('recent')} data-testid="kpi-opened-today">
+            <Statistic title="今天动过" value={openedToday} loading={isLoading} />
+          </Card>
+          <Card size="small" hoverable onClick={() => goView('my-dirty')} data-testid="kpi-dirty">
+            <Statistic
+              title="有未提交改动"
+              value={dirty}
+              loading={isLoading}
+              valueStyle={dirty > 0 ? { color: SEMANTIC.warning } : undefined}
+            />
+          </Card>
+          <Card size="small" hoverable onClick={() => goView('my-nodocs')} data-testid="kpi-nodocs">
+            <Statistic title="缺设计文档" value={noDocs} loading={isLoading} />
+          </Card>
+          <Card size="small" hoverable onClick={() => goView('my-noarch')} data-testid="kpi-noarch">
+            <Statistic title="缺架构图" value={noArch} loading={isLoading} />
+          </Card>
+          <Card size="small">
+            <Statistic title="平均分析耗时" value={avgMs} suffix="ms" loading={isLoading} />
+          </Card>
+        </div>
+
+        {/* 「需要关注」行动条：只显示计数 > 0 的项，点击跳对应卡片墙视图 */}
+        {attention.length > 0 && (
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}
+            data-testid="dash-attention"
+          >
+            <span style={{ fontSize: 12, color: SEMANTIC.warning, flexShrink: 0 }}>⚠ 需要关注：</span>
+            {attention.map((a) => (
+              <Tag
+                key={a.key}
+                color="warning"
+                style={{ cursor: 'pointer', marginInlineEnd: 0 }}
+                onClick={() => goView(a.key)}
+              >
+                {a.label} {a.count}
+              </Tag>
+            ))}
+          </div>
+        )}
+
+        {/* 聚合语言占比：全部项目按字节聚合（GitHub 风格色条 + 图例） */}
+        {langAgg !== null && (
+          <div style={{ marginTop: 12 }} data-testid="dash-langs">
+            <div style={{ fontSize: 12, color: SEMANTIC.textTertiary, marginBottom: 4 }}>
+              语言构成（全部项目聚合）
+            </div>
             <div
-              data-testid="dashboard-project-grid"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: 16,
+                display: 'flex',
+                height: 8,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: SEMANTIC.split,
               }}
             >
-              {pageItems.map((p) => (
-                <ProjectCard
-                  key={p.id}
-                  p={p}
-                  onOpen={() => openProject(p)}
-                  onPin={() => pin.mutate(p)}
-                  onAnalyze={() => analyze.mutate([p.id])}
-                  selected={selectedIds.includes(p.id)}
-                  selectMode={selectMode}
-                  onToggleSelect={(opts) => toggleSelect(p.id, opts)}
+              {langAgg.map((r) => (
+                <div
+                  key={r.language}
+                  style={{ width: `${r.percent}%`, background: langColor(r.language) }}
+                  title={`${r.language} ${r.percent}%`}
                 />
               ))}
             </div>
-            <div
-              data-testid="dashboard-project-pagination"
-              style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}
-            >
-              <Pagination
-                current={page}
-                pageSize={PAGE_SIZE}
-                total={total}
-                onChange={(next) => setPage(next)}
-                hideOnSinglePage
-                showSizeChanger={false}
-                showTotal={(n) => `共 ${n} 个项目`}
-              />
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
+              {langAgg.map((r) => (
+                <span key={r.language} style={{ fontSize: 12 }}>
+                  <i
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: 2,
+                      background: langColor(r.language),
+                      marginRight: 4,
+                    }}
+                  />
+                  {r.language} {r.percent}%
+                </span>
+              ))}
             </div>
-            {selectMode && (
-              <BatchActionBar
-                selectedIds={selectedIds}
-                onClear={() => setSelectedIds([])}
-                onExit={exitSelect}
-                onToggleAll={() => setSelectedIds(allSelected ? [] : allIds)}
-                allSelected={allSelected}
-              />
-            )}
-          </>
+          </div>
         )}
-      </div>
 
-      {/* 「最近提交」动态流：跨项目按提交时间倒序，点行跳该项目 Git 页签 */}
-      {/* 弹性垫片：内容不满一屏时吃掉剩余空间、把底部两卡推到底部；超屏时收缩为 0 顺流。 */}
-      <div style={{ flex: '1 1 0%', minHeight: 0 }} />
-
-      {/* 跨项目未完成清单（FR-9.3）：只在有未完成条目时出现；按项目分组、组内截止排序，
-          逾期标红；勾选即完成；点项目名跳该项目概览页签。旧版三卡曾因跳转乱被移除——
-          本卡沿用「最近提交」的底部单卡惯例，入口只有「需要关注」条与本卡自身。 */}
-      {todoDigest.total > 0 && (
-        <div ref={todosCardRef} style={{ marginTop: 12, scrollMarginTop: 8 }}>
-          <Card
-            size="small"
-            title={`未完成清单（${todoDigest.total}）`}
-            style={{ marginTop: 12 }}
-            data-testid="dash-todos"
-            extra={
-              <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
-                {todoDigest.groups.length} 个项目
-                {todoDigest.hidden > 0 ? ` · 还有 ${todoDigest.hidden} 条` : ''}
-              </span>
-            }
-          >
-            {todoDigest.groups.map((g, gi) => (
-              <div key={g.projectId} style={{ marginBottom: gi === todoDigest.groups.length - 1 ? 0 : 10 }}>
+        {/* 项目区：flex:1 吃掉剩余高度，分页器恒贴本区底部 */}
+        <div ref={projectsSectionRef} style={{ marginTop: 16, scrollMarginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              项目
+            </Typography.Title>
+            <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
+              共 {total} 个 · 每页 {PAGE_SIZE} 个
+            </span>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
+              {/* 显式选择模式（第 90 轮，与卡片墙统一）：进入后卡片可点选，底条常驻 */}
+              <Button
+                size="small"
+                type={selectMode ? 'primary' : 'default'}
+                icon={<CheckSquareOutlined />}
+                data-testid="dash-select-mode-btn"
+                onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              >
+                {selectMode ? '退出选择' : '选择'}
+              </Button>
+              <Button
+                size="small"
+                icon={<AppstoreOutlined />}
+                data-testid="dash-all-projects"
+                onClick={() =>
+                  useAppStore.getState().openTab(
+                    {
+                      kind: 'overview',
+                      projectId: null,
+                      targetPath: null,
+                      subTab: 'view:all-projects',
+                      scroll: 0,
+                    },
+                    '全部项目',
+                  )
+                }
+              >
+                卡片墙 · 全部项目
+              </Button>
+            </span>
+          </div>
+          {total === 0 ? (
+            <Card size="small">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <>
+                    还没有登记项目
+                    <br />
+                    <span style={{ fontSize: 12, opacity: 0.65 }}>
+                      ① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索
+                    </span>
+                  </>
+                }
+              >
                 <Button
-                  type="link"
-                  size="small"
-                  style={{ padding: 0, height: 'auto' }}
-                  onClick={() => openTodoProject(g.projectId, g.projectName)}
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => useAppStore.getState().requestAddProject()}
                 >
-                  {g.projectName}
+                  添加项目
                 </Button>
-                {g.items.map((t) => (
-                  <div
-                    key={t.id}
-                    style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0 2px 12px' }}
-                  >
-                    <Button
-                      size="small"
-                      type="text"
-                      icon={<CheckOutlined />}
-                      onClick={() => todoDone.mutate(t.id)}
-                    />
-                    <span style={{ flex: 1, fontSize: 12 }}>{t.title}</span>
-                    {t.dueOn !== null && (
-                      <Tag style={{ fontSize: 10 }} color={t.dueOn < todayKey ? 'error' : undefined}>
-                        截止 {t.dueOn}
-                      </Tag>
-                    )}
-                    {t.category !== null && <Tag style={{ fontSize: 10 }}>{t.category}</Tag>}
-                  </div>
+              </Empty>
+            </Card>
+          ) : (
+            <>
+              <div
+                data-testid="dashboard-project-grid"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 16,
+                }}
+              >
+                {pageItems.map((p) => (
+                  <ProjectCard
+                    key={p.id}
+                    p={p}
+                    onOpen={() => openProject(p)}
+                    onPin={() => pin.mutate(p)}
+                    onAnalyze={() => analyze.mutate([p.id])}
+                    selected={selectedIds.includes(p.id)}
+                    selectMode={selectMode}
+                    onToggleSelect={(opts) => toggleSelect(p.id, opts)}
+                  />
                 ))}
               </div>
-            ))}
-          </Card>
-        </div>
-      )}
-      {commits.length > 0 && (
-        <Card size="small" title="最近提交" style={{ marginTop: 12 }} data-testid="dash-commits">
-          <List
-            size="small"
-            rowKey="id"
-            dataSource={commits}
-            renderItem={(p) => (
-              <List.Item
-                className="tt-commit-row"
-                style={{ cursor: 'pointer', padding: '3px 0' }}
-                onClick={() => openGit(p)}
+              <div
+                data-testid="dashboard-project-pagination"
+                style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}
               >
-                <span style={{ display: 'inline-flex', gap: 8, width: '100%', alignItems: 'center' }}>
-                  <strong style={{ flexShrink: 0, fontSize: 12 }}>{p.alias ?? p.diskName}</strong>
-                  <span className="tt-ellipsis" style={{ flex: 1, fontSize: 12, opacity: 0.85 }}>
-                    {p.gitLastCommitSubject ?? '（无提交主题）'}
-                  </span>
-                  <span style={{ fontSize: 12, opacity: 0.55, flexShrink: 0 }}>
-                    {relTime(p.gitLastCommitAt)}
-                  </span>
+                <Pagination
+                  current={page}
+                  pageSize={PAGE_SIZE}
+                  total={total}
+                  onChange={(next) => setPage(next)}
+                  hideOnSinglePage
+                  showSizeChanger={false}
+                  showTotal={(n) => `共 ${n} 个项目`}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 「最近提交」动态流：跨项目按提交时间倒序，点行跳该项目 Git 页签 */}
+        {/* 弹性垫片：内容不满一屏时吃掉剩余空间、把底部两卡推到底部；超屏时收缩为 0 顺流。 */}
+        <div style={{ flex: '1 1 0%', minHeight: 0 }} />
+
+        {/* 跨项目未完成清单（FR-9.3）：只在有未完成条目时出现；按项目分组、组内截止排序，
+          逾期标红；勾选即完成；点项目名跳该项目概览页签。旧版三卡曾因跳转乱被移除——
+          本卡沿用「最近提交」的底部单卡惯例，入口只有「需要关注」条与本卡自身。 */}
+        {todoDigest.total > 0 && (
+          <div ref={todosCardRef} style={{ marginTop: 12, scrollMarginTop: 8 }}>
+            <Card
+              size="small"
+              title={`未完成清单（${todoDigest.total}）`}
+              style={{ marginTop: 12 }}
+              data-testid="dash-todos"
+              extra={
+                <span style={{ fontSize: 12, color: SEMANTIC.textTertiary }}>
+                  {todoDigest.groups.length} 个项目
+                  {todoDigest.hidden > 0 ? ` · 还有 ${todoDigest.hidden} 条` : ''}
                 </span>
-              </List.Item>
-            )}
-          />
-        </Card>
+              }
+            >
+              {todoDigest.groups.map((g, gi) => (
+                <div key={g.projectId} style={{ marginBottom: gi === todoDigest.groups.length - 1 ? 0 : 10 }}>
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, height: 'auto' }}
+                    onClick={() => openTodoProject(g.projectId, g.projectName)}
+                  >
+                    {g.projectName}
+                  </Button>
+                  {g.items.map((t) => (
+                    <div
+                      key={t.id}
+                      style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0 2px 12px' }}
+                    >
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<CheckOutlined />}
+                        onClick={() => todoDone.mutate(t.id)}
+                      />
+                      <span style={{ flex: 1, fontSize: 12 }}>{t.title}</span>
+                      {t.dueOn !== null && (
+                        <Tag style={{ fontSize: 10 }} color={t.dueOn < todayKey ? 'error' : undefined}>
+                          截止 {t.dueOn}
+                        </Tag>
+                      )}
+                      {t.category !== null && <Tag style={{ fontSize: 10 }}>{t.category}</Tag>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
+        {commits.length > 0 && (
+          <Card size="small" title="最近提交" style={{ marginTop: 12 }} data-testid="dash-commits">
+            <List
+              size="small"
+              rowKey="id"
+              dataSource={commits}
+              renderItem={(p) => (
+                <List.Item
+                  className="tt-commit-row"
+                  style={{ cursor: 'pointer', padding: '3px 0' }}
+                  onClick={() => openGit(p)}
+                >
+                  <span style={{ display: 'inline-flex', gap: 8, width: '100%', alignItems: 'center' }}>
+                    <strong style={{ flexShrink: 0, fontSize: 12 }}>{p.alias ?? p.diskName}</strong>
+                    <span className="tt-ellipsis" style={{ flex: 1, fontSize: 12, opacity: 0.85 }}>
+                      {p.gitLastCommitSubject ?? '（无提交主题）'}
+                    </span>
+                    <span style={{ fontSize: 12, opacity: 0.55, flexShrink: 0 }}>
+                      {relTime(p.gitLastCommitAt)}
+                    </span>
+                  </span>
+                </List.Item>
+              )}
+            />
+          </Card>
+        )}
+      </div>
+      {/* 选择模式底条：停靠在滚动区之下（不压内容，与 Workbench 卡片墙同范式） */}
+      {selectMode && (
+        <BatchActionBar
+          selectedIds={selectedIds}
+          onClear={() => setSelectedIds([])}
+          onExit={exitSelect}
+          onToggleAll={() => setSelectedIds(allSelected ? [] : allIds)}
+          allSelected={allSelected}
+        />
       )}
     </div>
   );
