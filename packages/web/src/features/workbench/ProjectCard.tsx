@@ -3,7 +3,7 @@
  * 从 Workbench.tsx 原地抽出：总览（Dashboard）也要放项目卡片，而 Workbench 已引用 Dashboard，
  * 若 Dashboard 反向 import Workbench 会形成循环依赖。
  */
-import { App, Avatar, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
+import { App, Card, Checkbox, Dropdown, Menu, Tag } from 'antd';
 import { LoadingOutlined, MoreOutlined, StarFilled, WarningOutlined } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,7 +22,7 @@ import {
   downloadProjectReport,
 } from '@/features/workbench/projectMenu';
 import { ProjectAvatarModal } from '@/features/workbench/ProjectAvatarModal';
-import { projectAvatarUrl } from '@/lib/api';
+import { ProjectBadge } from '@/components/ProjectBadge';
 import { SEMANTIC } from '@/theme/tokens';
 
 export function ProjectCard({
@@ -173,13 +173,7 @@ export function ProjectCard({
               }}
             />
           )}
-          <Avatar
-            style={{ background: SEMANTIC.primary, flexShrink: 0 }}
-            size={24}
-            src={p.hasAvatar === true ? projectAvatarUrl(p.id, p.avatarV ?? 0) : undefined}
-          >
-            {(p.alias ?? p.diskName).charAt(0).toUpperCase()}
-          </Avatar>
+          <ProjectBadge p={p} size={24} />
           <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
           {/* v2 降噪：已固定从标签改为标题栏星标；「别名」标签删除（下方有原名行） */}
           {p.isPinned && <StarFilled style={{ color: SEMANTIC.warning, flexShrink: 0, fontSize: 12 }} />}

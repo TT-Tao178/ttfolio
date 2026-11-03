@@ -424,6 +424,28 @@ export function langColor(language: string): string {
   return GITHUB_LANG_COLORS[language] ?? GITHUB_LANG_COLORS['Other'] ?? '#8b949e';
 }
 
+/** 项目徽标色板（2026-11-03 用户拍板：侧栏/卡片按项目稳定着色，替代单一主色）。
+ *  中饱和度 10 色，白字在其上、其上叠白字在浅色/玻璃/深色主题下均可读。 */
+export const PROJECT_BADGE_COLORS: readonly string[] = [
+  '#3b82f6', // 蓝
+  '#8b5cf6', // 紫
+  '#10b981', // 绿
+  '#f59e0b', // 琥珀
+  '#ef4444', // 红
+  '#06b6d4', // 青
+  '#ec4899', // 粉
+  '#84cc16', // 黄绿
+  '#6366f1', // 靛
+  '#f97316', // 橙
+];
+
+/** 按项目 id 稳定着色：同一项目永远同一颜色（id 不随改名变化，别名/目录名改名不跳色）。 */
+export function projectBadgeColor(projectId: string): string {
+  let h = 0;
+  for (let i = 0; i < projectId.length; i++) h = (h * 31 + projectId.charCodeAt(i)) >>> 0;
+  return PROJECT_BADGE_COLORS[h % PROJECT_BADGE_COLORS.length] ?? PROJECT_BADGE_COLORS[0] ?? '#3b82f6';
+}
+
 export function antdThemeConfig(resolved: ResolvedTheme): ThemeConfig {
   // oled/cyberpunk 沿用 darkAlgorithm（组件明暗关系一致），只是换一套真实 hex 让 AntD
   // 推导派生色；sketch 是纸感浅色，glass 是流光玻璃浅色，走 defaultAlgorithm

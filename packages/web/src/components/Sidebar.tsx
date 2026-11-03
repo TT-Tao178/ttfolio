@@ -31,6 +31,7 @@ import { CollectionEditModal, type CollectionEditTarget } from '@/features/workb
 import { CustomViewModal } from '@/features/workbench/CustomViewModal';
 import { downloadProjectReport, useRemoveProject } from '@/features/workbench/projectMenu';
 import { ProjectAvatarModal } from '@/features/workbench/ProjectAvatarModal';
+import { ProjectBadge } from '@/components/ProjectBadge';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
@@ -556,6 +557,8 @@ export function Sidebar(): React.JSX.Element {
         className="tt-proj-row"
         title={`${p.alias ?? p.diskName}${p.alias !== null ? `\n原名：${p.diskName}` : ''}\n${p.dirPath}`}
       >
+        {/* 行首项目徽标（2026-11-03 拍板）：首字母/自定义头像 + 按项目稳定着色，与卡片同组件 */}
+        <ProjectBadge p={p} size={18} />
         <span className="tt-ellipsis tt-proj-name">{p.alias ?? p.diskName}</span>
         {p.alias !== null && <span className="tt-ellipsis tt-mono tt-proj-disk">{p.diskName}</span>}
         <span
