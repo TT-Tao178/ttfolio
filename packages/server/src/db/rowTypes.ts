@@ -55,6 +55,8 @@ export interface CollectionRow {
   id: string;
   name: string;
   note: string | null;
+  /** 父集合 id（NULL=顶层）；外键 ON DELETE SET NULL——父行硬删时自动提升顶层（FR-15.1） */
+  parent_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

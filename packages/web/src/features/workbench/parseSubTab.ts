@@ -41,7 +41,14 @@ export function parseSubTab(
     // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的登记项目
     return { status: 'active', unassigned: '1' };
   }
-  if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };
+  // 父子集合（FR-15.1）：col:<id> 默认含全部子孙集合；col:<id>:direct 切回仅本集合
+  const colDirect = /^col:(.+):direct$/.exec(subTab);
+  if (colDirect !== null) {
+    return { status: 'active', collection: colDirect[1] ?? '', includeChildren: '0' };
+  }
+  if (subTab.startsWith('col:')) {
+    return { status: 'active', collection: subTab.slice(4), includeChildren: '1' };
+  }
   if (subTab.startsWith('tag:')) return { status: 'active', tag: subTab.slice(4) };
   if (subTab.startsWith('{')) {
     try {

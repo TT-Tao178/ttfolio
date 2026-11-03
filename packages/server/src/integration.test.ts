@@ -16,8 +16,10 @@ import {
   reviveProject,
   listProjects,
   listCollections,
+  collectionParentError,
   checkPathOk,
   needsReanalyze,
+  type CollectionMeta,
 } from './db/repo/projectsRepo.js';
 import { getSession, putSession, listTodos, createTodo, patchTodo } from './db/repo/sessionRepo.js';
 import {
@@ -296,6 +298,65 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     expect(byDefault).toEqual(byName);
     // 显式 last_opened 仍可用（「最近打开」视图锚点）
     expect(listProjects(db, { status: 'active', sort: 'last_opened' }).length).toBeGreaterThan(0);
+  });
+
+  it('父子集合：防环/深度/候选校验 + 含子孙聚合 + 删父提升（FR-15.1 / T-142）', () => {
+    const meta = (id: string, parentId: string | null): CollectionMeta => ({
+      id,
+      name: id,
+      note: null,
+      parentId,
+      memberCount: 0,
+      projectIds: [],
+      sortOrder: 0,
+    });
+    // 新建：父不存在 / 深度第 4 层拒绝
+    expect(collectionParentError([meta('a', null)], null, 'missing')).toBe('父集合不存在');
+    expect(collectionParentError([meta('a', null), meta('b', 'a'), meta('c', 'b')], null, 'c')).toBe(
+      '嵌套深度超限（最深 3 层）',
+    );
+    expect(collectionParentError([meta('a', null), meta('b', 'a'), meta('c', 'b')], null, 'b')).toBeNull();
+    // 移动：父=自身 / 父在自身子树内（成环）/ 移动后子树超深 / 合法移动
+    const tree = [meta('a', null), meta('b', 'a'), meta('c', 'b'), meta('d', 'a')];
+    expect(collectionParentError(tree, 'a', 'a')).toBe('父集合不能是自身');
+    expect(collectionParentError(tree, 'a', 'c')).toBe('不能把子孙集合设为父集合（会形成环）');
+    // b(子树高 2) 挂 d：d→b→c→a = 4 层，超限拒绝；c(叶) 挂 d：d→c→a = 3 层，合法
+    expect(collectionParentError(tree, 'b', 'd')).toBe('嵌套深度超限（最深 3 层）');
+    expect(collectionParentError(tree, 'c', 'd')).toBeNull();
+    // DB 面：建父/子集合，成员挂在子集合 → collectionIds 含父+子时聚合出成员
+    const now = new Date().toISOString();
+    db.pragma('foreign_keys = ON');
+    db.prepare(
+      'INSERT INTO collections (id, name, note, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, NULL, NULL, 0, ?, ?)',
+    ).run('col-p', '父集合', now, now);
+    db.prepare(
+      'INSERT INTO collections (id, name, note, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, NULL, ?, 0, ?, ?)',
+    ).run('col-c', '子集合', 'col-p', now, now);
+    const dirChild = path.join(root, '父子集合项目');
+    fs.mkdirSync(dirChild, { recursive: true });
+    const proj = insertProject(db, {
+      dirPath: dirChild,
+      dirPathKey: pathKey(dirChild),
+      diskName: '父子集合项目',
+      defaultArchDir: '架构图',
+    });
+    db.prepare(
+      'INSERT OR IGNORE INTO collection_members (collection_id, project_id, sort_order) VALUES (?, ?, 0)',
+    ).run('col-c', proj.id);
+    expect(
+      listProjects(db, { status: 'active', collectionIds: ['col-p', 'col-c'] }).some((p) => p.id === proj.id),
+    ).toBe(true);
+    expect(
+      listProjects(db, { status: 'active', collectionIds: ['col-c'] }).some((p) => p.id === proj.id),
+    ).toBe(true);
+    expect(listProjects(db, { status: 'active', collectionIds: [] }).length).toBe(0);
+    // 删父集合：子集合 parent_id 被 FK SET NULL 自动提升顶层
+    db.prepare('DELETE FROM collections WHERE id = ?').run('col-p');
+    expect(listCollections(db).find((c) => c.id === 'col-c')?.parentId).toBeNull();
+    // 清理自建行
+    db.prepare('DELETE FROM collection_members WHERE project_id = ?').run(proj.id);
+    db.prepare('DELETE FROM collections WHERE id = ?').run('col-c');
+    db.prepare('DELETE FROM projects WHERE id = ?').run(proj.id);
   });
 });
 

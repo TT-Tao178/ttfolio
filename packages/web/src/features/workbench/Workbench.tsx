@@ -1,6 +1,6 @@
 /** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图。
  *  「添加项目」弹窗在 ./AddProjectModal（App 层挂载）。 */
-import { Button, Dropdown, Empty, Input, Menu, Segmented, Select, Table, Tooltip, App } from 'antd';
+import { Button, Checkbox, Dropdown, Empty, Input, Menu, Segmented, Select, Table, Tooltip, App } from 'antd';
 import {
   CheckSquareOutlined,
   InboxOutlined,
@@ -69,6 +69,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const filters = parseSubTab(subTab, settings.customViews);
   // 集合视图标识：传给「添加项目」弹窗，登记成功后项目随即加入该集合（0.3.5 修复）
   const collectionId = filters['collection'] ?? null;
+  // 父子集合（FR-15.1）：集合视图默认含全部子孙集合的项目；开关切换改写当前标签 subTab
+  const includeChildren = collectionId === null ? false : filters['includeChildren'] !== '0';
   const {
     data: allProjects,
     isLoading,
@@ -279,6 +281,19 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                 value={view}
                 onChange={(v) => setView(v as 'card' | 'table')}
               />
+              {/* 父子集合（FR-15.1）：集合视图专用——含子集合聚合开关，切换改写当前标签 */}
+              {collectionId !== null && (
+                <Checkbox
+                  checked={includeChildren}
+                  onChange={(e) => {
+                    const next =
+                      e.target.checked === true ? `col:${collectionId}` : `col:${collectionId}:direct`;
+                    useAppStore.getState().updateActiveLocation({ subTab: next }, true);
+                  }}
+                >
+                  含子集合
+                </Checkbox>
+              )}
               <div style={{ flex: 1 }} />
               {/* 显式选择模式（第 90 轮）：进入后卡片可点选/Shift 范围选，底条常驻 */}
               <Button

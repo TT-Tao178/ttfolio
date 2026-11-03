@@ -179,10 +179,17 @@ export const deleteProjectSchema = z.object({
 
 export const analyzeBodySchema = z.object({ projectIds: z.array(z.string()).optional() });
 
-export const collectionCreateSchema = z.object({ name: z.string().min(1), note: z.string().nullish() });
+export const collectionCreateSchema = z.object({
+  name: z.string().min(1),
+  note: z.string().nullish(),
+  /** 父集合 id（FR-15.1 父子集合）：NULL/缺省 = 顶层；深度 ≤3 与防环由服务层校验 */
+  parentId: z.string().min(1).nullish(),
+});
 export const collectionPatchSchema = z.object({
   name: z.string().min(1).optional(),
   note: z.string().nullish().optional(),
+  /** 移动到新父集合（FR-15.1）：显式传 parentId 变更归属（null=提升顶层） */
+  parentId: z.string().min(1).nullish().optional(),
 });
 /** 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：按传入顺序全量重排 sort_order */
 export const collectionReorderSchema = z.object({ ids: z.array(z.string()).min(1) });

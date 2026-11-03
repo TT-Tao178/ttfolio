@@ -26,7 +26,19 @@ describe('parseSubTab', () => {
   });
 
   it('col:<id> → 集合过滤参数（回归锚点：此前只返回 status 导致集合视图显示全部项目）', () => {
-    expect(parseSubTab('col:01ABC')).toEqual({ status: 'active', collection: '01ABC' });
+    expect(parseSubTab('col:01ABC')).toEqual({
+      status: 'active',
+      collection: '01ABC',
+      includeChildren: '1',
+    });
+  });
+
+  it('col:<id>:direct → 仅本集合（FR-15.1 父子集合：includeChildren=0 关闭含子孙聚合）', () => {
+    expect(parseSubTab('col:01ABC:direct')).toEqual({
+      status: 'active',
+      collection: '01ABC',
+      includeChildren: '0',
+    });
   });
 
   it('col:unassigned → 未分配虚拟分组（第 93 轮：unassigned=1，不误入 collection 过滤）', () => {

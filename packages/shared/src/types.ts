@@ -516,6 +516,8 @@ export interface CollectionInfo {
   id: string;
   name: string;
   note: string | null;
+  /** 父集合 id（NULL=顶层）；树由前端按此组装（FR-15.1，服务端保持平表口径） */
+  parentId: string | null;
   memberCount: number;
   projectIds: string[];
 }

@@ -15,6 +15,8 @@ export interface ListFilters {
   status?: ProjectStatus | 'all';
   type?: ProjectType | 'all';
   collectionId?: string;
+  /** 父子集合含子孙聚合（FR-15.1）：集合及全部子孙 id（路由层展开） */
+  collectionIds?: string[];
   /** true = 只列不属于任何集合的项目（侧栏「未分配」虚拟分组） */
   unassigned?: boolean;
   tagId?: string;
@@ -225,6 +227,21 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
     where.push('id IN (SELECT project_id FROM collection_members WHERE collection_id = ?)');
     params.push(filters.collectionId);
   }
+  if (filters.collectionIds !== undefined) {
+    // 父子集合含子孙聚合（FR-15.1）：路由层已把子孙 id 展开进列表
+    const ids = filters.collectionIds;
+    if (ids.length === 0) {
+      // 空集合列表 = 该集合及子孙都没有成员，直接返回空
+      where.push('0 = 1');
+    } else {
+      where.push(
+        `id IN (SELECT project_id FROM collection_members WHERE collection_id IN (${ids
+          .map(() => '?')
+          .join(',')}))`,
+      );
+      params.push(...ids);
+    }
+  }
   if (filters.unassigned === true) {
     // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的登记项目
     where.push('id NOT IN (SELECT project_id FROM collection_members)');
@@ -398,6 +415,41 @@ export interface CollectionMeta extends CollectionInfo {
   sortOrder: number;
 }
 
+/** FR-15.1 父子集合写入校验：父存在、防环（新父不得在自身子树内）、深度 ≤3。
+ *  id=null 表示新建节点（无自身子树，高度视为 1）。返回错误文案或 null（通过）。 */
+export function collectionParentError(
+  cols: CollectionMeta[],
+  id: string | null,
+  parentId: string | null,
+): string | null {
+  if (parentId === null) return null;
+  const byId = new Map(cols.map((c) => [c.id, c]));
+  if (!byId.has(parentId)) return '父集合不存在';
+  if (id !== null && parentId === id) return '父集合不能是自身';
+  if (id !== null) {
+    // 防环：沿新父的祖先链向上走，遇到自身 = 新父在自身子树内
+    let cur: string | null = parentId;
+    while (cur !== null) {
+      if (cur === id) return '不能把子孙集合设为父集合（会形成环）';
+      cur = byId.get(cur)?.parentId ?? null;
+    }
+  }
+  // 深度：新位置自身层级 + 被移动子树高度 ≤ 3（新建节点高度视为 1）
+  let depth = 1;
+  let cur: string | null = parentId;
+  while (cur !== null) {
+    depth += 1;
+    cur = byId.get(cur)?.parentId ?? null;
+  }
+  const height = (function h(cid: string): number {
+    let max = 1;
+    for (const c of cols) if (c.parentId === cid) max = Math.max(max, 1 + h(c.id));
+    return max;
+  })(id ?? '');
+  if (depth + (id !== null ? height : 1) - 1 > 3) return '嵌套深度超限（最深 3 层）';
+  return null;
+}
+
 export function listCollections(db: Database.Database): CollectionMeta[] {
   const rows = getAll<CollectionRow>(db, 'SELECT * FROM collections ORDER BY sort_order, created_at');
   return rows.map((r) => {
@@ -422,6 +474,7 @@ export function listCollections(db: Database.Database): CollectionMeta[] {
       id: r.id,
       name: r.name,
       note: r.note,
+      parentId: r.parent_id ?? null,
       memberCount: c?.c ?? 0,
       projectIds: members.map((m) => m.project_id),
       sortOrder: r.sort_order,

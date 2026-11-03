@@ -45,8 +45,8 @@ type SidebarItem = {
   key: MenuKey;
   label: React.ReactNode;
   className?: string;
-  /** 集合条目的可折叠成员列表（2026-11-03 手测反馈恢复：点名开卡片墙 + 就地展开成员） */
-  children?: Array<{ key: MenuKey; label: React.ReactNode }>;
+  /** 集合条目的可折叠子项（FR-15.1 父子集合：子集合条目 + 成员行，可递归嵌套） */
+  children?: SidebarItem[];
   /** 子菜单标题点击（antd 不走 onClick）——开卡片墙并展开成员 */
   onTitleClick?: () => void;
 };
@@ -125,8 +125,37 @@ export function Sidebar(): React.JSX.Element {
   const [editingCol, setEditingCol] = useState<CollectionEditTarget | null>(null);
   // 新建集合弹窗（2026-11-03 手测反馈：「集合」标题 + 号入口，首个集合也要能建）
   const [createColOpen, setCreateColOpen] = useState(false);
-  // 集合成员展开受控键（点名开卡片墙 + 展开；箭头只切换展开）
-  const [colOpenKeys, setColOpenKeys] = useState<string[]>([]);
+  // 集合成员展开受控键（点名开卡片墙 + 展开；箭头只切换展开）。
+  // FR-15.1：展开态 localStorage 持久化（嵌套子菜单展开状态跨重启保留）
+  const [colOpenKeys, setColOpenKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('tt-col-open-keys');
+      const parsed: unknown = raw === null ? [] : JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
+  const setColKeysPersist = (next: string[]): void => {
+    setColOpenKeys(next);
+    try {
+      localStorage.setItem('tt-col-open-keys', JSON.stringify(next));
+    } catch {
+      // localStorage 不可用（隐私模式等）降级为仅内存态
+    }
+  };
+  /** 展开指定集合/未分配行（开卡片墙时联动展开，持久化走 setColKeysPersist） */
+  const expandCol = (key: string): void => {
+    setColOpenKeys((prev) => {
+      const next = prev.includes(key) ? prev : [...prev, key];
+      try {
+        localStorage.setItem('tt-col-open-keys', JSON.stringify(next));
+      } catch {
+        // 同上，降级仅内存态
+      }
+      return next;
+    });
+  };
   // 拖拽归类（FR-15.2 / T-143）：拖悬停在哪个集合行上（高亮用）
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   // 自定义视图编辑弹窗（FR-4.11）：initial=null 为新建
@@ -272,16 +301,19 @@ export function Sidebar(): React.JSX.Element {
               key: 'moveup',
               label: '上移',
               icon: <ArrowUpOutlined />,
-              disabled: (collections ?? []).findIndex((c) => c.id === ctxCollection.id) <= 0,
+              disabled:
+                (collections ?? []).filter(
+                  (c) => (c.parentId ?? null) === (ctxCollection?.parentId ?? null),
+                )[0]?.id === ctxCollection?.id,
             },
             {
               key: 'movedown',
               label: '下移',
               icon: <ArrowDownOutlined />,
               disabled:
-                (collections ?? []).findIndex((c) => c.id === ctxCollection.id) === -1 ||
-                (collections ?? []).findIndex((c) => c.id === ctxCollection.id) ===
-                  (collections ?? []).length - 1,
+                (collections ?? [])
+                  .filter((c) => (c.parentId ?? null) === (ctxCollection?.parentId ?? null))
+                  .slice(-1)[0]?.id === ctxCollection?.id,
             },
             { type: 'divider' as const },
             { key: 'editcol', label: '编辑名称 / 备注…', icon: <EditOutlined /> },
@@ -343,7 +375,11 @@ export function Sidebar(): React.JSX.Element {
     if (col === undefined) return;
     modal.confirm({
       title: `删除集合「${col.name}」？`,
-      content: `集合下 ${col.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响。`,
+      content: `集合下 ${col.memberCount} 个项目的归属关系将一并移除；项目本身与磁盘文件不受影响。${
+        (collections ?? []).filter((c) => c.parentId === col.id).length > 0
+          ? `其下 ${(collections ?? []).filter((c) => c.parentId === col.id).length} 个子集合将提升为顶层集合。`
+          : ''
+      }`,
       okText: '删除集合',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -444,16 +480,17 @@ export function Sidebar(): React.JSX.Element {
       switch (key) {
         case 'moveup':
         case 'movedown': {
-          // 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：与相邻集合交换位置，全量重排
-          const list = (collections ?? []).slice();
-          const i = list.findIndex((c) => c.id === col.id);
-          const j = key === 'moveup' ? i - 1 : i + 1;
-          if (i < 0 || j < 0 || j >= list.length) break;
-          const a = list[i];
-          const b = list[j];
+          // 集合手动排序（0.3.8 补 KNOWN-GAPS #9）；FR-15.1 父子集合：在同层兄弟间交换
+          // （顶层集合与各父集合的子集合各自成序），全量平表 sort_order 重排不变
+          const parentId = col.parentId ?? null;
+          const siblings = (collections ?? []).filter((c) => (c.parentId ?? null) === parentId);
+          const si = siblings.findIndex((c) => c.id === col.id);
+          const sj = key === 'moveup' ? si - 1 : si + 1;
+          if (si < 0 || sj < 0 || sj >= siblings.length) break;
+          const a = siblings[si];
+          const b = siblings[sj];
           if (a === undefined || b === undefined) break;
-          list[i] = b;
-          list[j] = a;
+          const list = (collections ?? []).map((x) => (x.id === a.id ? b : x.id === b.id ? a : x));
           void api
             .post('/api/collections/reorder', { ids: list.map((c) => c.id) })
             .then(() => queryClient.invalidateQueries({ queryKey: ['collections'] }))
@@ -461,7 +498,7 @@ export function Sidebar(): React.JSX.Element {
           break;
         }
         case 'editcol':
-          setEditingCol({ id: col.id, name: col.name, note: col.note });
+          setEditingCol({ id: col.id, name: col.name, note: col.note, parentId: col.parentId });
           break;
         case 'delcol':
           confirmDeleteCollection(col.id);
@@ -495,68 +532,76 @@ export function Sidebar(): React.JSX.Element {
       });
     }
     // 集合（2026-11-03 手测二次迭代）：分组标题常驻（+ 号新建集合——首个集合也要能建）；
-    // 条目恢复可折叠成员列表（点名开卡片墙 + 就地展开成员，拍板 #4 的「不展开」经实测推翻）；
-    // 文件夹图标换亮色 Windows 资源管理器风（FolderTwoTone 金色，不再降透明度压暗）。
-    // 展开态受控：标题点击=开卡片墙并展开成员；行尾箭头=仅展开/收起。
+    // 可折叠成员列表（点名开卡片墙 + 就地展开成员）；亮色文件夹图标；展开态受控持久化。
+    // FR-15.1 父子集合：按 parentId 递归组树（服务端平表），子集合在前、成员行在后，
+    // 缩进由 antd 子菜单天然表达；点集合名=开卡片墙并展开（含子集合口径，工具栏可切仅本集合）；
+    // 拖拽归类目标兼容子集合行（拖到子集合=只入子集合）。
     const projBadgeRow = (p: ProjectSummary): React.JSX.Element => (
       <span data-project-id={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
         <ProjectBadge p={p} size={16} />
         <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
       </span>
     );
+    const buildCollectionItems = (parentId: string | null): SidebarItem[] =>
+      (collections ?? [])
+        .filter((c) => (c.parentId ?? null) === parentId)
+        .map((c) => {
+          const members = (c.projectIds ?? [])
+            .map((pid) => (projects ?? []).find((p) => p.id === pid))
+            .filter((p): p is ProjectSummary => p !== undefined);
+          return {
+            key: `col:${c.id}`,
+            // data-collection-id 供 document 级右键委托定位集合（第 31 轮）；
+            // 拖拽归类（FR-15.2 / T-143）：集合行接收卡片拖入（application/x-ttfolio-projects 通道）
+            label: (
+              <span
+                data-collection-id={c.id}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('application/x-ttfolio-projects')) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverCol(c.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverCol === c.id) setDragOverCol(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDragOverCol(null);
+                  void dropIntoCollection(c.id, e.dataTransfer);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  minWidth: 0,
+                  borderRadius: 6,
+                  padding: '1px 4px',
+                  outline: dragOverCol === c.id ? `1px dashed ${SEMANTIC.primary}` : undefined,
+                  background: dragOverCol === c.id ? SEMANTIC.primaryBg : undefined,
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
+                <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
+              </span>
+            ),
+            children: [
+              ...buildCollectionItems(c.id),
+              ...members.map((p) => ({
+                key: `colproj:${c.id}:${p.id}`,
+                label: projBadgeRow(p),
+              })),
+            ],
+            onTitleClick: () => {
+              openCollectionView(c.id);
+              expandCol(`col:${c.id}`);
+            },
+          };
+        });
     items.push({ key: 'sep-collections', label: '集合' });
-    for (const c of collections ?? []) {
-      const members = (c.projectIds ?? [])
-        .map((pid) => (projects ?? []).find((p) => p.id === pid))
-        .filter((p): p is ProjectSummary => p !== undefined);
-      items.push({
-        key: `col:${c.id}`,
-        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）；
-        // 拖拽归类（FR-15.2 / T-143）：集合行接收卡片拖入（application/x-ttfolio-projects 通道）
-        label: (
-          <span
-            data-collection-id={c.id}
-            onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes('application/x-ttfolio-projects')) return;
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOverCol(c.id);
-            }}
-            onDragLeave={() => {
-              if (dragOverCol === c.id) setDragOverCol(null);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOverCol(null);
-              void dropIntoCollection(c.id, e.dataTransfer);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              minWidth: 0,
-              borderRadius: 6,
-              padding: '1px 4px',
-              outline: dragOverCol === c.id ? `1px dashed ${SEMANTIC.primary}` : undefined,
-              background: dragOverCol === c.id ? SEMANTIC.primaryBg : undefined,
-              transition: 'background-color 0.15s ease',
-            }}
-          >
-            <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
-            <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
-          </span>
-        ),
-        children: members.map((p) => ({
-          key: `colproj:${c.id}:${p.id}`,
-          label: projBadgeRow(p),
-        })),
-        onTitleClick: () => {
-          openCollectionView(c.id);
-          setColOpenKeys((prev) => (prev.includes(`col:${c.id}`) ? prev : [...prev, `col:${c.id}`]));
-        },
-      });
-    }
+    items.push(...buildCollectionItems(null));
     // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的项目归拢到集合区
     // 末位；点名=开未分配卡片墙（col:unassigned → unassigned=1 过滤），成员同样
     // 就地展开。是视图不是集合：无右键编辑/删除，也不参与集合排序。
@@ -577,7 +622,7 @@ export function Sidebar(): React.JSX.Element {
         })),
         onTitleClick: () => {
           openUnassignedView();
-          setColOpenKeys((prev) => (prev.includes('col:unassigned') ? prev : [...prev, 'col:unassigned']));
+          expandCol('col:unassigned');
         },
       });
     }
@@ -876,7 +921,7 @@ export function Sidebar(): React.JSX.Element {
               : it,
           )}
           onClick={onClick}
-          onOpenChange={(keys) => setColOpenKeys(keys)}
+          onOpenChange={(keys) => setColKeysPersist(keys)}
           openKeys={colOpenKeys}
           style={{ borderInlineEnd: 'none' }}
         />
@@ -924,7 +969,11 @@ export function Sidebar(): React.JSX.Element {
           onClose={() => setAvatarProject(null)}
         />
       )}
-      <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />
+      <CollectionEditModal
+        collection={editingCol}
+        collections={collections ?? []}
+        onClose={() => setEditingCol(null)}
+      />
       {createColOpen && (
         <CollectionEditModal
           key="create-col"

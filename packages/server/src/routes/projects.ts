@@ -32,6 +32,7 @@ import {
   markOpened,
   needsReanalyze,
   listCollections,
+  collectionParentError,
   type ListFilters,
 } from '../db/repo/projectsRepo.js';
 import { avatarInfo, isSafeProjectId, removeAvatar, saveAvatar } from '../core/projectAvatar.js';
@@ -64,10 +65,23 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const q = req.query as Record<string, string | undefined>;
     // stale 天数放宽为 1..3650（FR-4.11 自定义视图需要任意 N；原硬编码只认 '30'）
     const staleN = q.stale === undefined || q.stale === '' ? NaN : Number(q.stale);
+    // 父子集合（FR-15.1）：集合过滤默认含全部子孙集合（includeChildren=0 切回仅本集合）
+    let collectionFilter = q.collection;
+    let collectionIds: string[] | undefined;
+    if (collectionFilter !== undefined && collectionFilter !== '' && q.includeChildren !== '0') {
+      const cols = listCollections(ctx.db());
+      const ids = [collectionFilter];
+      for (let i = 0; i < ids.length; i++) {
+        for (const c of cols) if (c.parentId === ids[i] && !ids.includes(c.id)) ids.push(c.id);
+      }
+      collectionIds = ids;
+      collectionFilter = undefined;
+    }
     const filters: ListFilters = {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
       type: q.type as ListFilters['type'],
-      collectionId: q.collection,
+      collectionId: collectionFilter,
+      collectionIds,
       unassigned: q.unassigned === '1' ? true : undefined,
       tagId: q.tag,
       dirty:
@@ -502,15 +516,25 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
   // ---- 集合 ----
   app.get('/api/collections', async () => ok(listCollections(ctx.db())));
 
+  // ---- FR-15.1 父子集合写入校验：父存在、防环、深度 ≤3（纯函数在 projectsRepo，可测） ----
+  const validateParentAssignment = (
+    db: ReturnType<AppContext['db']>,
+    id: string | null,
+    parentId: string | null,
+  ): string | null => collectionParentError(listCollections(db), id, parentId);
+
   app.post('/api/collections', async (req) => {
     const parsed = collectionCreateSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
+    // FR-15.1 父子集合：父存在 + 深度 ≤3（新建节点无环可能）
+    const parentErr = validateParentAssignment(db, null, parsed.data.parentId ?? null);
+    if (parentErr !== null) return fail('BAD_REQUEST', parentErr);
     const id = ulid();
     const now = new Date().toISOString();
     db.prepare(
-      'INSERT INTO collections (id, name, note, sort_order, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)',
-    ).run(id, parsed.data.name, parsed.data.note ?? null, now, now);
+      'INSERT INTO collections (id, name, note, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
+    ).run(id, parsed.data.name, parsed.data.note ?? null, parsed.data.parentId ?? null, now, now);
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
@@ -519,9 +543,29 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionCreateSchema.partial().safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
-    db.prepare(
-      'UPDATE collections SET name = COALESCE(?, name), note = COALESCE(?, note), updated_at = ? WHERE id = ?',
-    ).run(parsed.data.name ?? null, parsed.data.note ?? null, new Date().toISOString(), id);
+    // FR-15.1：显式传 parentId（含 null=提升顶层）时校验防环/存在/深度
+    if (parsed.data.parentId !== undefined) {
+      const parentErr = validateParentAssignment(db, id, parsed.data.parentId ?? null);
+      if (parentErr !== null) return fail('BAD_REQUEST', parentErr);
+    }
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    if (parsed.data.name !== undefined) {
+      sets.push('name = ?');
+      vals.push(parsed.data.name);
+    }
+    if (parsed.data.note !== undefined) {
+      sets.push('note = ?');
+      vals.push(parsed.data.note);
+    }
+    if (parsed.data.parentId !== undefined) {
+      sets.push('parent_id = ?');
+      vals.push(parsed.data.parentId ?? null);
+    }
+    if (sets.length === 0) return ok(listCollections(db).find((c) => c.id === id) ?? null);
+    sets.push('updated_at = ?');
+    vals.push(new Date().toISOString(), id);
+    db.prepare(`UPDATE collections SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
