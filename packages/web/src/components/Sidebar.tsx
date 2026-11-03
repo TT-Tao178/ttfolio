@@ -10,8 +10,10 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
+  EyeOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
+  PlusOutlined,
   StarFilled,
   StarOutlined,
 } from '@ant-design/icons';
@@ -30,6 +32,7 @@ import { ProjectAvatarModal } from '@/features/workbench/ProjectAvatarModal';
 import { SEMANTIC } from '@/theme/tokens';
 import { AccountBar } from '@/features/profile/AccountBar';
 import { openAgo } from '@/lib/format';
+import { Tooltip } from 'antd';
 
 type MenuKey = string;
 
@@ -429,25 +432,19 @@ export function Sidebar(): React.JSX.Element {
     // 这些"我的视图"本身仍保留：工作台总览的「需要处理」卡片会直接跳到对应卡片墙（viewTitle 映射保留）。
     items.push({ key: 'view:all', label: '工作台总览' });
     items.push({ key: 'view:recent', label: '最近打开' });
-    // 自定义「我的视图」（FR-4.11 / KNOWN-GAPS #5）：入口在侧栏（KNOWN-GAPS 原补法），
-    // 右键可编辑/删除；「新建视图…」打开七字段编辑弹窗
+    // 「我的视图」分组（FR-4.11）：内置快捷视图在前（2026-11-03 拍板恢复 2 个——
+    // 第 85 轮曾按当时要求移除全部内置项，恢复后总览「需要关注」跳转侧栏有高亮落点），
+    // 自定义视图在后；行首眼睛图标对齐期望图。自定义视图右键可编辑/删除。
+    // 「新建视图…」不再占列表行（拍板）：入口收进分组标题右侧 + 号（Menu label 渲染处）。
     items.push({ key: 'sep-views', label: '我的视图' });
+    items.push({ key: 'view:my-dirty', label: viewRowLabel('有未提交改动') });
+    items.push({ key: 'view:my-nodocs', label: viewRowLabel('缺文档') });
     for (const v of settings.customViews) {
       items.push({
         key: `view:custom:${v.id}`,
-        label: (
-          <span
-            data-view-id={v.id}
-            className="tt-ellipsis"
-            style={{ display: 'block', maxWidth: 170 }}
-            title={v.name}
-          >
-            {v.name}
-          </span>
-        ),
+        label: viewRowLabel(v.name, v.id),
       });
     }
-    items.push({ key: 'view-new', label: '新建视图…' });
     // 集合 = 平面条目（2026-11-03 拍板反转第 30 轮子菜单）：点集合名直接打开该集合的
     // 卡片墙（成员在那里看，侧栏不再重复列成员）；计数随行。右键菜单保留
     // 上移/下移/编辑/删除（打开视图由左键直出，右键不再重复此项）。
@@ -627,10 +624,6 @@ export function Sidebar(): React.JSX.Element {
       );
       return;
     }
-    if (key === 'view-new') {
-      setViewEditor({ initial: null });
-      return;
-    }
     if (key.startsWith('view:')) {
       // 工作台总览（Dashboard）与卡片墙是两个屏：只有 view:all 落到总览，
       // 最近打开/已固定以及"我的视图"都落到各自的卡片墙标签（各自独立，可并存）。
@@ -698,7 +691,30 @@ export function Sidebar(): React.JSX.Element {
           selectedKeys={selectedKeys}
           items={items.map((it) =>
             it.key.startsWith('sep-')
-              ? { key: it.key, type: 'group', label: <span className="tt-side-label">{it.label}</span> }
+              ? {
+                  key: it.key,
+                  type: 'group' as const,
+                  // 「我的视图」标题行带 + 号新建入口（2026-11-03 拍板：「新建视图…」
+                  // 不再占列表行）；stopPropagation 防止冒泡进菜单交互
+                  label:
+                    it.key === 'sep-views' ? (
+                      <span className="tt-side-group-head">
+                        <span className="tt-side-label">我的视图</span>
+                        <Tooltip title="新建视图">
+                          <PlusOutlined
+                            className="tt-side-group-add"
+                            data-testid="sidebar-view-add"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewEditor({ initial: null });
+                            }}
+                          />
+                        </Tooltip>
+                      </span>
+                    ) : (
+                      <span className="tt-side-label">{it.label}</span>
+                    ),
+                }
               : it,
           )}
           onClick={onClick}
@@ -757,6 +773,23 @@ export function Sidebar(): React.JSX.Element {
         />
       )}
     </div>
+  );
+}
+
+/** 视图行标签：行首眼睛图标（2026-11-03 对齐期望图）；viewId 仅自定义视图携带，
+ *  供 document 级右键委托定位（内置快捷视图无编辑/删除，不挂标记）。 */
+function viewRowLabel(name: string, viewId?: string): React.JSX.Element {
+  return (
+    <span
+      data-view-id={viewId}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+      title={name}
+    >
+      <EyeOutlined style={{ fontSize: 12, opacity: 0.6, flexShrink: 0 }} />
+      <span className="tt-ellipsis" style={{ maxWidth: 160 }}>
+        {name}
+      </span>
+    </span>
   );
 }
 

@@ -185,6 +185,28 @@ body {
   opacity: 0.55;
 }
 
+/* 「我的视图」分组标题行右侧的 + 号新建入口（2026-11-03 拍板：「新建视图…」不再
+   占列表行）。默认淡显、悬停标题行浮出——常驻降噪，可发现性靠 hover。 */
+.tt-side-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tt-side-group-add {
+  font-size: 11px;
+  padding: 0 3px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ant-menu-item-group-title:hover .tt-side-group-add,
+.tt-side-group-add:focus-visible {
+  opacity: 0.8;
+}
+.tt-side-group-add:hover {
+  opacity: 1;
+  color: var(--tt-primary);
+}
+
 /* 侧栏过滤框条目：它是容器不是动作——去掉菜单条目的 hover 背景/选中态与点击高亮 */
 .ant-menu-item.tt-proj-filter-item {
   height: auto;
