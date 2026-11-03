@@ -2,6 +2,8 @@
  * 集合编辑弹窗（评审二.6：PATCH /api/collections/:id 此前闲置——重命名与
  * 备注没有任何 UI）。名称必填，备注可选（空串存 null）。
  * 设置页集合卡与侧栏集合右键菜单共用。
+ * create 模式（2026-11-03 用户需求）：collection=null + create 时为「新建集合」
+ * （POST /api/collections），侧栏「集合」分组标题 + 号入口。
  */
 import { App as AntdApp, Input, Modal } from 'antd';
 import React, { useEffect, useState } from 'react';
@@ -16,9 +18,12 @@ export interface CollectionEditTarget {
 
 export function CollectionEditModal({
   collection,
+  create = false,
   onClose,
 }: {
   collection: CollectionEditTarget | null;
+  /** true = 新建集合（POST），此时忽略 collection */
+  create?: boolean;
   onClose: () => void;
 }): React.JSX.Element | null {
   const { message } = AntdApp.useApp();
@@ -31,30 +36,34 @@ export function CollectionEditModal({
     setNote(collection?.note ?? '');
   }, [collection]);
   const save = useMutation({
-    mutationFn: () =>
-      api.patch(`/api/collections/${collection?.id}`, {
+    mutationFn: () => {
+      const body = {
         name: name.trim(),
         note: note.trim() === '' ? null : note,
-      }),
+      };
+      return create
+        ? api.post('/api/collections', body)
+        : api.patch(`/api/collections/${collection?.id}`, body);
+    },
     onSuccess: () => {
-      void message.success('已保存');
+      void message.success(create ? '已创建集合' : '已保存');
       void queryClient.invalidateQueries({ queryKey: ['collections'] });
       onClose();
     },
     onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '保存失败'),
   });
-  if (collection === null) return null;
+  if (create === false && collection === null) return null;
   return (
     <Modal
-      title={`编辑集合：${collection.name}`}
+      title={create ? '新建集合' : `编辑集合：${collection?.name ?? ''}`}
       open
       onCancel={onClose}
       onOk={() => save.mutate()}
-      okText="保存"
+      okText={create ? '创建' : '保存'}
       okButtonProps={{ loading: save.isPending, disabled: name.trim() === '' }}
       cancelText="取消"
       width={420}
-      data-testid="collection-edit-modal"
+      data-testid={create ? 'collection-create-modal' : 'collection-edit-modal'}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="集合名称" autoFocus />

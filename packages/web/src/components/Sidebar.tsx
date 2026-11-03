@@ -12,8 +12,8 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
-  FolderFilled,
   FolderOpenOutlined,
+  FolderTwoTone,
   PlusOutlined,
   StarFilled,
   StarOutlined,
@@ -45,6 +45,10 @@ type SidebarItem = {
   key: MenuKey;
   label: React.ReactNode;
   className?: string;
+  /** 集合条目的可折叠成员列表（2026-11-03 手测反馈恢复：点名开卡片墙 + 就地展开成员） */
+  children?: Array<{ key: MenuKey; label: React.ReactNode }>;
+  /** 子菜单标题点击（antd 不走 onClick）——开卡片墙并展开成员 */
+  onTitleClick?: () => void;
 };
 
 export function Sidebar(): React.JSX.Element {
@@ -119,6 +123,10 @@ export function Sidebar(): React.JSX.Element {
   const [pickerProject, setPickerProject] = useState<ProjectSummary | null>(null);
   // 集合编辑弹窗（重命名/备注）
   const [editingCol, setEditingCol] = useState<CollectionEditTarget | null>(null);
+  // 新建集合弹窗（2026-11-03 手测反馈：「集合」标题 + 号入口，首个集合也要能建）
+  const [createColOpen, setCreateColOpen] = useState(false);
+  // 集合成员展开受控键（点名开卡片墙 + 展开；箭头只切换展开）
+  const [colOpenKeys, setColOpenKeys] = useState<string[]>([]);
   // 自定义视图编辑弹窗（FR-4.11）：initial=null 为新建
   const [viewEditor, setViewEditor] = useState<{ initial: CustomView | null } | null>(null);
   const pin = useMutation({
@@ -448,25 +456,44 @@ export function Sidebar(): React.JSX.Element {
         label: viewRowLabel(v.name, v.id),
       });
     }
-    // 集合（2026-11-03 对齐期望图）：补分组标题 + 行首文件夹图标 + 半角计数括号；
-    // 无集合时不落空标题。点条目直开该集合卡片墙（见 onClick）。
-    if ((collections ?? []).length > 0) {
-      items.push({ key: 'sep-collections', label: '集合' });
-      for (const c of collections ?? []) {
-        items.push({
-          key: `col:${c.id}`,
-          // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
+    // 集合（2026-11-03 手测二次迭代）：分组标题常驻（+ 号新建集合——首个集合也要能建）；
+    // 条目恢复可折叠成员列表（点名开卡片墙 + 就地展开成员，拍板 #4 的「不展开」经实测推翻）；
+    // 文件夹图标换亮色 Windows 资源管理器风（FolderTwoTone 金色，不再降透明度压暗）。
+    // 展开态受控：标题点击=开卡片墙并展开成员；行尾箭头=仅展开/收起。
+    items.push({ key: 'sep-collections', label: '集合' });
+    for (const c of collections ?? []) {
+      const members = (c.projectIds ?? [])
+        .map((pid) => (projects ?? []).find((p) => p.id === pid))
+        .filter((p): p is ProjectSummary => p !== undefined);
+      items.push({
+        key: `col:${c.id}`,
+        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
+        label: (
+          <span
+            data-collection-id={c.id}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+          >
+            <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
+            <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
+          </span>
+        ),
+        children: members.map((p) => ({
+          key: `colproj:${c.id}:${p.id}`,
           label: (
             <span
-              data-collection-id={c.id}
+              data-project-id={p.id}
               style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
             >
-              <FolderFilled style={{ fontSize: 13, color: SEMANTIC.warning, opacity: 0.7, flexShrink: 0 }} />
-              <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
+              <ProjectBadge p={p} size={16} />
+              <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
             </span>
           ),
-        });
-      }
+        })),
+        onTitleClick: () => {
+          openCollectionView(c.id);
+          setColOpenKeys((prev) => (prev.includes(`col:${c.id}`) ? prev : [...prev, `col:${c.id}`]));
+        },
+      });
     }
     // 标签 = 平面条目（第 36 轮 A2）：点击开该标签的卡片墙（subTab=tag:<id>），
     // 计数与集合条目同口径；行首标签图标随标签色（未设色淡显）；项目数 0 的标签
@@ -635,9 +662,16 @@ export function Sidebar(): React.JSX.Element {
     else if (activeTab?.kind === 'doclib') selected = 'doclib';
   }
 
-  // 选中键：卡片墙/总览由 subTab 直接映射；项目页签高亮主列表对应行
-  // （集合行同键位 col:<id>，打开集合视图后自然点亮）
+  // 选中键：卡片墙/总览由 subTab 直接映射；项目页签高亮主列表对应行；
+  // 活动项目所属集合的成员行同样点亮（从集合展开列表打开项目后，归属处有标识）
   const selectedKeys: string[] = selected !== '' ? [selected] : [];
+  if (domain === 'projects' && activeTab?.kind === 'project' && activeTab.projectId !== null) {
+    for (const c of collections ?? []) {
+      if (c.projectIds.includes(activeTab.projectId)) {
+        selectedKeys.push(`colproj:${c.id}:${activeTab.projectId}`);
+      }
+    }
+  }
 
   const onClick = (e: { key: string }): void => {
     const key = e.key;
@@ -705,8 +739,15 @@ export function Sidebar(): React.JSX.Element {
       return;
     }
     if (key.startsWith('col:')) {
-      // 集合条目点击 = 直接打开该集合的卡片墙（2026-11-03 拍板：替代原子菜单+「打开集合视图」）
+      // 集合标题点击通常走 onTitleClick（开卡片墙+展开）；此处兜底同动作
       openCollectionView(key.slice(4));
+      return;
+    }
+    if (key.startsWith('colproj:')) {
+      // 集合成员项目直接点开（files 页签），与主列表点项目一致
+      const pid = key.split(':')[2];
+      const p = (projects ?? []).find((x) => x.id === pid);
+      if (p !== undefined) openProject(p, 'files');
       return;
     }
     if (key.startsWith('proj:')) {
@@ -728,23 +769,15 @@ export function Sidebar(): React.JSX.Element {
               ? {
                   key: it.key,
                   type: 'group' as const,
-                  // 「我的视图」标题行带 + 号新建入口（2026-11-03 拍板：「新建视图…」
-                  // 不再占列表行）；stopPropagation 防止冒泡进菜单交互
+                  // 分组标题行 + 号新建入口（2026-11-03：「新建视图…」/新建集合都不再占
+                  // 列表行）；stopPropagation 防止冒泡进菜单交互
                   label:
                     it.key === 'sep-views' ? (
-                      <span className="tt-side-group-head">
-                        <span className="tt-side-label">我的视图</span>
-                        <Tooltip title="新建视图">
-                          <PlusOutlined
-                            className="tt-side-group-add"
-                            data-testid="sidebar-view-add"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewEditor({ initial: null });
-                            }}
-                          />
-                        </Tooltip>
-                      </span>
+                      groupHead('我的视图', '新建视图', 'sidebar-view-add', () =>
+                        setViewEditor({ initial: null }),
+                      )
+                    ) : it.key === 'sep-collections' ? (
+                      groupHead('集合', '新建集合', 'sidebar-collection-add', () => setCreateColOpen(true))
                     ) : (
                       <span className="tt-side-label">{it.label}</span>
                     ),
@@ -752,6 +785,8 @@ export function Sidebar(): React.JSX.Element {
               : it,
           )}
           onClick={onClick}
+          onOpenChange={(keys) => setColOpenKeys(keys)}
+          openKeys={colOpenKeys}
           style={{ borderInlineEnd: 'none' }}
         />
       </div>
@@ -799,6 +834,14 @@ export function Sidebar(): React.JSX.Element {
         />
       )}
       <CollectionEditModal collection={editingCol} onClose={() => setEditingCol(null)} />
+      {createColOpen && (
+        <CollectionEditModal
+          key="create-col"
+          collection={null}
+          create
+          onClose={() => setCreateColOpen(false)}
+        />
+      )}
       {viewEditor !== null && (
         <CustomViewModal
           key={viewEditor.initial?.id ?? 'new'}
@@ -823,6 +866,25 @@ function viewRowLabel(name: string, viewId?: string): React.JSX.Element {
       <span className="tt-ellipsis" style={{ maxWidth: 160 }}>
         {name}
       </span>
+    </span>
+  );
+}
+
+/** 分组标题行：右侧 + 号新建入口（我的视图/集合共用，2026-11-03）。 */
+function groupHead(label: string, addTip: string, testId: string, onAdd: () => void): React.JSX.Element {
+  return (
+    <span className="tt-side-group-head">
+      <span className="tt-side-label">{label}</span>
+      <Tooltip title={addTip}>
+        <PlusOutlined
+          className="tt-side-group-add"
+          data-testid={testId}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
+        />
+      </Tooltip>
     </span>
   );
 }
