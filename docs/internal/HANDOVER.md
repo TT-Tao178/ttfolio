@@ -35,7 +35,17 @@ npm run dev          # 同时起 Vite(5173) 与后端(7717)；用户内容只读
 
 ## 3. 当前状态
 
-> ⚠ 本节状态截至第 93 轮（**未出包**；dev 5173/7717 在跑、热载即测）。手测
+> ⚠ 本节状态截至第 94 轮（**未出包**；dev 5173/7717 全新起、已核验）。三连
+> 修：**去「点击置顶」**——列表默认排序 last_opened → **name 稳定序**
+> （迁移 **0015** 翻存量 card_sort，user_version 14→15；「最近打开」视图/
+> 继续上次 chips/排序器手选不受影响，打开计数照常）；选择模式底条（已选 N
+> 个/批量动作）**布局级停靠**——Workbench/Dashboard 根改 flex 列（内层滚动
+> 区+底条贴底不压内容），BatchActionBar 去 sticky。测试 **290 条** 三绿。
+> 提交 fcf1fe3→d5e0c39，未 push 未出包；手测清单见 PROGRESS 第 94 轮。
+> ⚠ 过程注记：tsx watch 连续两轮没接住服务端改动（后端旧代码、迁移不跑），
+> 均靠整树 taskkill + 全新 npm run dev 处置；**每轮改完服务端必须先核验
+> user_version/health 再交用户测**。
+> ⚠ 历史状态截至第 93 轮（**未出包**；dev 5173/7717 在跑、热载即测）。手测
 > 反馈四连修：①集合图标换亮色 FolderTwoTone 金色（Windows 观感）；②「集合」
 > 标题 + 号新建（CollectionEditModal 增 create 模式 POST /api/collections）；
 > ③**第 92 轮拍板 #4「集合不展开成员」经实测推翻**——成员折叠列表恢复，
