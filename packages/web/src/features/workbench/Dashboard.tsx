@@ -426,6 +426,7 @@ export function Dashboard(): React.JSX.Element {
                     selected={selectedIds.includes(p.id)}
                     selectMode={selectMode}
                     onToggleSelect={(opts) => toggleSelect(p.id, opts)}
+                    dragIds={selectMode === true && selectedIds.includes(p.id) ? selectedIds : [p.id]}
                   />
                 ))}
               </div>

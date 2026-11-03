@@ -127,6 +127,8 @@ export function Sidebar(): React.JSX.Element {
   const [createColOpen, setCreateColOpen] = useState(false);
   // 集合成员展开受控键（点名开卡片墙 + 展开；箭头只切换展开）
   const [colOpenKeys, setColOpenKeys] = useState<string[]>([]);
+  // 拖拽归类（FR-15.2 / T-143）：拖悬停在哪个集合行上（高亮用）
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   // 自定义视图编辑弹窗（FR-4.11）：initial=null 为新建
   const [viewEditor, setViewEditor] = useState<{ initial: CustomView | null } | null>(null);
   const pin = useMutation({
@@ -298,6 +300,30 @@ export function Sidebar(): React.JSX.Element {
       { kind: 'overview', projectId: null, targetPath: null, subTab: 'col:unassigned', scroll: 0 },
       '未分配',
     );
+  };
+  // 拖拽归类（FR-15.2 / T-143）：卡片（单张或选择模式整组）拖入集合行 → 批量加入该集合。
+  // 走既有 members 追加幂等接口，零新通道；移除语义刻意不做拖拽（显式菜单通道保留）
+  const dropIntoCollection = async (cid: string, dt: DataTransfer): Promise<void> => {
+    let ids: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(dt.getData('application/x-ttfolio-projects'));
+      if (Array.isArray(parsed)) ids = parsed.filter((x): x is string => typeof x === 'string');
+    } catch {
+      // 非本应用的数据拖入（外部文件等）：走下方空列表提示
+    }
+    if (ids.length === 0) {
+      void message.info('没有可识别的拖入内容');
+      return;
+    }
+    const col = (collections ?? []).find((c) => c.id === cid);
+    try {
+      await api.post(`/api/collections/${cid}/members`, { projectIds: ids });
+      void message.success(`已把 ${ids.length} 个项目加入「${col?.name ?? '集合'}」`);
+      void queryClient.invalidateQueries({ queryKey: ['projects'] });
+      void queryClient.invalidateQueries({ queryKey: ['collections'] });
+    } catch (e) {
+      void message.error(e instanceof ApiClientError ? e.message : '加入集合失败');
+    }
   };
   const openCollectionView = (cid: string): void => {
     // 「未分配」是虚拟分组（无真实集合 id），点击落到 unassigned 卡片墙
@@ -485,11 +511,37 @@ export function Sidebar(): React.JSX.Element {
         .filter((p): p is ProjectSummary => p !== undefined);
       items.push({
         key: `col:${c.id}`,
-        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）
+        // data-collection-id 供 document 级右键委托定位集合（第 31 轮）；
+        // 拖拽归类（FR-15.2 / T-143）：集合行接收卡片拖入（application/x-ttfolio-projects 通道）
         label: (
           <span
             data-collection-id={c.id}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes('application/x-ttfolio-projects')) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setDragOverCol(c.id);
+            }}
+            onDragLeave={() => {
+              if (dragOverCol === c.id) setDragOverCol(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragOverCol(null);
+              void dropIntoCollection(c.id, e.dataTransfer);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              minWidth: 0,
+              borderRadius: 6,
+              padding: '1px 4px',
+              outline: dragOverCol === c.id ? `1px dashed ${SEMANTIC.primary}` : undefined,
+              background: dragOverCol === c.id ? SEMANTIC.primaryBg : undefined,
+              transition: 'background-color 0.15s ease',
+            }}
           >
             <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
             <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>

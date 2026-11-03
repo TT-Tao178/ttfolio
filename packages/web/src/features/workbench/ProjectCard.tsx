@@ -33,6 +33,7 @@ export function ProjectCard({
   selected,
   selectMode,
   onToggleSelect,
+  dragIds,
 }: {
   p: ProjectSummary;
   onOpen: () => void;
@@ -45,6 +46,9 @@ export function ProjectCard({
   selected?: boolean;
   selectMode?: boolean;
   onToggleSelect?: (opts?: { shift?: boolean }) => void;
+  /** 拖拽归类（FR-15.2 / T-143）：本次拖动携带的项目 id（选择模式整组=选中集）；
+   *  缺省拖单卡。数据写 dataTransfer 的 application/x-ttfolio-projects 通道，侧栏集合行接收 */
+  dragIds?: string[];
 }): React.JSX.Element {
   const { message } = App.useApp();
   const queryClient2 = useQueryClient();
@@ -129,6 +133,12 @@ export function ProjectCard({
     <Card
       hoverable
       size="small"
+      draggable={dragIds !== undefined}
+      onDragStart={(e) => {
+        if (dragIds === undefined || dragIds.length === 0) return;
+        e.dataTransfer.setData('application/x-ttfolio-projects', JSON.stringify(dragIds));
+        e.dataTransfer.effectAllowed = 'copyMove';
+      }}
       style={{
         position: 'relative',
         borderColor: selected === true ? SEMANTIC.primary : p.pathOk ? undefined : SEMANTIC.error,
