@@ -94,7 +94,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   agentRepoConfirmed: false,
   terminalShell: 'powershell',
   defaultArchDirName: '架构图',
-  cardSort: 'last_opened',
+  cardSort: 'name', // 默认稳定排序（2026-11-03 去「点击置顶」；最近打开仍是可选排序）
   showIgnored: false,
   defaultProjectTab: 'files',
   docRootBlacklist: [],

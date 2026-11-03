@@ -289,6 +289,14 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     db.prepare('DELETE FROM collections WHERE id = ?').run('col-u');
     db.prepare('DELETE FROM projects WHERE id = ?').run(free.id);
   });
+
+  it('默认排序为名称稳定序（第 94 轮去「点击置顶」回归）：无 sort 参数等价 sort=name', () => {
+    const byDefault = listProjects(db, { status: 'active' }).map((p) => p.id);
+    const byName = listProjects(db, { status: 'active', sort: 'name' }).map((p) => p.id);
+    expect(byDefault).toEqual(byName);
+    // 显式 last_opened 仍可用（「最近打开」视图锚点）
+    expect(listProjects(db, { status: 'active', sort: 'last_opened' }).length).toBeGreaterThan(0);
+  });
 });
 
 describe('打开时静默重分析判定（KNOWN-GAPS #3，第 36 轮 A1）', () => {

@@ -111,7 +111,9 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
         ? all['terminal_shell']
         : 'powershell',
       defaultArchDirName: all[SETTING_KEYS.defaultArchDirName] ?? '架构图',
-      cardSort: all[SETTING_KEYS.cardSort] ?? 'last_opened',
+      // 默认排序 2026-11-03 起为 name（去「点击置顶」，迁移 0015 同步翻存量）；
+      // last_opened 仍可选（卡片墙排序器 /「最近打开」视图显式传参）
+      cardSort: all[SETTING_KEYS.cardSort] ?? 'name',
       showIgnored: (all[SETTING_KEYS.showIgnored] ?? '0') === '1',
       defaultProjectTab: all[SETTING_KEYS.defaultProjectTab] ?? 'files',
       docRootBlacklist:

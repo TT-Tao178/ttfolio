@@ -237,13 +237,16 @@ export function listProjects(db: Database.Database, filters: ListFilters): Proje
     switch (filters.sort) {
       case 'last_commit':
         return 'is_pinned DESC, git_last_commit_at DESC';
-      case 'name':
-        return 'is_pinned DESC, lower(coalesce(alias, disk_name)) ASC';
+      case 'last_opened':
+        // 显式传入才按最近打开（「最近打开」视图/继续上次 chips 用）
+        return 'is_pinned DESC, CASE WHEN last_opened_at IS NULL THEN 1 ELSE 0 END, last_opened_at DESC';
       case 'size':
         return 'is_pinned DESC, size_bytes DESC';
-      case 'last_opened':
       default:
-        return 'is_pinned DESC, CASE WHEN last_opened_at IS NULL THEN 1 ELSE 0 END, last_opened_at DESC';
+        // 默认按名称稳定排序（2026-11-03 用户反馈：此前默认最近打开，「点开一个项目
+        // 就被顶到列表最前」——侧栏/卡片墙/未分配成员列表全部会跳位置，已去掉）。
+        // 打开计数仍照常上报，「最近打开」视图与继续上次 chips 不受影响。
+        return 'is_pinned DESC, lower(coalesce(alias, disk_name)) ASC';
     }
   })();
   const rows = getAll<ProjectRow>(
