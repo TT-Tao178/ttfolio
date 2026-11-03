@@ -50,6 +50,25 @@ import { CommitView } from '@/features/git/CommitView';
 import { api } from '@/lib/api';
 import { SEMANTIC } from '@/theme/tokens';
 import type { HealthInfo, SessionData } from '@ttfolio/shared';
+import { AddProjectModal } from '@/features/workbench/AddProjectModal';
+
+/** 「添加项目」弹窗宿主（2026-11-03 提升到 App 层）：常驻挂载，监听 requestAddProject
+ *  的 nonce 信号开弹窗。原先弹窗只在工作台分支渲染且 nonce 只由 Workbench 消费——
+ *  非工作台标签触发导入要么强切标签要么延迟到切回才弹；现在任意屏即时可用。
+ *  nonce 单调递增且本组件永不卸载，初始 0 不会误开；打开瞬间的集合上下文快照
+ *  存入本地 state（后到的 nonce 变更不覆盖已打开弹窗的上下文）。 */
+function AddProjectHost(): React.JSX.Element {
+  const addProjectNonce = useAppStore((s) => s.addProjectNonce);
+  const [open, setOpen] = useState(false);
+  const [collectionId, setCollectionId] = useState<string | null>(null);
+  useEffect(() => {
+    if (addProjectNonce > 0) {
+      setCollectionId(useAppStore.getState().addProjectCollectionId ?? null);
+      setOpen(true);
+    }
+  }, [addProjectNonce]);
+  return <AddProjectModal open={open} onClose={() => setOpen(false)} collectionId={collectionId} />;
+}
 
 /** 内容区错误边界：某个视图渲染崩溃时只降级本面板并给出提示，绝不卸载整棵应用树。 */
 class PaneErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -408,13 +427,7 @@ function Shell(): React.JSX.Element {
               icon={<PlusOutlined />}
               data-testid="top-add-btn"
               style={{ flexShrink: 0 }}
-              onClick={() => {
-                openTab(
-                  { kind: 'overview', projectId: null, targetPath: null, subTab: null, scroll: 0 },
-                  '工作台',
-                );
-                useAppStore.getState().requestAddProject();
-              }}
+              onClick={() => useAppStore.getState().requestAddProject()}
             >
               导入
             </Button>
@@ -559,6 +572,7 @@ function Shell(): React.JSX.Element {
       <StatusBar sseState={sseState} />
       <CommandPalette />
       <OnboardingTour />
+      <AddProjectHost />
       <span
         data-testid="app-theme"
         data-dark={dark ? '1' : '0'}

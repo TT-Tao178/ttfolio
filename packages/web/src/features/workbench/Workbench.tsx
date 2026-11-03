@@ -1,19 +1,6 @@
-/** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图 + 添加项目。 */
-import {
-  Button,
-  Dropdown,
-  Empty,
-  Input,
-  Menu,
-  Modal,
-  Segmented,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  App,
-} from 'antd';
+/** 工作台总览（FR-2.1/2.8/4.11/9.3/11.x）：卡片墙 + 表格视图 + 我的视图。
+ *  「添加项目」弹窗在 ./AddProjectModal（App 层挂载）。 */
+import { Button, Dropdown, Empty, Input, Menu, Segmented, Select, Table, Tooltip, App } from 'antd';
 import {
   CheckSquareOutlined,
   InboxOutlined,
@@ -25,7 +12,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
+import type { ProjectSummary } from '@ttfolio/shared';
 import { useAppStore, useTabScroll } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { Dashboard } from './Dashboard';
@@ -40,12 +27,8 @@ import { ProjectAvatarModal } from './ProjectAvatarModal';
 import { buildProjectMenu, useArchiveProject, useRemoveProject, downloadProjectReport } from './projectMenu';
 import { parseSubTab } from './parseSubTab';
 import { BatchActionBar } from './BatchActionBar';
-import { markPendingAnalysis } from './pendingAnalyze';
 export { parseSubTab };
 import { SEMANTIC } from '@/theme/tokens';
-
-/** 已消费过的「添加项目」信号值：跨挂载保留，避免重新挂载时重复弹窗。 */
-let lastAddNonce = 0;
 
 export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Element {
   const { settings } = useSettings();
@@ -57,20 +40,12 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   useEffect(() => {
     if (!sortTouched.current) setSort(settings.cardSort);
   }, [settings.cardSort]);
-  const [addOpen, setAddOpen] = useState(false);
   // T-130：集合视图「从已登记项目中添加」弹窗开关（仅 collectionId 非空时可开）
   const [addMembersOpen, setAddMembersOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // 顶栏/总览「添加项目」信号：nonce 变化即打开弹窗（模块级 lastAddNonce 保证"只消费一次"——
-  // 若用组件内 ref，切到项目页再回总览会因 nonce 仍 >0 而弹出上次的弹窗）。
-  const addProjectNonce = useAppStore((s) => s.addProjectNonce);
-  useEffect(() => {
-    if (addProjectNonce > lastAddNonce) {
-      lastAddNonce = addProjectNonce;
-      setAddOpen(true);
-    }
-  }, [addProjectNonce]);
+  // 「添加项目」弹窗已提升到 App 层（2026-11-03，AddProjectModal.tsx）：任意屏可用，
+  // 这里各入口经 requestAddProject(collectionId) 发信号，集合上下文一并携带。
 
   // ---- 表格视图的项目操作（评审 P2：此前操作列只有「打开」、行无右键，与卡片不对等）----
   // 菜单定义/分发与卡片共用 buildProjectMenu；确认类动作在此注入（确认弹窗与请求归本组件）
@@ -264,7 +239,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
       {subTab === null ? (
         <>
           <Dashboard />
-          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
         </>
       ) : (
         <>
@@ -345,7 +319,7 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setAddOpen(true)}
+              onClick={() => useAppStore.getState().requestAddProject(collectionId)}
               data-testid="add-project-btn"
             >
               添加项目
@@ -356,7 +330,10 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
             error={error}
             empty={(projects ?? []).length === 0}
             emptyText="还没有登记任何项目：① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索"
-            emptyAction={{ label: '添加第一个项目', onClick: () => setAddOpen(true) }}
+            emptyAction={{
+              label: '添加第一个项目',
+              onClick: () => useAppStore.getState().requestAddProject(collectionId),
+            }}
           >
             {view === 'card' ? (
               <div
@@ -407,7 +384,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               />
             )}
           </StateView>
-          <AddProjectModal open={addOpen} onClose={() => setAddOpen(false)} collectionId={collectionId} />
           {addMembersOpen && collectionId !== null && (
             <CollectionAddMembersModal
               key={collectionId}
@@ -484,294 +460,6 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
         </>
       )}
     </div>
-  );
-}
-
-function AddProjectModal({
-  open,
-  onClose,
-  collectionId = null,
-}: {
-  open: boolean;
-  onClose: () => void;
-  /** 集合视图传入：登记成功后项目随即加入该集合（追加语义，不影响其他成员） */
-  collectionId?: string | null;
-}): React.JSX.Element {
-  const [text, setText] = useState('');
-  const [parentPath, setParentPath] = useState('');
-  const [children, setChildren] = useState<
-    Array<{ name: string; path: string; registered: boolean; checked: boolean }>
-  >([]);
-  const [picking, setPicking] = useState(false);
-  const [browsing, setBrowsing] = useState(false);
-  // 拖拽登记（T-118）：仅桌面版（preload 桥存在）可用；drop 高亮态
-  const canDrop = typeof window.ttfolioNative?.getPathForFile === 'function';
-  const [dragOver, setDragOver] = useState(false);
-  const { message } = App.useApp();
-  const queryClient = useQueryClient();
-  // 集合上下文仅用于展示与登记后入集：名字取 ['collections'] 缓存（与侧栏共享，未加载时降级中性文案）
-  const { data: collections } = useQuery({
-    queryKey: ['collections'],
-    queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
-    enabled: open && collectionId !== null,
-  });
-  const collectionName =
-    collectionId !== null ? (collections ?? []).find((c) => c.id === collectionId)?.name : undefined;
-
-  // 拖拽登记（T-118）：全局 drop 收集到的路径在弹窗打开时消费一次（App 级 drop → store → 这里）
-  useEffect(() => {
-    if (!open) return;
-    const prefill = useAppStore.getState().addProjectPrefill;
-    if (prefill !== null && prefill !== '') {
-      setText(prefill);
-      useAppStore.getState().setAddProjectPrefill(null);
-    }
-  }, [open]);
-
-  const dropPathsOf = (e: React.DragEvent): string[] =>
-    Array.from(e.dataTransfer.files)
-      .map((f) => window.ttfolioNative?.getPathForFile?.(f) ?? '')
-      .filter((p) => p !== '');
-
-  const add = useMutation({
-    mutationFn: async (body: unknown) => {
-      const r = await api.post<{ added: string[]; skipped: Array<{ path: string; reason: string }> }>(
-        '/api/projects',
-        body,
-      );
-      // 集合上下文（修复：集合视图里「添加项目」此前只进公共池不进集合）：
-      // 登记成功即加入当前集合——members 为追加语义，不影响集合已有成员
-      let joined = false;
-      if (collectionId !== null && r.added.length > 0) {
-        try {
-          await api.post(`/api/collections/${collectionId}/members`, { projectIds: r.added });
-          joined = true;
-        } catch {
-          joined = false;
-        }
-      }
-      return { ...r, joined };
-    },
-    onSuccess: (r) => {
-      // 分析完成反馈（T-119）：新登记的项目在 project.analyzed SSE 到达时 toast 一次
-      markPendingAnalysis(r.added);
-      if (r.added.length > 0) {
-        if (collectionId !== null) {
-          if (r.joined) void message.success(`已登记 ${r.added.length} 个项目并加入集合，正在分析…`);
-          else void message.warning('项目已登记，但加入集合失败——可稍后在项目右键「归属集合…」中补加', 5);
-        } else {
-          void message.success(`已登记 ${r.added.length} 个项目，正在分析…`);
-          // 登记成功后切到卡片墙：否则停在总览屏看不到刚登记的项目（"添加了但没反应"）。
-          // 集合视图不切走：登记结果直接体现在当前集合卡片墙（invalidate 后新卡片出现）
-          const st = useAppStore.getState();
-          const cur = st.tabs.find((t) => t.id === st.activeTabId);
-          if (cur?.kind === 'overview') st.updateActiveLocation({ subTab: 'view:all' }, true);
-          else
-            st.openTab(
-              { kind: 'overview', projectId: null, targetPath: null, subTab: 'view:all', scroll: 0 },
-              '工作台',
-            );
-        }
-        void queryClient.invalidateQueries({ queryKey: ['collections'] });
-      }
-      for (const s of r.skipped) void message.warning(`跳过 ${s.path}：${s.reason}`);
-      void queryClient.invalidateQueries({ queryKey: ['projects'] });
-      onClose();
-      setText('');
-    },
-    onError: (e) => void message.error(e instanceof ApiClientError ? e.message : '登记失败'),
-  });
-
-  const pickFolder = async (): Promise<void> => {
-    setPicking(true);
-    try {
-      // 对话框由服务端弹出（可能有几百毫秒延迟），必须立刻给提示，否则像"点了没反应"；
-      // 后台进程弹的系统对话框可能被浏览器压在后面（Win11 前台锁定），提示里带 Alt+Tab 指引
-      void message.info('正在弹出系统对话框；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
-      const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
-      if (r.paths.length > 0) setText(r.paths.join('\n'));
-      else void message.info('未选择目录');
-    } catch {
-      void message.error('打开系统对话框失败，请粘贴路径');
-    } finally {
-      setPicking(false);
-    }
-  };
-
-  const browseParent = async (): Promise<void> => {
-    setBrowsing(true);
-    try {
-      void message.info('正在弹出系统对话框选择父目录；若被其他窗口挡住，请按 Alt+Tab 查看', 5);
-      const r = await api.post<{ paths: string[] }>('/api/dialogs/pick-folder');
-      if (r.paths.length > 0) setParentPath(r.paths[0] ?? '');
-      else void message.info('未选择目录');
-    } catch {
-      void message.error('打开系统对话框失败');
-    } finally {
-      setBrowsing(false);
-    }
-  };
-
-  const loadChildren = async (): Promise<void> => {
-    if (parentPath === '') return;
-    try {
-      const r = await api.get<{
-        path: string;
-        children: Array<{ name: string; path: string; registered: boolean }>;
-      }>('/api/folders/children', { path: parentPath });
-      setChildren(r.children.map((c) => ({ ...c, checked: !c.registered })));
-    } catch (e) {
-      void message.error(e instanceof ApiClientError ? e.message : '读取子目录失败');
-    }
-  };
-
-  return (
-    <Modal
-      title={collectionId !== null ? `添加项目到「${collectionName ?? '集合'}」` : '添加项目'}
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={640}
-      data-testid="add-project-modal"
-    >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-          // 拖拽登记（T-118）：桌面版整个弹窗都是落点，拖近时虚线高亮
-          ...(canDrop
-            ? {
-                border: `1px dashed ${dragOver ? SEMANTIC.primary : SEMANTIC.split}`,
-                borderRadius: 8,
-                padding: dragOver ? 11 : 12,
-                background: dragOver ? SEMANTIC.primaryBg : undefined,
-                transition: 'border-color 0.15s ease, background-color 0.15s ease',
-              }
-            : {}),
-        }}
-        onDragOver={(e) => {
-          if (!canDrop) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setDragOver(true);
-        }}
-        onDragLeave={(e) => {
-          if (!canDrop) return;
-          e.stopPropagation();
-          setDragOver(false);
-        }}
-        onDrop={(e) => {
-          if (!canDrop) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setDragOver(false);
-          const paths = dropPathsOf(e);
-          if (paths.length === 0) {
-            void message.info('没有可识别的拖入内容');
-            return;
-          }
-          setText((cur) => (cur.trim() === '' ? paths.join('\n') : `${cur}\n${paths.join('\n')}`));
-          void message.info(`已填入 ${paths.length} 个路径，点「登记以上目录」确认（非文件夹会被自动跳过）`);
-        }}
-      >
-        <div>
-          <div style={{ marginBottom: 6 }}>
-            ① 添加单个项目（粘贴项目文件夹路径）——也支持一次粘贴多行批量登记，可带引号、\\?\ 前缀
-          </div>
-          <Input.TextArea
-            rows={4}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={'D:\\code\\project-a\n"D:\\code\\project b"'}
-            data-testid="paste-paths"
-          />
-          <Space style={{ marginTop: 8 }}>
-            <Button loading={picking} onClick={() => void pickFolder()}>
-              系统对话框选择…
-            </Button>
-            <Button
-              type="primary"
-              disabled={text.trim() === ''}
-              data-testid="paste-add-btn"
-              onClick={() => add.mutate({ paths: text.split(/\r?\n/) })}
-            >
-              登记以上目录
-            </Button>
-          </Space>
-        </div>
-        <div>
-          <div style={{ marginBottom: 6 }}>
-            ② 批量登记（选一个父目录，扫描其下的子文件夹，一次登记多个项目）
-          </div>
-          <Space.Compact style={{ width: '100%' }}>
-            <Input
-              value={parentPath}
-              onChange={(e) => setParentPath(e.target.value)}
-              placeholder="父目录路径"
-            />
-            <Button loading={browsing} onClick={() => void browseParent()}>
-              选择…
-            </Button>
-            <Button onClick={() => void loadChildren()}>载入子目录</Button>
-          </Space.Compact>
-          {children.length > 0 && (
-            <div
-              style={{
-                marginTop: 8,
-                maxHeight: 200,
-                overflow: 'auto',
-                border: `1px solid ${SEMANTIC.split}`,
-                borderRadius: 6,
-                padding: 8,
-              }}
-            >
-              {children.map((c, i) => (
-                <label key={c.path} style={{ display: 'block' }}>
-                  <input
-                    type="checkbox"
-                    checked={c.checked}
-                    disabled={c.registered}
-                    onChange={(e) => {
-                      const next = [...children];
-                      const cur = next[i];
-                      if (cur !== undefined) next[i] = { ...cur, checked: e.target.checked };
-                      setChildren(next);
-                    }}
-                  />{' '}
-                  {c.name}
-                  {c.registered && <Tag style={{ marginLeft: 6 }}>已登记</Tag>}
-                </label>
-              ))}
-              <Button
-                type="primary"
-                size="small"
-                style={{ marginTop: 8 }}
-                onClick={() =>
-                  add.mutate({
-                    parentPath,
-                    children: children.filter((c) => c.checked && !c.registered).map((c) => c.name),
-                  })
-                }
-              >
-                登记勾选的 {children.filter((c) => c.checked && !c.registered).length} 个目录
-              </Button>
-            </div>
-          )}
-        </div>
-        {canDrop ? (
-          <div style={{ fontSize: 12, opacity: 0.65 }}>
-            提示：桌面版支持把项目文件夹直接拖进本窗口或本弹窗——路径会自动填入上方输入框确认后登记；
-            混入的文件会被自动跳过，只登记文件夹。也可以粘贴多行路径、用系统对话框或父目录批量登记。
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, opacity: 0.65 }}>
-            提示：浏览器安全限制拿不到拖拽文件夹的绝对路径，Web 模式下拖拽添加不可用——请用上方三种入口
-            （粘贴路径 / 系统对话框 / 父目录批量登记）。桌面版支持直接拖入。
-          </div>
-        )}
-      </div>
-    </Modal>
   );
 }
 

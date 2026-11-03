@@ -88,9 +88,12 @@ interface AppState {
   markDirty: (key: string) => void;
   clearDirty: (key: string) => void;
   setPalette: (v: boolean, opts?: { scope?: 'all' | 'project'; mode?: 'search' | 'command' }) => void;
-  /** 「＋导入」入口信号：顶栏按钮自增，工作台监听到变化即打开添加项目弹窗 */
+  /** 「＋导入」入口信号：任意屏触发自增，App 层 AddProjectHost 监听即打开添加项目弹窗
+   *  （2026-11-03 提升到 App 层——原先只由 Workbench 消费，非工作台标签点了要强切标签） */
   addProjectNonce: number;
-  requestAddProject: () => void;
+  /** 与 nonce 同写的集合上下文：集合视图触发时传集合 id，登记成功后项目随即入集 */
+  addProjectCollectionId: string | null;
+  requestAddProject: (collectionId?: string | null) => void;
   /** 新手导览（T-120）：设置→关于「重新查看」入口信号，nonce 自增触发 */
   onboardingNonce: number;
   requestOnboarding: () => void;
@@ -326,7 +329,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...(opts?.mode !== undefined ? { paletteMode: opts.mode } : {}),
     }),
   addProjectNonce: 0,
-  requestAddProject: () => set({ addProjectNonce: get().addProjectNonce + 1 }),
+  addProjectCollectionId: null,
+  requestAddProject: (collectionId) =>
+    set({ addProjectNonce: get().addProjectNonce + 1, addProjectCollectionId: collectionId ?? null }),
   onboardingNonce: 0,
   requestOnboarding: () => set({ onboardingNonce: get().onboardingNonce + 1 }),
   addProjectPrefill: null,
