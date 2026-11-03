@@ -29,6 +29,10 @@ describe('parseSubTab', () => {
     expect(parseSubTab('col:01ABC')).toEqual({ status: 'active', collection: '01ABC' });
   });
 
+  it('col:unassigned → 未分配虚拟分组（第 93 轮：unassigned=1，不误入 collection 过滤）', () => {
+    expect(parseSubTab('col:unassigned')).toEqual({ status: 'active', unassigned: '1' });
+  });
+
   it('tag:<id> → 标签过滤参数（第 36 轮 A2 补齐 KNOWN-GAPS #8，与 col: 同构）', () => {
     expect(parseSubTab('tag:01XYZ')).toEqual({ status: 'active', tag: '01XYZ' });
     expect(parseSubTab('tag:')).toEqual({ status: 'active', tag: '' });

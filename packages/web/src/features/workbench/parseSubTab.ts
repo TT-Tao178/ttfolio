@@ -37,6 +37,10 @@ export function parseSubTab(
         return { status: 'active' };
     }
   }
+  if (subTab === 'col:unassigned') {
+    // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的登记项目
+    return { status: 'active', unassigned: '1' };
+  }
   if (subTab.startsWith('col:')) return { status: 'active', collection: subTab.slice(4) };
   if (subTab.startsWith('tag:')) return { status: 'active', tag: subTab.slice(4) };
   if (subTab.startsWith('{')) {

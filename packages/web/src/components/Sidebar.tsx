@@ -292,7 +292,19 @@ export function Sidebar(): React.JSX.Element {
               { key: 'delview', label: '删除视图…', icon: <DeleteOutlined />, danger: true },
             ]
           : [];
+  const openUnassignedView = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['projects'] });
+    openTab(
+      { kind: 'overview', projectId: null, targetPath: null, subTab: 'col:unassigned', scroll: 0 },
+      '未分配',
+    );
+  };
   const openCollectionView = (cid: string): void => {
+    // 「未分配」是虚拟分组（无真实集合 id），点击落到 unassigned 卡片墙
+    if (cid === 'unassigned') {
+      openUnassignedView();
+      return;
+    }
     const col = (collections ?? []).find((c) => c.id === cid);
     void queryClient.invalidateQueries({ queryKey: ['projects'] });
     openTab(
@@ -460,6 +472,12 @@ export function Sidebar(): React.JSX.Element {
     // 条目恢复可折叠成员列表（点名开卡片墙 + 就地展开成员，拍板 #4 的「不展开」经实测推翻）；
     // 文件夹图标换亮色 Windows 资源管理器风（FolderTwoTone 金色，不再降透明度压暗）。
     // 展开态受控：标题点击=开卡片墙并展开成员；行尾箭头=仅展开/收起。
+    const projBadgeRow = (p: ProjectSummary): React.JSX.Element => (
+      <span data-project-id={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <ProjectBadge p={p} size={16} />
+        <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
+      </span>
+    );
     items.push({ key: 'sep-collections', label: '集合' });
     for (const c of collections ?? []) {
       const members = (c.projectIds ?? [])
@@ -479,19 +497,35 @@ export function Sidebar(): React.JSX.Element {
         ),
         children: members.map((p) => ({
           key: `colproj:${c.id}:${p.id}`,
-          label: (
-            <span
-              data-project-id={p.id}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}
-            >
-              <ProjectBadge p={p} size={16} />
-              <span className="tt-ellipsis">{p.alias ?? p.diskName}</span>
-            </span>
-          ),
+          label: projBadgeRow(p),
         })),
         onTitleClick: () => {
           openCollectionView(c.id);
           setColOpenKeys((prev) => (prev.includes(`col:${c.id}`) ? prev : [...prev, `col:${c.id}`]));
+        },
+      });
+    }
+    // 「未分配」虚拟分组（2026-11-03 用户需求）：不属于任何集合的项目归拢到集合区
+    // 末位；点名=开未分配卡片墙（col:unassigned → unassigned=1 过滤），成员同样
+    // 就地展开。是视图不是集合：无右键编辑/删除，也不参与集合排序。
+    const colIds = new Set((collections ?? []).flatMap((c) => c.projectIds));
+    const unassignedProjects = (projects ?? []).filter((p) => !colIds.has(p.id));
+    if (unassignedProjects.length > 0) {
+      items.push({
+        key: 'col:unassigned',
+        label: (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <FolderOpenOutlined style={{ fontSize: 13, opacity: 0.55, flexShrink: 0 }} />
+            <span className="tt-ellipsis">{`未分配 (${unassignedProjects.length})`}</span>
+          </span>
+        ),
+        children: unassignedProjects.map((p) => ({
+          key: `colproj:unassigned:${p.id}`,
+          label: projBadgeRow(p),
+        })),
+        onTitleClick: () => {
+          openUnassignedView();
+          setColOpenKeys((prev) => (prev.includes('col:unassigned') ? prev : [...prev, 'col:unassigned']));
         },
       });
     }
@@ -666,10 +700,15 @@ export function Sidebar(): React.JSX.Element {
   // 活动项目所属集合的成员行同样点亮（从集合展开列表打开项目后，归属处有标识）
   const selectedKeys: string[] = selected !== '' ? [selected] : [];
   if (domain === 'projects' && activeTab?.kind === 'project' && activeTab.projectId !== null) {
-    for (const c of collections ?? []) {
-      if (c.projectIds.includes(activeTab.projectId)) {
-        selectedKeys.push(`colproj:${c.id}:${activeTab.projectId}`);
+    const pid = activeTab.projectId;
+    const inSomeCol = (collections ?? []).some((c) => c.projectIds.includes(pid));
+    if (inSomeCol) {
+      for (const c of collections ?? []) {
+        if (c.projectIds.includes(pid)) selectedKeys.push(`colproj:${c.id}:${pid}`);
       }
+    } else if (selected === '') {
+      // 未归属任何集合：点亮「未分配」虚拟分组的成员行
+      selectedKeys.push(`colproj:unassigned:${pid}`);
     }
   }
 
