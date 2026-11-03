@@ -288,7 +288,9 @@ export function getRemovedProjectByPathKey(db: Database.Database, keyArg: string
   ]);
 }
 
-/** 复活一个被移除登记的项目：清空 deleted_at，刷新路径与目录名，rev +1。 */
+/** 复活一个被移除登记的项目：清空 deleted_at，刷新路径与目录名，rev +1。
+ *  归属（集合/标签）已在移除登记时清空（2026-11-03 行为反转），复活即干净落回公共池；
+ *  别名/备注/头像/打开计数保留。 */
 export function reviveProject(
   db: Database.Database,
   id: string,
@@ -362,7 +364,13 @@ export function needsReanalyze(
 
 export function softDeleteProject(db: Database.Database, id: string): void {
   const now3 = new Date().toISOString();
+  // 行为反转（用户 2026-11-03 拍板）：移除登记即清组织归属——集合/标签成员行随软删
+  // 一并删除，「同路径再导入」落回公共池，不再自动回到上次的集合/标签
+  // （原「复活归属恢复」设计废弃）。别名/备注/头像/打开计数保留。
+  // 存量软删项目的残留成员行由迁移 0014 一次性清理。
   run(db, 'UPDATE projects SET deleted_at = ?, updated_at = ? WHERE id = ?', [now3, now3, id]);
+  run(db, 'DELETE FROM collection_members WHERE project_id = ?', [id]);
+  run(db, 'DELETE FROM project_tags WHERE project_id = ?', [id]);
 }
 
 export function checkPathOk(db: Database.Database, existsFn: (p: string) => boolean): number {
@@ -384,9 +392,9 @@ export interface CollectionMeta extends CollectionInfo {
 export function listCollections(db: Database.Database): CollectionMeta[] {
   const rows = getAll<CollectionRow>(db, 'SELECT * FROM collections ORDER BY sort_order, created_at');
   return rows.map((r) => {
-    // 用户报障（2026-10-31）：移除登记后侧栏集合计数（n）不归零——成员行是孤儿
-    // （softDeleteProject 只写 deleted_at；成员行保留，同路径重新登记时归属可恢复），
-    // 这里 JOIN projects 过滤已删项目，计数与成员列表口径一致
+    // JOIN projects 过滤已删项目：现行为（2026-11-03 反转）下 softDeleteProject 已即时
+    // 清成员行、迁移 0014 清了存量，理论上不再有孤儿行；过滤保留作纵深防御
+    // （2026-10-31 报障：孤儿成员行曾让侧栏集合计数不归零）
     const members = getAll<{ project_id: string }>(
       db,
       `SELECT cm.project_id FROM collection_members cm

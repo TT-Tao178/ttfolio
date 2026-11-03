@@ -552,6 +552,14 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionMembersSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
+    const col = db.prepare<[string], { id: string }>('SELECT id FROM collections WHERE id = ?').get(id);
+    if (col === undefined) return fail('NOT_FOUND', '集合不存在', 404);
+    // 成员必须是「登记中」的项目（2026-11-03）：此前零校验直插，对已移除登记的
+    // 项目 id 会静默写孤儿成员行（界面不可见，复活时旧归属连带冒出来）
+    const invalid = parsed.data.projectIds.filter((pid) => getProjectRow(db, pid) === undefined);
+    if (invalid.length > 0) {
+      return fail('BAD_REQUEST', `以下项目不存在或已移除登记：${invalid.join('、')}`);
+    }
     const tx = db.transaction(() => {
       if (parsed.data.replace) {
         db.prepare('DELETE FROM collection_members WHERE collection_id = ?').run(id);
@@ -654,6 +662,11 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
             tag.id,
           );
         } else if (action === 'collection') {
+          // 与 members 接口同口径（2026-11-03）：不把已移除登记的项目插进集合
+          if (getProjectRow(db, pid) === undefined) {
+            failed.push(pid);
+            continue;
+          }
           const col = db
             .prepare<[string], { id: string }>('SELECT id FROM collections WHERE id = ?')
             .get(parsed.data.collectionId ?? '');

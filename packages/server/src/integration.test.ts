@@ -10,8 +10,10 @@ import {
   insertProject,
   getProjectByPathKey,
   getProjectRow,
+  getProjectSummary,
   patchProject,
   softDeleteProject,
+  reviveProject,
   listProjects,
   listCollections,
   checkPathOk,
@@ -232,12 +234,26 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     // 软删前：计数 1
     expect(listCollections(db).find((c) => c.id === 'col-gone')?.memberCount).toBe(1);
     expect(listTagsWithCount(db).find((t) => t.id === 'tag-orphan')?.projectCount).toBe(1);
-    // 软删（= 移除登记的 repo 层动作）：成员行保留（同路径复活归属可恢复），但计数/列表不再含它
+    // 软删（= 移除登记的 repo 层动作）：成员行即删（2026-11-03 行为反转——
+    // 原「成员行保留、复活归属恢复」废弃），计数/列表归零且行级别无残留
     softDeleteProject(db, gone.id);
     const col = listCollections(db).find((c) => c.id === 'col-gone');
     expect(col?.memberCount).toBe(0);
     expect(col?.projectIds).toEqual([]);
     expect(listTagsWithCount(db).find((t) => t.id === 'tag-orphan')?.projectCount).toBe(0);
+    expect(
+      db.prepare('SELECT COUNT(*) AS c FROM collection_members WHERE project_id = ?').get(gone.id),
+    ).toEqual({ c: 0 });
+    expect(db.prepare('SELECT COUNT(*) AS c FROM project_tags WHERE project_id = ?').get(gone.id)).toEqual({
+      c: 0,
+    });
+    // 同路径再登记 = 原地复活：归属保持为空（落回公共池），不再自动回集合/标签
+    const revived = reviveProject(db, gone.id, { dirPath: dirGone, diskName: 'orphan 项目' });
+    expect(revived?.id).toBe(gone.id);
+    expect(listCollections(db).find((c) => c.id === 'col-gone')?.memberCount).toBe(0);
+    expect(listTagsWithCount(db).find((t) => t.id === 'tag-orphan')?.projectCount).toBe(0);
+    expect(getProjectSummary(db, gone.id)?.collections).toEqual([]);
+    expect(getProjectSummary(db, gone.id)?.tags).toEqual([]);
     // 清理自建行：共享库有全局断言（如标签中枢的 project_tags 全表计数），不留痕
     db.prepare('DELETE FROM project_tags WHERE project_id = ?').run(gone.id);
     db.prepare('DELETE FROM tags WHERE id = ?').run('tag-orphan');
