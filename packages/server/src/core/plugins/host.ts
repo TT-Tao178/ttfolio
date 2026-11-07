@@ -20,6 +20,7 @@ import { analyzeProjects } from '../analyzer/runner.js';
 import { getPlugin } from './registry.js';
 import type { PluginInfo } from './manifest.js';
 import { isSafeMainPath, type PluginPermission } from './manifest.js';
+import { runSandboxPlugin } from './sandboxRunner.js';
 
 export interface PluginApi {
   log(message: string): void;
@@ -35,6 +36,8 @@ interface HostDeps {
   sse: SseHub;
   logger: Logger;
   version: string;
+  /** FR-16.4 沙箱宿主需要数据目录（写 sandbox-host.cjs 与运行） */
+  dataDir?: string;
 }
 
 const RUN_TIMEOUT_MS = 10_000;
@@ -54,6 +57,16 @@ export async function runScriptPlugin(
   };
   if (plugin.kind !== 'script') {
     return { ok: false, output, error: '该插件不是脚本插件' };
+  }
+  // FR-16.4 / T-135：声明 execution=sandbox 的插件走进程外沙箱（崩溃/超时/输出隔离）
+  if (plugin.execution === 'sandbox') {
+    if (deps.dataDir === undefined || deps.dataDir === '') {
+      return { ok: false, output, error: '沙箱宿主不可用（缺少数据目录配置）' };
+    }
+    return await runSandboxPlugin(
+      { getDb: deps.getDb, sse: deps.sse, logger: deps.logger, dataDir: deps.dataDir },
+      plugin,
+    );
   }
   if (plugin.dirPath === null || plugin.dirPath === '') {
     return { ok: false, output, error: '插件目录缺失（重新安装该插件）' };

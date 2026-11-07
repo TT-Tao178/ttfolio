@@ -59,6 +59,9 @@ export const pluginManifestSchema = z.object({
     .default({ commands: [], cards: [] }),
   /** 脚本插件：相对插件目录的入口文件（必须落在目录内） */
   main: z.string().max(200).optional(),
+  /** 执行模式（FR-16.4 / T-135）：inproc=同进程受控（默认）；sandbox=进程外沙箱
+   *  （独立子进程，崩溃/超时/资源隔离；仅桌面版可用） */
+  execution: z.enum(['inproc', 'sandbox']).default('inproc'),
 });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
@@ -74,6 +77,7 @@ export interface PluginInfo {
   installedAt: string;
   dirPath: string | null;
   description: string | null;
+  execution: 'inproc' | 'sandbox';
   permissions: PluginPermission[];
   commands: Array<{
     id: string;

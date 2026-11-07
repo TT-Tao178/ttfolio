@@ -506,6 +506,16 @@ function getState() {
   };
 }
 
+/** FR-16.8 / T-139：容器与被嵌窗口的当前 DPI（未挂载返回 null；取值失败给 0，调用方据此跳过）。 */
+function getDpis() {
+  if (session === null) return null;
+  try {
+    return { container: safeDpi(session.container), target: safeDpi(session.hwnd) };
+  } catch {
+    return null;
+  }
+}
+
 function isAttached() {
   return session !== null && session.attached;
 }
@@ -950,6 +960,7 @@ module.exports = {
   detach,
   detachAll,
   resize,
+  getDpis,
   setVisible,
   refresh,
   isAttached,

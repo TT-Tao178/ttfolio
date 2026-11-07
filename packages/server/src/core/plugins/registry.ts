@@ -30,6 +30,7 @@ function toInfo(r: PluginRow): PluginInfo | null {
       installedAt: r.installed_at,
       dirPath: r.dir_path,
       description: m.description ?? null,
+      execution: m.execution ?? 'inproc',
       permissions: m.permissions ?? [],
       commands: (m.contributes?.commands ?? []).map((c) => ({
         id: c.id,
@@ -56,6 +57,7 @@ export const BUILTIN_PLUGINS: PluginManifest[] = [
     author: 'ttFolio',
     description: '声明式插件示例：贡献一条命令，在命令面板里查看项目规模统计。',
     kind: 'declarative',
+    execution: 'inproc',
     permissions: ['commands.contribute'],
     contributes: {
       commands: [

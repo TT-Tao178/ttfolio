@@ -99,6 +99,7 @@ describe('插件注册表与命令贡献（FR-14.1）', () => {
       name: '演示卡片',
       version: '1.0.0',
       kind: 'declarative' as const,
+      execution: 'inproc' as const,
       permissions: [] as [],
       contributes: {
         commands: [],

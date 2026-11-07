@@ -97,6 +97,10 @@ try {
 
 /** 渲染层最近一次上报的面板 DIP 矩形（相对页面视口）；窗口移动/缩放/跨屏时用它重算。 */
 let embedRectDip = null;
+/** FR-16.8 / T-139：跨屏 DPI 重建需要重挂的 sourceId 与限流时间戳 */
+let lastEmbedSourceId = null;
+let lastDpiRebuildAt = 0;
+let dpiDebounceTimer = null;
 
 /**
  * 面板 DIP 矩形（相对页面视口）→ **屏幕物理像素**矩形。
@@ -137,6 +141,46 @@ function syncEmbedRect() {
   if (embedHost === null || !embedHost.isAttached() || embedRectDip === null) return;
   const px = embedRectToPx(embedRectDip);
   if (px !== null) embedHost.resize(px);
+}
+
+// FR-16.8 / T-139（2026-11-07 用户点名 B 组）：跨屏缩放比变化时，容器不重建会导致
+// 老式感知目标偏糊——display-metrics-changed（300ms 防抖）后比对容器/目标 DPI，
+// 不一致则 detach（全量还原）→ 按新屏 DPI 重建 attach。同一目标 30s 内最多一次，
+// 失败回落监控（不重试死循环）。
+if (typeof screen.on === 'function') {
+  screen.on('display-metrics-changed', () => {
+    if (dpiDebounceTimer !== null) clearTimeout(dpiDebounceTimer);
+    dpiDebounceTimer = setTimeout(() => {
+      dpiDebounceTimer = null;
+      try {
+        if (embedHost === null || !embedHost.isAttached() || embedRectDip === null) return;
+        if (win === null || win.isDestroyed()) return;
+        if (lastEmbedSourceId === null) return;
+        const dpis = embedHost.getDpis();
+        if (dpis === null || dpis.container === 0 || dpis.target === 0 || dpis.container === dpis.target)
+          return;
+        if (Date.now() - lastDpiRebuildAt < 30_000) return;
+        embedHost.detach();
+        const px = embedRectToPx(embedRectDip);
+        if (px === null) return;
+        const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
+        const r = embedHost.attach(Number(handle), lastEmbedSourceId, px);
+        lastDpiRebuildAt = Date.now();
+        process.stdout.write(
+          `[ttfolio-electron] embed container rebuilt for DPI change (container=${dpis.container} target=${dpis.target} ok=${r.ok})
+`,
+        );
+        if (win !== null && !win.isDestroyed()) {
+          win.webContents.send('tt:embed-host-changed', { event: 'dpi-rebuilt', ok: r.ok === true });
+        }
+      } catch (err) {
+        process.stdout.write(
+          `[ttfolio-electron] embed DPI rebuild failed: ${err && err.message ? err.message : String(err)}
+`,
+        );
+      }
+    }, 300);
+  });
 }
 
 /** 退出/关窗口时的还原：与 before-quit 共用，幂等（两条路径都会触发）。 */
@@ -672,7 +716,8 @@ ipcMain.handle('tt:embed-host-attach', async (_event, sourceId, rect) => {
     const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
     embedRectDip = dip;
     const r = embedHost.attach(Number(handle), String(sourceId), px);
-    if (r.ok !== true) embedRectDip = null;
+    if (r.ok === true) lastEmbedSourceId = String(sourceId);
+    else embedRectDip = null;
     return r;
   } catch (err) {
     embedRectDip = null;
