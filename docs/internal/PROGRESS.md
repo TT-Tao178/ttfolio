@@ -2,6 +2,33 @@
 
 # PROGRESS
 
+## 第 102 轮：扩展批次收尾对——孤儿救援 + 任务栏身份反转（v0.6.5 随包）
+
+- 扩展批次第五对/收尾对（2026-11-07）。FR-16.10/16.9 收编于 4.16 节。
+- **T-141 孤儿救援（da95120）**：embed-host captureRescue（attach 时整份
+  还原档案：hwnd/GWL 样式/placement base64/进程路径/类名）+ rescueOrphan
+  （类名+进程路径双校验防 hwnd 复用误伤 → restoreWindow 同链整份还原）；
+  main：attach 写 embed-rescue.json（数据目录）、干净 detach 与目标失效清
+  档案、启动读档案 → 校验即救援（广播 orphan-rescued，清档案）→ 失败放弃
+  清档；全程 try/catch 不影响启动。**方案 A（辅助宿主进程）不做**：owner 换
+  进程后浮层守卫需跨进程 Z 序联动，复杂度远超收益（救援已覆盖主要痛点）。
+- **T-140 spike 结论 + 写方向反转（同提交）**：独立探针实测 koffi GetValue
+  显式 PROPVARIANT 缓冲——**干净返回 hr=1（S_FALSE），无硬崩溃**（T-131
+  时代的「读即崩」疑为调用形态差异）——读方向不可行，spike 按设计终止；
+  反转方案实装：attach 时把容器同款 AUMID（目标 exe 路径）**写到目标窗口**
+  （setWindowAppId 写方向已验证），两窗口任务栏归为一组；分离时 VT_EMPTY
+  清除。局限入 KNOWN-GAPS #9（目标自带显式 AUMID 被覆盖，分离后回退默认
+  分组而非原值）。探针脚本在 .tmp-test（不入库不入启动链）。
+- 门禁三绿每提交真实退出码 0（303 条）；electron 双文件语法/require 冒烟过；
+  spike 探针独立进程跑通（写 OK / 读 hr=1 终止）。
+- **版本三处（本次提交）+ 链路 + 发布**：audit → build → build:server →
+  electron-rebuild → builder 065t1 → 自检（0.6.5 断言）→ 回移 + npm rebuild →
+  门禁三绿 + e2e → push/tag v0.6.5 → Release 脚本 + 复核 + 资产对照（拖传
+  欠账十一页 v0.5.4~v0.6.5）。062t1/063t1/064t1/065t1 残留不代删。
+- KNOWN-GAPS 更新：「窗口寄宿的已知限制」#5/#9 改写（孤儿救援落地/写方向
+  反转落地+局限）；任务总表 T-132~141 转 ✅（扩展批次全部完成，FR-16 系列
+  齐了）。
+
 ## 第 101 轮：v0.6.4 发布（寄宿状态记忆 + 多槽挂起）+ 启动即死二连修复
 
 - **版本三处（43c073f）**；链路一轮过但 **064t1 首版冒烟失败**（同 063t1 的
