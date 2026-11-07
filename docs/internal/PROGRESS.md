@@ -2,6 +2,24 @@
 
 # PROGRESS
 
+## 第 100 轮：扩展批次第四对——寄宿状态记忆 + 多槽挂起（v0.6.4 随包）
+
+- 扩展批次第四对（2026-11-07）。FR-16.6/16.7 收编于 4.16 节。
+- **T-137 状态记忆（a591eb9）**：embed-host 加 EnumWindows + IsWindowVisible
+  绑定与 findByFingerprint（进程路径+类名双匹配、koffi proto 回调名全局唯一
+  + 回调模块级保活防 GC）+ sessionFingerprint；main 寄宿成功写数据目录
+  embed-session.json（**设计偏离**：蓝本原写 ui_layout_json——主进程访问
+  settings 需跨进程，落数据目录文件主进程单写者更直接）；detach 与目标失效
+  自动清指纹；IPC 会话读取/指纹匹配（唯一命中才发 sourceId）；EmbedPanel
+  挂载且未选窗口时自动匹配——唯一命中走既有 attach 链并提示，零命中静默
+  （程序未开属正常），多命中如实提示；不自动拉起目标程序（只匹配已运行）。
+- **T-138 多槽挂起·方案 B（同提交）**：EmbedPanel 槽位 chips ≤3（localStorage
+  跨重启）：保存当前=指纹+窗口名+面板宽；点击切槽=findByFingerprint 重匹配
+  （唯一命中才切，未命中如实提示）；切槽走既有 detach→attach 链（还原保真
+  不变）；方案 A 全并行多容器不在本版（状态机单例改造回归面大，方案 B 实测
+  后由用户拍板）。
+- 门禁三绿每提交真实退出码 0（303 条）；electron 三文件 node --check 全过。
+
 ## 第 99 轮：扩展批次第三对——插件沙箱 + 寄宿 DPI 重建（v0.6.3 随包）
 
 - 扩展批次第三对（2026-11-07）。FR-16.4/16.8 收编于 4.16 节。
