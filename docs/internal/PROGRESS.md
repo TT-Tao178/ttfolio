@@ -2,6 +2,34 @@
 
 # PROGRESS
 
+## 第 99 轮：扩展批次第三对——插件沙箱 + 寄宿 DPI 重建（v0.6.3 随包）
+
+- 扩展批次第三对（2026-11-07）。FR-16.4/16.8 收编于 4.16 节。
+- **T-135 插件沙箱（e462602）**：manifest execution 字段（inproc/sandbox，
+  **设计偏离**：蓝本原写迁移 0019 DB 列——实装 manifest 声明动态读取，零迁移）；
+  sandboxRunner：宿主脚本服务端生成写数据目录（与运行版本同源、幂等覆盖）、
+  spawn process.execPath + **ELECTRON_RUN_AS_NODE=1**（此处该变量是「要」的，
+  与启动冒烟剔除方向相反——如实标注）、stdio JSON-lines RPC、权限/审计父进程
+  逐调用执行、30s 超时强杀 + 输出 ≤64KB + EPIPE/提前退出/启动失败兜底、
+  Web/独立服务如实拒绝；host.ts 按 execution 分流；+4 单测（真子进程：正常
+  受控调用/越权拒绝/超时强杀/上限常量）。**语义如实标注**：沙箱模式 API 全
+  异步（inproc 的 list/get 为同步），插件按 execution 模式适配。
+- **T-139 DPI 重建（同提交）**：embed-host 导出 getDpis()；main.cjs
+  display-metrics-changed（300ms 防抖）→ 容器/目标 DPI 不一致且 30s 限流 →
+  detach 全量还原 → embedRectToPx 新屏像素重建 attach（复用 attach 全链守卫）；
+  lastEmbedSourceId 记录 + 成功经 tt:embed-host-changed 广播 dpi-rebuilt；
+  失败回落监控。**偏离记录**：FR-16.8 原写 toast 提示——实装为通道广播+日志。
+- 门禁三绿每提交真实退出码 0（299→**303 条**，+4）。实施过程记录：lint 抓
+  未使用 capped/write（prettier 重排后替换失配，Edit 工具重接线）；沙箱测试
+  首轮 projects=undefined——沙箱模式 API 返回 Promise（插件未 await），据此
+  把「沙箱 API 全异步」写进文档语义；EPIPE 未捕获异常（kill 后写管道）加
+  write 守卫 + 流错误吞噬。
+- **v0.6.2 待推挂起（网络）**：git 协议被重置（Recv reset/连接失败），但
+  api.github.com 通道活——Release v0.6.2 页已建（201），**远端 tag v0.6.2 被
+  GitHub 自动指到远端 main 旧头 642f736（内容为 0.6.1 时代）**；本地 tag 指向
+  正确 7be77f2。待网络恢复：push main（aa50c2d 起）+ `push origin v0.6.2
+  --force` 修正远端 tag。主进程等出包链不受影响（本地全绿）。
+
 ## 第 98 轮：A 组次两项——Agent 深化 + Token DPAPI（v0.6.2 随包）
 
 - 扩展批次第二对（2026-11-07）。FR-16.3/16.5 收编于 4.16 节。
