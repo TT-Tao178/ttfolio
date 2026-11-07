@@ -18,8 +18,16 @@ const {
   ipcMain,
   nativeTheme,
   nativeImage,
-  screen,
 } = require('electron');
+
+/**
+ * screen 模块在 app ready 之前**访问即抛错**（Electron 的属性 getter 直接 throw：
+ * "The 'screen' module can't be used before the app 'ready' event"）。
+ * 所以不能在顶层解构，统一走这个延迟取值入口，调用点必须保证已 ready。
+ */
+function getScreen() {
+  return require('electron').screen;
+}
 const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
@@ -113,7 +121,7 @@ function embedRectToPx(rect) {
   if (win === null || win.isDestroyed()) return null;
   try {
     const cb = win.getContentBounds();
-    const phys = screen.dipToScreenRect(win, {
+    const phys = getScreen().dipToScreenRect(win, {
       x: cb.x + rect.x,
       y: cb.y + rect.y,
       width: rect.width,
@@ -147,41 +155,44 @@ function syncEmbedRect() {
 // 老式感知目标偏糊——display-metrics-changed（300ms 防抖）后比对容器/目标 DPI，
 // 不一致则 detach（全量还原）→ 按新屏 DPI 重建 attach。同一目标 30s 内最多一次，
 // 失败回落监控（不重试死循环）。
-if (typeof screen.on === 'function') {
-  screen.on('display-metrics-changed', () => {
-    if (dpiDebounceTimer !== null) clearTimeout(dpiDebounceTimer);
-    dpiDebounceTimer = setTimeout(() => {
-      dpiDebounceTimer = null;
-      try {
-        if (embedHost === null || !embedHost.isAttached() || embedRectDip === null) return;
-        if (win === null || win.isDestroyed()) return;
-        if (lastEmbedSourceId === null) return;
-        const dpis = embedHost.getDpis();
-        if (dpis === null || dpis.container === 0 || dpis.target === 0 || dpis.container === dpis.target)
-          return;
-        if (Date.now() - lastDpiRebuildAt < 30_000) return;
-        embedHost.detach();
-        const px = embedRectToPx(embedRectDip);
-        if (px === null) return;
-        const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
-        const r = embedHost.attach(Number(handle), lastEmbedSourceId, px);
-        lastDpiRebuildAt = Date.now();
-        process.stdout.write(
-          `[ttfolio-electron] embed container rebuilt for DPI change (container=${dpis.container} target=${dpis.target} ok=${r.ok})
+// screen 在 app ready 之前访问会抛错，这段注册必须推迟到 ready 之后（处理体保持不变）。
+app.whenReady().then(() => {
+  const screenMod = getScreen();
+  if (typeof screenMod.on === 'function')
+    screenMod.on('display-metrics-changed', () => {
+      if (dpiDebounceTimer !== null) clearTimeout(dpiDebounceTimer);
+      dpiDebounceTimer = setTimeout(() => {
+        dpiDebounceTimer = null;
+        try {
+          if (embedHost === null || !embedHost.isAttached() || embedRectDip === null) return;
+          if (win === null || win.isDestroyed()) return;
+          if (lastEmbedSourceId === null) return;
+          const dpis = embedHost.getDpis();
+          if (dpis === null || dpis.container === 0 || dpis.target === 0 || dpis.container === dpis.target)
+            return;
+          if (Date.now() - lastDpiRebuildAt < 30_000) return;
+          embedHost.detach();
+          const px = embedRectToPx(embedRectDip);
+          if (px === null) return;
+          const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
+          const r = embedHost.attach(Number(handle), lastEmbedSourceId, px);
+          lastDpiRebuildAt = Date.now();
+          process.stdout.write(
+            `[ttfolio-electron] embed container rebuilt for DPI change (container=${dpis.container} target=${dpis.target} ok=${r.ok})
 `,
-        );
-        if (win !== null && !win.isDestroyed()) {
-          win.webContents.send('tt:embed-host-changed', { event: 'dpi-rebuilt', ok: r.ok === true });
+          );
+          if (win !== null && !win.isDestroyed()) {
+            win.webContents.send('tt:embed-host-changed', { event: 'dpi-rebuilt', ok: r.ok === true });
+          }
+        } catch (err) {
+          process.stdout.write(
+            `[ttfolio-electron] embed DPI rebuild failed: ${err && err.message ? err.message : String(err)}
+`,
+          );
         }
-      } catch (err) {
-        process.stdout.write(
-          `[ttfolio-electron] embed DPI rebuild failed: ${err && err.message ? err.message : String(err)}
-`,
-        );
-      }
-    }, 300);
-  });
-}
+      }, 300);
+    });
+});
 
 /** 退出/关窗口时的还原：与 before-quit 共用，幂等（两条路径都会触发）。 */
 function detachAllEmbeds() {
@@ -224,7 +235,10 @@ if (embedHost !== null) {
       if (win !== null && !win.isDestroyed()) win.webContents.send('tt:embed-host-changed', payload);
     },
     // 以下三项都延迟取值：调用发生在运行期，此时 app/screen/win 一定就绪
-    getWorkAreas: () => screen.getAllDisplays().map((d) => d.workArea),
+    getWorkAreas: () =>
+      getScreen()
+        .getAllDisplays()
+        .map((d) => d.workArea),
     isHostMinimized: () => win !== null && !win.isDestroyed() && win.isMinimized(),
   });
 }
@@ -425,7 +439,7 @@ async function boot() {
     if (embedHost !== null) embedHost.refresh();
     syncEmbedRect();
   });
-  screen.on('display-metrics-changed', () => {
+  getScreen().on('display-metrics-changed', () => {
     syncEmbedRect();
     if (embedHost !== null) embedHost.refresh();
   });
