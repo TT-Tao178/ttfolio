@@ -2,6 +2,27 @@
 
 # PROGRESS
 
+## 第 97 轮：A 组前两项——扫描登记 + 规则集合（v0.6.1 随包）
+
+- 用户点名「完成剩余功能，每完成两个测试打包出新版本」。配对计划：v0.6.1
+  T-132+133 / v0.6.2 T-134+136 / v0.6.3 T-135+139 / v0.6.4 T-137+138 /
+  v0.6.5 T-141+140。FR-16.1~16.10 已收编设计文档 4.16 节（生成器跳过 FR-16）。
+- **T-132 扫描登记（e7550b3）**：core/scanner.ts 预留接口实装（深度≤2/候选≤200/
+  扫描≤5000/预算 5s 超限如实 truncated；信号 8 种；黑名单遍历）；/api/scan/
+  preview+ignore 路由；忽略名单 settings 键 scan_ignore_json；设置→数据源卡
+  ScanCard（根目录管理/扫描/勾选登记走既有批量通道/加入忽略）。**设计偏离
+  记录**：FR-16.1 原写任务通道异步——实装同步+护栏（典型 <1s），truncated
+  如实标注。C-02 绕行记录（目录名点前缀 slice）。
+- **T-133 规则集合（同提交）**：迁移 **0016** collections 加 kind/rules_json；
+  成员查询时现算不落成员表（ruleMemberProjectIds 五字段 contains，≤5 条全部
+  满足）；members 400/「从已登记项目添加」隐藏/自动入集跳过/拖拽拒绝（三入口
+  一致）；规则集合不参与父子嵌套（collectionParentError 双向拒）；侧栏漏斗
+  图标；编辑弹窗类型+条件编辑器；卡片墙按现算成员呈现（路由侧 collectionIds
+  解析）。CollectionInfo 加 kind/rules。
+- 门禁三绿每提交真实退出码 0（292→**296 条**，+4：scanner 单测 3、规则集合
+  集成回归 1）。实施过程记录：C-02 lint 抓 scanner 点前缀 startsWith（slice
+  绕行+注释）；isRuleCollection 三处替换首版漏两处（lint unused 抓到补齐）。
+
 ## 第 96 轮：C 组四项——组织导航闭环（v0.6.0 随包）
 
 - 用户点名「完成 C 组，打包，版本 v0.6.0」。C 组四项按设计蓝本
