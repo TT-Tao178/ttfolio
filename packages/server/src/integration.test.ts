@@ -293,6 +293,35 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     db.prepare('DELETE FROM projects WHERE id = ?').run(free.id);
   });
 
+  it('listChanges actor 过滤 + change_event 记录发布身份（FR-16.3 / T-134）', () => {
+    const dirCh = path.join(root, 'changes-actor-demo');
+    fs.mkdirSync(dirCh, { recursive: true });
+    const proj = insertProject(db, {
+      dirPath: dirCh,
+      dirPathKey: pathKey(dirCh),
+      diskName: 'changes-actor-demo',
+      defaultArchDir: '架构图',
+    });
+    const now = new Date().toISOString();
+    const ins = db.prepare(
+      'INSERT INTO change_event (project_id, session_id, burst_id, path, kind, first_at, last_at, change_count, bytes, source, actor) VALUES (?, NULL, ?, ?, ?, ?, ?, 1, 10, ?, ?)',
+    );
+    ins.run(proj.id, 'b1', 'a.ts', 'update', now, now, 'agent', 'my-agent');
+    ins.run(proj.id, 'b1', 'b.ts', 'update', now, now, 'watcher', '');
+    const all = listChanges(db, proj.id, { limit: 100 });
+    expect(all.length).toBe(2);
+    expect(all.every((e) => e.actor !== undefined)).toBe(true);
+    const byAgent = listChanges(db, proj.id, { limit: 100, actor: 'my-agent' });
+    expect(byAgent.length).toBe(1);
+    expect(byAgent[0]?.path).toBe('a.ts');
+    // 语义：actor 传空串视为「不过滤」（路由层缺失该 query 时同样不过滤）
+    const byEmpty = listChanges(db, proj.id, { limit: 100, actor: '' });
+    expect(byEmpty.length).toBe(2);
+    // 清理
+    db.prepare('DELETE FROM change_event WHERE project_id = ?').run(proj.id);
+    db.prepare('DELETE FROM projects WHERE id = ?').run(proj.id);
+  });
+
   it('默认排序为名称稳定序（第 94 轮去「点击置顶」回归）：无 sort 参数等价 sort=name', () => {
     const byDefault = listProjects(db, { status: 'active' }).map((p) => p.id);
     const byName = listProjects(db, { status: 'active', sort: 'name' }).map((p) => p.id);

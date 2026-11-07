@@ -19,6 +19,9 @@ import { buildProjectIndex, clearProjectIndex } from '../core/search.js';
 import { listTaskRuns } from '../db/repo/taskRunRepo.js';
 import { validateTemplateArgs, openUrlInBrowser } from '../core/openExternal.js';
 import { AppError } from '../core/errors.js';
+import { protectSecret, unprotectSecret } from '../core/tokenCipher.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   SETTING_KEYS,
   TRASH_RETENTION_DAYS,
@@ -60,6 +63,43 @@ const MIGRATION_LABELS: Array<{ file: string; label: string }> = [
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
+
+  // ---- FR-16.5 / T-136：GitHub Token DPAPI 收口 ----
+  // 读取唯一出口：protected=1 时从数据目录 github_token.bin 解密；旧明文兜底（迁移前）。
+  const readGithubToken = async (): Promise<string | null> => {
+    const db = ctx.db();
+    if (getSetting(db, 'github_token_protected') === '1') {
+      const file = path.join(ctx.layout.dataDir, 'github_token.bin');
+      if (!fs.existsSync(file)) return null;
+      try {
+        const plain = await unprotectSecret(fs.readFileSync(file, 'utf8').trim());
+        return plain === '' ? null : plain;
+      } catch {
+        // 解密失败（换用户/文件损坏）：如实返回空，状态页显示未配置——绝不静默降级读旧明文
+        return null;
+      }
+    }
+    const legacy = getSetting(db, SETTING_KEYS.githubToken);
+    return legacy !== null && legacy !== '' ? legacy : null;
+  };
+  const writeGithubToken = async (plain: string): Promise<void> => {
+    const cipher = await protectSecret(plain);
+    fs.writeFileSync(path.join(ctx.layout.dataDir, 'github_token.bin'), cipher, 'utf8');
+    setSetting(ctx.db(), SETTING_KEYS.githubToken, '');
+    setSetting(ctx.db(), 'github_token_protected', '1');
+  };
+  const clearGithubToken = (): void => {
+    const file = path.join(ctx.layout.dataDir, 'github_token.bin');
+    if (fs.existsSync(file)) {
+      try {
+        fs.rmSync(file);
+      } catch {
+        /* 文件锁等：下次清理 */
+      }
+    }
+    setSetting(ctx.db(), SETTING_KEYS.githubToken, '');
+    setSetting(ctx.db(), 'github_token_protected', '0');
+  };
 
   app.get('/api/health', async (_req) => {
     return ok({
@@ -124,6 +164,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
       scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
       scanIgnorePaths: safeJson(all[SETTING_KEYS.scanIgnoreJson] ?? '[]'),
+      handoffTemplates: safeJson(all[SETTING_KEYS.handoffTemplatesJson] ?? '[]'),
       uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}'),
       customViews: parseCustomViews(all[SETTING_KEYS.customViews]),
     });
@@ -168,6 +209,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       keybindings_json: (v) => JSON.stringify(v),
       scan_root_dirs_json: (v) => JSON.stringify(v),
       scan_ignore_json: (v) => JSON.stringify(v),
+      handoff_templates_json: (v) => JSON.stringify(v),
       ui_layout_json: (v) => JSON.stringify(v),
       custom_views_json: (v) => JSON.stringify(v),
     };
@@ -197,7 +239,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   // 仓库的 Token（存 settings.github_token，仅写不回显）。 ----
 
   app.get('/api/update/status', async () => {
-    const token = getSetting(ctx.db(), SETTING_KEYS.githubToken);
+    const token = await readGithubToken();
     return ok({
       currentVersion: ctx.version,
       repo: GITHUB_REPO,
@@ -217,18 +259,18 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
           '不像 GitHub Token：应以 ghp_ / gho_ / github_pat_ 开头、无空白、长度 ≥ 20',
         );
       }
-      setSetting(ctx.db(), SETTING_KEYS.githubToken, token);
+      await writeGithubToken(token);
       logActivity(ctx.db(), {
         kind: 'settings.change',
         level: 'L1',
-        detail: { key: SETTING_KEYS.githubToken, action: 'set' },
+        detail: { key: 'github_token', action: 'set-dpapi' },
       });
     } else {
-      setSetting(ctx.db(), SETTING_KEYS.githubToken, '');
+      clearGithubToken();
       logActivity(ctx.db(), {
         kind: 'settings.change',
         level: 'L1',
-        detail: { key: SETTING_KEYS.githubToken, action: 'clear' },
+        detail: { key: 'github_token', action: 'clear' },
       });
     }
     return ok({ saved: true, tokenSet: token !== '' });
@@ -465,8 +507,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   }
 
   app.get('/api/update/check', async () => {
-    const db = ctx.db();
-    const token = getSetting(db, SETTING_KEYS.githubToken);
+    const token = await readGithubToken();
     let res: { status: number; data: unknown };
     try {
       res = await githubGetLatestRelease(token !== null && token !== '' ? token : null);

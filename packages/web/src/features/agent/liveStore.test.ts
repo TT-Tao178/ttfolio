@@ -16,6 +16,7 @@ function ev(seq: number, overrides: Partial<ChangeEventInfo> = {}): ChangeEventI
     changeCount: 1,
     bytes: 10,
     source: 'watcher',
+    actor: '',
     ...overrides,
   };
 }

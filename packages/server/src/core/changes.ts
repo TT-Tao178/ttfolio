@@ -37,6 +37,8 @@ export interface ChangeEventInfo {
   changeCount: number;
   bytes: number | null;
   source: ChangeSource;
+  /** 发布时链身份（FR-16.3 / T-134）；'' = 无身份 */
+  actor: string;
 }
 
 export interface PublishChangeInput {
@@ -158,13 +160,14 @@ export class ChangeTracker {
           const firstAt = prev?.first_at ?? nowIso;
           const count = (prev?.change_count ?? 0) + 1;
           const sessionId = input.sessionId ?? prev?.session_id ?? null;
+          const actor = currentActor().actor;
           if (prev !== undefined) run(db, 'DELETE FROM change_event WHERE id = ?', [prev.id]);
           const r = run(
             db,
             `INSERT INTO change_event
-               (project_id, session_id, burst_id, path, kind, first_at, last_at, change_count, bytes, source)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [input.projectId, sessionId, burstId, rel, kind, firstAt, nowIso, count, sizeOf(), source],
+               (project_id, session_id, burst_id, path, kind, first_at, last_at, change_count, bytes, source, actor)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [input.projectId, sessionId, burstId, rel, kind, firstAt, nowIso, count, sizeOf(), source, actor],
           );
           events.push({
             seq: Number(r.lastInsertRowid),
@@ -178,6 +181,7 @@ export class ChangeTracker {
             changeCount: count,
             bytes: sizeOf(),
             source,
+            actor,
           });
         }
       } catch (err) {
@@ -239,21 +243,27 @@ export class ChangeTracker {
 export function listChanges(
   db: Database.Database,
   projectId: string,
-  opts: { since?: number; limit: number },
+  opts: { since?: number; limit: number; actor?: string },
 ): ChangeEventInfo[] {
+  // FR-16.3：actor 过滤（与活动页口径一致）——SQL 拼 actor 条件，参数化
+  const actorCond = opts.actor !== undefined && opts.actor !== '' ? ' AND actor = ?' : '';
   const rows =
     opts.since !== undefined && Number.isFinite(opts.since)
       ? getAll<Record<string, unknown>>(
           db,
-          `SELECT * FROM change_event WHERE project_id = ? AND id > ? ORDER BY id ASC LIMIT ?`,
-          [projectId, opts.since, opts.limit],
+          `SELECT * FROM change_event WHERE project_id = ? AND id > ?${actorCond} ORDER BY id ASC LIMIT ?`,
+          opts.actor !== undefined && opts.actor !== ''
+            ? [projectId, opts.since, opts.actor, opts.limit]
+            : [projectId, opts.since, opts.limit],
         )
       : getAll<Record<string, unknown>>(
           db,
           `SELECT * FROM (
-             SELECT * FROM change_event WHERE project_id = ? ORDER BY id DESC LIMIT ?
+             SELECT * FROM change_event WHERE project_id = ?${actorCond} ORDER BY id DESC LIMIT ?
            ) ORDER BY id ASC`,
-          [projectId, opts.limit],
+          opts.actor !== undefined && opts.actor !== ''
+            ? [projectId, opts.actor, opts.limit]
+            : [projectId, opts.limit],
         );
   return rows.map((r) => ({
     seq: Number(r['id']),
@@ -267,6 +277,7 @@ export function listChanges(
     changeCount: Number(r['change_count'] ?? 1),
     bytes: r['bytes'] === null ? null : Number(r['bytes']),
     source: (r['source'] as ChangeSource) ?? 'watcher',
+    actor: String(r['actor'] ?? ''),
   }));
 }
 

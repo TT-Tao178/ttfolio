@@ -8,12 +8,13 @@ export const changesRoutes: FastifyPluginAsync = async (app) => {
   const ctx = app.ttfolio as AppContext;
 
   app.get('/api/changes', async (req) => {
-    const q = req.query as { projectId?: string; since?: string; limit?: string };
+    // FR-16.3：actor 过滤（与活动页口径一致）
+    const q = req.query as { projectId?: string; since?: string; limit?: string; actor?: string };
     if (q.projectId === undefined || q.projectId === '') return fail('BAD_REQUEST', '缺少 projectId');
     const limit = Math.min(Math.max(Number(q.limit ?? '300'), 1), 1000);
     const sinceNum = q.since !== undefined && q.since !== '' ? Number(q.since) : undefined;
     const since = sinceNum !== undefined && Number.isFinite(sinceNum) ? sinceNum : undefined;
-    const events = listChanges(ctx.db(), q.projectId, { since, limit });
+    const events = listChanges(ctx.db(), q.projectId, { since, limit, actor: q.actor });
     return ok({ seq: events.length > 0 ? (events[events.length - 1]?.seq ?? 0) : (since ?? 0), events });
   });
 };

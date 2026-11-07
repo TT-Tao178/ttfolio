@@ -21,10 +21,63 @@ import {
 import { closeSessionWithSummary } from '../core/sessionSummary.js';
 import { readSnapshot } from '../core/snapshots.js';
 import { headHash } from '../core/git.js';
-import { logActivity } from '../db/repo/metaRepo.js';
+import { logActivity, getSetting } from '../db/repo/metaRepo.js';
 import { currentActor } from '../core/actor.js';
+import { listChanges } from '../core/changes.js';
+import { listTodos } from '../db/repo/sessionRepo.js';
 import { agentSessionPatchSchema, agentSessionSummarySchema } from '@ttfolio/shared';
 import type { AgentManifest } from '@ttfolio/shared';
+
+/** 默认交接单模板（FR-16.3 / T-134）；自定义模板存 settings 键 handoff_templates_json */
+const DEFAULT_HANDOFF_TEMPLATE = `# 交接单：{{project}}
+
+## 速览
+- 路径：{{path}}
+- 类型 / 主语言 / 技术栈：{{type}} / {{language}} / {{stack}}
+- Git：{{branch}}{{dirty}}
+- 最后打开：{{lastOpened}}
+
+## 归属
+- 集合：{{collections}}
+- 标签：{{tags}}
+
+## 未完成清单（{{todoCount}}）
+{{todos}}
+
+## 最近变更（最近 {{changeCount}} 条）
+{{recentChanges}}
+
+## 备注
+{{note}}
+`;
+
+function parseHandoffTemplates(raw: string | null): Array<{ id: string; name: string; body: string }> {
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (t): t is { id: string; name: string; body: string } =>
+          t !== null &&
+          typeof t === 'object' &&
+          typeof (t as { id?: unknown }).id === 'string' &&
+          typeof (t as { name?: unknown }).name === 'string' &&
+          typeof (t as { body?: unknown }).body === 'string',
+      )
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
+/** 占位符白名单渲染：未知/缺失值渲染为空并附「缺失」标记（FR-16.3 验收） */
+function renderHandoff(body: string, values: Record<string, string>): string {
+  return body.replace(/\{\{(\w+)\}\}/g, (_m, key: string) => {
+    const v = values[key];
+    return v !== undefined && v !== '' ? v : `（缺失：${key}）`;
+  });
+}
 
 /** 能力端点表：只列既有真实端点（含真实参数名），给 agent 一张可靠的地图。 */
 function capabilityTable(): Record<string, string> {
@@ -86,6 +139,64 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       ``,
     ].join('\n');
     return ok(`${header}${packet}`);
+  });
+
+  // ---- 交接单（FR-16.3 / T-134）：Markdown 附件，模板可自定义（settings 键
+  // handoff_templates_json ≤10 条）；只读聚合绝不写项目文件；占位符缺失渲染
+  // 「（缺失：key）」标记。----
+  app.get('/api/agent/projects/:id/handoff', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const q = req.query as { template?: string };
+    const db = ctx.db();
+    const p = getProjectSummary(db, id);
+    if (p === null) return fail('NOT_FOUND', '项目不存在', 404);
+    const todos = listTodos(db, { projectId: id, includeDone: false });
+    const changes = listChanges(db, id, { limit: 10 });
+    const colNames = listCollections(db)
+      .filter((c) => c.projectIds.includes(id))
+      .map((c) => c.name);
+    const row = getProjectRow(db, id);
+    const values: Record<string, string> = {
+      project: p.alias ?? p.diskName,
+      path: p.dirPath,
+      type: String(p.type),
+      language: p.primaryLanguage ?? '',
+      stack: p.techStack.length > 0 ? p.techStack.join('、') : '',
+      branch: row?.git_is_repo === 1 ? (row.git_branch ?? '（无提交）') : '非 git 仓库',
+      dirty: row?.git_is_repo === 1 && row.git_dirty === 1 ? '（有未提交改动）' : '（工作区干净）',
+      lastOpened: p.lastOpenedAt === null ? '从未打开' : new Date(p.lastOpenedAt).toLocaleString('zh-CN'),
+      collections: colNames.length > 0 ? colNames.join('、') : '（无）',
+      tags: p.tags.length > 0 ? p.tags.join('、') : '（无）', // tags 为 string[]
+      todoCount: String(todos.length),
+      todos:
+        todos.length > 0
+          ? todos.map((t) => `- [ ] ${t.title}${t.dueOn !== null ? `（截止 ${t.dueOn}）` : ''}`).join('\n')
+          : '（无未完成项）',
+      changeCount: String(changes.length),
+      recentChanges:
+        changes.length > 0
+          ? changes
+              .map(
+                (c) =>
+                  `- ${c.kind} ${c.path}（${c.source}，${new Date(c.firstAt ?? Date.now()).toLocaleString('zh-CN')}）`,
+              )
+              .join('\n')
+          : '（暂无变更记录）',
+      note: p.notes ?? '（无备注）',
+    };
+    const templates = parseHandoffTemplates(getSetting(db, 'handoff_templates_json'));
+    const tpl = q.template !== undefined ? templates.find((t) => t.id === q.template) : undefined;
+    const markdown = renderHandoff(tpl !== undefined ? tpl.body : DEFAULT_HANDOFF_TEMPLATE, values);
+    logActivity(db, {
+      kind: 'agent.handoff_export',
+      level: 'L1',
+      projectId: id,
+      actor: currentActor().actor,
+      detail: { template: tpl?.id ?? 'default' },
+    });
+    reply.header('content-type', 'text/markdown; charset=utf-8');
+    reply.header('content-disposition', 'attachment; filename="ttfolio-handoff.md"');
+    return reply.send(markdown);
   });
 
   // ---- 资源仓库会话（FR-13.3 / T-097） ----

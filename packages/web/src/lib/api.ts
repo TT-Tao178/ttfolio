@@ -201,6 +201,16 @@ export function sseUrl(): string {
  * 这里改为：带 token 取回内容 → 生成 blob → 触发本地保存。
  * 刻意不改服务端鉴权闸门（为两个按钮放宽鉴权会扩大安全面）。
  */
+/** 带 token 取回文本（交接单等 Markdown 端点；非 ok 抛 ApiClientError）。 */
+export async function fetchTextWithToken(path: string): Promise<string> {
+  const url = new URL(base() + path, window.location.origin);
+  const res = await fetch(url.toString(), { headers: { 'x-ttfolio-token': token() } });
+  if (!res.ok) {
+    throw new ApiClientError(`HTTP_${res.status}`, `获取失败（HTTP ${res.status}）`, undefined, res.status);
+  }
+  return await res.text();
+}
+
 export async function downloadWithToken(path: string, fallbackName: string): Promise<void> {
   const url = new URL(base() + path, window.location.origin);
   const res = await fetch(url.toString(), { headers: { 'x-ttfolio-token': token() } });

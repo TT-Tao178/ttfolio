@@ -52,6 +52,7 @@ export const SETTING_KEYS = {
   docRootBlacklist: 'doc_root_blacklist_json',
   scanRootDirs: 'scan_root_dirs_json', // FR-16.1 实装（T-132）
   scanIgnoreJson: 'scan_ignore_json', // 扫描候选忽略名单（FR-16.1）
+  handoffTemplatesJson: 'handoff_templates_json', // 交接单自定义模板（FR-16.3）
   keybindings: 'keybindings_json', // FR-11.4
   // 代码语法配色方案（FR-13.4 / T-098）：classic | warm | neon，独立于应用主题
   syntaxScheme: 'syntax_scheme',

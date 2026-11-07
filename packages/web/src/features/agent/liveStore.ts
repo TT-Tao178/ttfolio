@@ -21,6 +21,8 @@ export interface ChangeEventInfo {
   changeCount: number;
   bytes: number | null;
   source: ChangeSource;
+  /** 发布时链身份（FR-16.3）；'' = 无身份（watcher 旧数据） */
+  actor: string;
 }
 
 /** 前端窗口上限：与后端回读 300 条配合，防长时间挂机无限增长。 */

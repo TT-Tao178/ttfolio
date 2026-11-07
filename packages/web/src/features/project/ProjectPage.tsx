@@ -19,6 +19,7 @@ import {
   StarFilled,
   CopyOutlined,
   DownloadOutlined,
+  FileTextOutlined,
   FolderOpenOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
@@ -32,6 +33,7 @@ import { LanguageBar } from '@/components/LanguageBar';
 import { StateView } from '@/components/StateView';
 import { typeLabel } from '@/components/DetailPanel';
 import { downloadProjectReport } from '@/features/workbench/projectMenu';
+import { HandoffModal } from './HandoffModal';
 import { FilesTab } from '@/features/files/FilesTab';
 import { GitTab } from '@/features/git/GitTab';
 import { ArchivesTab } from '@/features/archives/ArchivesTab';
@@ -62,6 +64,7 @@ export function ProjectPage({
   const { message } = App.useApp();
   const active = subTab ?? 'files';
   const [aliasOpen, setAliasOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   // 项目概览页签的滚动同步（0.3.8 补 KNOWN-GAPS #4）：按 项目+页签 维度持久化与回放
   const ovScrollRef = useRef<HTMLDivElement>(null);
   useTabScroll(ovScrollRef, `${projectId}|${active}`);
@@ -158,8 +161,23 @@ export function ProjectPage({
           >
             导出报告
           </Button>
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            onClick={() => setHandoffOpen(true)}
+            data-testid="handoff-btn"
+          >
+            交接单
+          </Button>
         </Space>
       </div>
+      {handoffOpen && p !== undefined && (
+        <HandoffModal
+          projectId={projectId}
+          name={p.alias ?? p.diskName}
+          onClose={() => setHandoffOpen(false)}
+        />
+      )}
       {/* 项目页页签（3.3 / FR-13）：概览→文件→Git→架构图→文档→动态（FR-13.2）→仓库（FR-13.3，可选）→媒体（FR-13.5）；快捷键 1–8 走同一套 updateActiveLocation */}
       <Tabs
         size="small"

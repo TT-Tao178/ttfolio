@@ -1,5 +1,5 @@
 /** 活动中心（FR-13.8 / T-105）：活动记录（筛选/分页/CSV）+ 时间线（按天）+ 最近查看（recent_files + 收藏置顶）。 */
-import { Button, DatePicker, Empty, List, Select, Space, Tabs, Tag, Typography } from 'antd';
+import { Button, DatePicker, Empty, Input, List, Select, Space, Tabs, Tag, Typography } from 'antd';
 import { DownloadOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useMemo, useState } from 'react';
@@ -23,6 +23,7 @@ interface ActivityFilters {
   projectId?: string;
   level?: string;
   kind?: string;
+  actor?: string;
   range?: [Dayjs, Dayjs] | null;
 }
 
@@ -31,6 +32,7 @@ function filterParams(f: ActivityFilters): Record<string, string> {
   if (f.projectId !== undefined) p.projectId = f.projectId;
   if (f.level !== undefined) p.level = f.level;
   if (f.kind !== undefined) p.kind = f.kind;
+  if (f.actor !== undefined && f.actor !== '') p.actor = f.actor;
   if (f.range !== undefined && f.range !== null) {
     p.since = f.range[0].startOf('day').toISOString();
     p.until = f.range[1].endOf('day').toISOString();
@@ -123,7 +125,14 @@ function FilterBar({
       <DatePicker.RangePicker
         value={filters.range ?? null}
         onChange={(range) => onChange({ ...filters, range: range as [Dayjs, Dayjs] | null })}
-        allowEmpty={[true, true]}
+      />
+      <Input
+        allowClear
+        placeholder="actor（local / agent 名）"
+        style={{ minWidth: 150 }}
+        value={filters.actor ?? ''}
+        onChange={(e) => onChange({ ...filters, actor: e.target.value === '' ? undefined : e.target.value })}
+        data-testid="activity-actor-filter"
       />
     </Space>
   );

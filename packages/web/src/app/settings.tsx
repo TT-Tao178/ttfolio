@@ -63,6 +63,7 @@ export interface SettingsShape {
   syntaxScheme: string;
   scanRootDirs: unknown[];
   scanIgnorePaths: string[];
+  handoffTemplates: unknown[];
   /** 可拖拽面板尺寸（见 hooks/usePaneSize.ts） */
   uiLayout: {
     sidebarWidth?: number;
@@ -103,6 +104,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   syntaxScheme: 'classic',
   scanRootDirs: [],
   scanIgnorePaths: [],
+  handoffTemplates: [],
   uiLayout: {},
   customViews: [],
 };
@@ -134,6 +136,7 @@ const SERVER_KEY: Record<string, string> = {
   syntaxScheme: 'syntax_scheme',
   scanRootDirs: 'scan_root_dirs_json',
   scanIgnorePaths: 'scan_ignore_json',
+  handoffTemplates: 'handoff_templates_json',
   uiLayout: 'ui_layout_json',
   customViews: 'custom_views_json',
 };

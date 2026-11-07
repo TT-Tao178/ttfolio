@@ -2,7 +2,7 @@
  *  右栏跟随最新 / 当前内容 / 与基线差异（基线 = 手动「设基线」时的 git HEAD）。 */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Button, Empty, Segmented, Switch, Tag, Tooltip } from 'antd';
+import { Alert, App, Button, Empty, Segmented, Select, Switch, Tag, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   EditOutlined,
@@ -100,7 +100,21 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
   const isRepo = p?.gitIsRepo === true;
 
   const events = useLiveEvents(projectId);
-  const bursts = useMemo(() => groupBursts(events), [events]);
+  // FR-16.3 / T-134：actor 筛选（多 agent 分账旁观）
+  const [actorFilter, setActorFilter] = useState<string | null>(null);
+  const actorOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of events) set.add(e.actor === '' ? '（无身份）' : e.actor);
+    return [...set].map((a) => ({ value: a, label: a }));
+  }, [events]);
+  const filteredEvents = useMemo(
+    () =>
+      actorFilter === null
+        ? events
+        : events.filter((e) => (actorFilter === '（无身份）' ? e.actor === '' : e.actor === actorFilter)),
+    [events, actorFilter],
+  );
+  const bursts = useMemo(() => groupBursts(filteredEvents), [filteredEvents]);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(null);
   const [follow, setFollow] = useState(true);
   const [baseline, setBaseline] = useState<string | null>(null);
@@ -265,7 +279,19 @@ export function AgentLiveTab({ projectId }: { projectId: string }): React.JSX.El
           >
             设基线
           </Button>
-          <span style={{ fontSize: 12, opacity: 0.65 }}>{events.length} 条 · 已落库（保留 7 天）</span>
+          <span style={{ fontSize: 12, opacity: 0.65 }}>
+            {filteredEvents.length} 条 · 已落库（保留 7 天）
+          </span>
+          <Select
+            size="small"
+            allowClear
+            style={{ minWidth: 130 }}
+            placeholder="按 actor 筛选"
+            value={actorFilter ?? undefined}
+            onChange={(v) => setActorFilter(typeof v === 'string' ? v : null)}
+            options={actorOptions}
+            data-testid="agent-live-actor-filter"
+          />
           <span style={{ flex: 1 }} />
           <Tooltip title="跟随最新：自动滚动到最新变更并打开对应文件（点条目即钉住）">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}>

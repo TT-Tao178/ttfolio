@@ -1,4 +1,5 @@
 /** 启动：读配置 → 建/迁移库 → 校验项目路径 → 起双端口 HTTP → 起 Watcher → 每日备份。 */
+import fs from 'node:fs';
 import { existsSync, renameSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { loadPort, resolveDataDir, ensureDataDirs, writeRuntime, loadOrCreateToken } from './config.js';
@@ -17,7 +18,7 @@ import { setDefaultActorName } from './core/actor.js';
 import { hasWindowsPathHazard } from './core/pathGuard.js';
 import { compileIgnore } from './core/ignore.js';
 import { createBackup, applyRetentionByDays } from './core/backup.js';
-import { getSetting, setSetting } from './db/repo/metaRepo.js';
+import { getSetting, setSetting, logActivity } from './db/repo/metaRepo.js';
 import {
   insertTaskRun,
   finishTaskRun,
@@ -28,6 +29,7 @@ import { ChangeTracker, purgeChangeEvents } from './core/changes.js';
 import { pruneSnapshots } from './core/snapshots.js';
 import { autoCloseSessions, closeAutoSessionsOnExit } from './core/sessionSummary.js';
 import { enforceQuota } from './core/thumbs.js';
+import { protectSecret } from './core/tokenCipher.js';
 import { getAll } from './db/sql.js';
 import { SETTING_KEYS } from '@ttfolio/shared';
 
@@ -212,7 +214,7 @@ async function main(): Promise<void> {
 
   // ---- 启动重活延后（首屏优先）：服务已监听、Electron 已开始出首帧，3 秒后再做维护 ----
   // 全部逐项 try/catch，任何一项失败不影响其余，也不影响已起来的服务。
-  const deferBootMaintenance = (): void => {
+  const deferBootMaintenance = async (): Promise<void> => {
     const t0 = Date.now();
     const done = (msg: string): void =>
       logger.info({ mod: 'boot-deferred', msg: `${msg} (${Date.now() - t0}ms)` });
@@ -222,6 +224,28 @@ async function main(): Promise<void> {
       if (q.removed > 0) done(`thumb quota: removed ${q.removed} files, freed ${q.freed} bytes`);
     } catch {
       /* 配额清理失败不阻断 */
+    }
+    // GitHub Token DPAPI 一次性迁移（FR-16.5 / T-136，幂等）：旧明文 → 密文文件 +
+    // 清 settings 值。迁移/解密失败不阻断启动（读路径会如实显示未配置）
+    try {
+      const legacy = getSetting(db, SETTING_KEYS.githubToken);
+      if (legacy !== null && legacy !== '' && getSetting(db, 'github_token_protected') !== '1') {
+        const cipher = await protectSecret(legacy);
+        fs.writeFileSync(path.join(layout.dataDir, 'github_token.bin'), cipher, 'utf8');
+        setSetting(db, SETTING_KEYS.githubToken, '');
+        setSetting(db, 'github_token_protected', '1');
+        logActivity(db, {
+          kind: 'settings.change',
+          level: 'L2',
+          detail: { key: 'github_token', action: 'migrate-dpapi' },
+        });
+        done('github token migrated to DPAPI');
+      }
+    } catch (err) {
+      logger.warn({
+        mod: 'boot-deferred',
+        msg: `github token DPAPI migration skipped: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
     // 每日备份（>24h，VACUUM INTO 整库复制——最重的一项）
     const lastBackup = getSetting(db, SETTING_KEYS.lastBackupAt);
