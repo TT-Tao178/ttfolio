@@ -104,6 +104,8 @@ function buildTable() {
   const shell32 = koffi.load('shell32.dll');
   return {
     IsWindow: user32.func('int32_t IsWindow(intptr_t)'),
+    IsWindowVisible: user32.func('bool IsWindowVisible(intptr_t)'),
+    EnumWindows: user32.func('bool EnumWindows(void *fn, intptr_t lparam)'),
     IsChild: user32.func('int32_t IsChild(intptr_t parent, intptr_t child)'),
     IsZoomed: user32.func('int32_t IsZoomed(intptr_t)'),
     IsIconic: user32.func('int32_t IsIconic(intptr_t)'),
@@ -947,6 +949,52 @@ function focusInside(s) {
   }
 }
 
+// FR-16.6 / T-137：指纹重匹配（状态记忆）。koffi 回调：proto 名全局唯一（koffi
+// 硬规则 #3），回调对象模块级保活防 GC。
+const TTF_ENUMPROC = koffi.proto('ttf_enumproc_t', 'bool', ['intptr_t', 'intptr_t']);
+let enumProcCb = null;
+
+/** 枚举顶层可见窗口，返回指纹（进程路径 + 类名，均不区分大小写）命中的全部 hwnd。
+ *  调用方判 0/1/多：唯一命中才自动回寄宿（零/多命中如实回监控）。 */
+function findByFingerprint(processPath, className) {
+  const wantPath = String(processPath ?? '').toLowerCase();
+  const wantCls = String(className ?? '');
+  const hits = [];
+  if (wantPath === '' || wantCls === '') return hits;
+  enumProcCb = koffi.register(TTF_ENUMPROC, 'bool', (hwnd, _lparam) => {
+    try {
+      if (d.IsWindowVisible(hwnd) === 0) return true;
+      if (classNameOf(hwnd) !== wantCls) return true;
+      if (exePathOf(hwnd).toLowerCase() !== wantPath) return true;
+      hits.push(Number(hwnd));
+    } catch {
+      /* 单窗口取值失败不中断枚举 */
+    }
+    return true;
+  });
+  try {
+    d.EnumWindows(enumProcCb, 0);
+  } finally {
+    try {
+      koffi.unregister(enumProcCb);
+    } catch {
+      /* 已注册保活对象，unregister 失败不阻断 */
+    }
+  }
+  return hits;
+}
+
+/** 当前寄宿会话的指纹（进程路径 + 类名）；未挂载返回 null。 */
+function sessionFingerprint() {
+  if (session === null) return null;
+  try {
+    const p = exePathOf(session.hwnd);
+    return { processPath: p, className: session.className };
+  } catch {
+    return null;
+  }
+}
+
 /** 退出兜底：与 win.on('close') 共用，必须幂等（两条路径都会触发）。 */
 function detachAll() {
   if (session !== null) detach();
@@ -965,6 +1013,8 @@ module.exports = {
   refresh,
   isAttached,
   getState,
+  findByFingerprint,
+  sessionFingerprint,
   // 纯函数导出：冒烟脚本直接验证解析口径
   parseSourceId,
   // 提权相关（管理员窗口支持，默认不启用，由渲染层显式入口触发）

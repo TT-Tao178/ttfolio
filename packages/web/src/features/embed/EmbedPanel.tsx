@@ -6,13 +6,14 @@
  *  空域（原生窗口不参与 CSS 层叠）由浮层守卫处理：浮层压到寄宿区上时隐藏原生窗口、
  *  用 poster 静帧顶住，浮层收起即恢复。 */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, App as AntdApp, Button, Modal, Segmented, Select, Space, Spin, Tooltip } from 'antd';
+import { Alert, App as AntdApp, Button, Modal, Segmented, Select, Space, Spin, Tag, Tooltip } from 'antd';
 import {
   CloseOutlined,
   DisconnectOutlined,
   ExperimentOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '@/app/store';
 import { useSettings } from '@/app/settings';
@@ -61,6 +62,13 @@ interface NativeHost {
   /** 以管理员身份重启（默认不调用；仅在管理员窗口接管失败时由用户显式点击） */
   relaunchAsAdmin?: () => Promise<{ ok: boolean; error?: string }>;
   onRetryRequest?: (cb: () => void) => () => void;
+  /** FR-16.6 / T-137：读取寄宿会话指纹（重启回寄宿） */
+  session?: () => Promise<{ ok: boolean; fp: { processPath: string; className: string } | null }>;
+  /** FR-16.6 / T-137：指纹重匹配（EnumWindows，唯一命中才返回 sourceId） */
+  findByFingerprint?: (
+    processPath: string,
+    className: string,
+  ) => Promise<{ ok: boolean; sourceId?: string; error?: string }>;
 }
 
 interface NativeEmbed {
@@ -201,6 +209,102 @@ export function EmbedPanel(): React.JSX.Element {
       off();
     };
   }, [hostApi, refresh]);
+
+  // FR-16.6 / T-137（2026-11-07）：重启后按指纹重匹配上次寄宿窗口——唯一命中即
+  // 走既有 attach 链（快照→接管→主进程写回会话指纹）；零命中静默（正常：程序未开），
+  // 多命中如实提示。面板开着且未手动选窗口时才尝试。
+  useEffect(() => {
+    if (hostApi === null || native === null) return undefined;
+    if (selected !== null) return undefined;
+    if (hostApi.session === undefined || hostApi.findByFingerprint === undefined) return undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const s = await hostApi.session?.();
+        const fp = s?.fp ?? null;
+        if (cancelled || fp === null) return;
+        const f = await hostApi.findByFingerprint?.(fp.processPath, fp.className);
+        if (cancelled || f === undefined) return;
+        if (f.ok === true && typeof f.sourceId === 'string') {
+          setSelected(f.sourceId);
+          void messageRef.current.success('已自动回到上次寄宿的窗口');
+        } else if (typeof f.error === 'string' && f.error.includes('多个同名实例')) {
+          void messageRef.current.warning(f.error);
+        }
+      } catch {
+        /* 会话缺失/匹配失败：静默回落监控 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hostApi, native, selected]);
+
+  // FR-16.7 / T-138（2026-11-07，方案 B 槽位挂起）：≤3 个记忆槽（指纹+窗口名），
+  // 点击切槽 = 挂起当前（走既有 detach→attach 链）并按指纹重匹配挂上新窗口；
+  // 保存槽 = 当前挂载窗口的指纹入列（超限挤最旧）。跨重启存 localStorage。
+  type EmbedSlot = { processPath: string; className: string; name: string; width: number };
+  const SLOT_KEY = 'tt-embed-slots';
+  const readSlots = (): EmbedSlot[] => {
+    try {
+      const raw = localStorage.getItem(SLOT_KEY);
+      const parsed: unknown = raw === null ? [] : JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (x): x is EmbedSlot =>
+              x !== null &&
+              typeof x === 'object' &&
+              typeof (x as { processPath?: unknown }).processPath === 'string' &&
+              typeof (x as { className?: unknown }).className === 'string',
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  };
+  const [slots, setSlots] = useState<EmbedSlot[]>(readSlots);
+  const saveSlots = (next: EmbedSlot[]): void => {
+    setSlots(next.slice(-3));
+    try {
+      localStorage.setItem(SLOT_KEY, JSON.stringify(next.slice(-3)));
+    } catch {
+      /* 存储不可用降级仅内存 */
+    }
+  };
+  const saveCurrentAsSlot = async (): Promise<void> => {
+    if (hostApi?.session === undefined) return;
+    try {
+      const s = await hostApi.session();
+      const fp = s?.fp ?? null;
+      if (fp === null) {
+        void messageRef.current.info('当前没有挂载中的窗口');
+        return;
+      }
+      const w = typeof width === 'number' ? width : 420;
+      const next = readSlots().filter(
+        (x) => !(x.processPath === fp.processPath && x.className === fp.className),
+      );
+      const name = hostInfo?.title ?? fp.className;
+      saveSlots([...next, { processPath: fp.processPath, className: fp.className, name, width: w }]);
+    } catch {
+      /* 会话读取失败静默 */
+    }
+  };
+  const switchToSlot = async (slot: EmbedSlot): Promise<void> => {
+    if (hostApi?.findByFingerprint === undefined) return;
+    try {
+      const f = await hostApi.findByFingerprint(slot.processPath, slot.className);
+      if (f.ok === true && typeof f.sourceId === 'string') {
+        setMode('host');
+        setSelected(f.sourceId);
+        if (typeof slot.width === 'number' && slot.width >= MIN_W) setWidth(Math.min(MAX_W, slot.width));
+      } else {
+        void messageRef.current.warning(`槽位「${slot.name}」的窗口未找到（可能未打开）`);
+      }
+    } catch {
+      void messageRef.current.warning('槽位切换失败');
+    }
+  };
 
   // 进入寄宿：接管选中窗口；离开寄宿/换窗口/关面板时先还原（互转必先停对方资源）
   useEffect(() => {
@@ -497,6 +601,34 @@ export function EmbedPanel(): React.JSX.Element {
           ]}
           data-testid="embed-mode"
         />
+        {/* FR-16.7 / T-138：槽位挂起 chips（≤3，点击切槽，+ 保存当前，× 删除） */}
+        {native !== null && hostApi !== undefined && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            {slots.map((sl) => (
+              <Tag
+                key={`${sl.processPath}|${sl.className}`}
+                style={{ marginInlineEnd: 0, cursor: 'pointer', maxWidth: 150 }}
+                onClick={() => void switchToSlot(sl)}
+                closable
+                onClose={() => saveSlots(readSlots().filter((x) => x !== sl))}
+              >
+                <span className="tt-ellipsis" style={{ maxWidth: 110 }} title={`切到 ${sl.name}`}>
+                  {sl.name}
+                </span>
+              </Tag>
+            ))}
+            {mode === 'host' && status === 'attached' && slots.length < 3 && (
+              <Tooltip title="把当前挂载窗口存为槽位">
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() => void saveCurrentAsSlot()}
+                />
+              </Tooltip>
+            )}
+          </span>
+        )}
         <div style={{ flex: 1 }} />
         <Button
           size="small"

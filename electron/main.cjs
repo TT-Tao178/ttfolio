@@ -107,6 +107,38 @@ try {
 let embedRectDip = null;
 /** FR-16.8 / T-139：跨屏 DPI 重建需要重挂的 sourceId 与限流时间戳 */
 let lastEmbedSourceId = null;
+// FR-16.6 / T-137：寄宿会话指纹持久化（数据目录 embed-session.json；主进程单写者）
+const embedSessionFile = () => {
+  const env = process.env['TTFOLIO_DATA_DIR'];
+  const dir = env !== undefined && env !== '' ? env : path.join(process.env['APPDATA'] || '', 'ttFolio');
+  return path.join(dir, 'embed-session.json');
+};
+const readEmbedSession = () => {
+  try {
+    const raw = fs.readFileSync(embedSessionFile(), 'utf8');
+    const j = JSON.parse(raw);
+    if (typeof j.processPath === 'string' && typeof j.className === 'string' && j.processPath !== '') {
+      return { processPath: j.processPath, className: j.className };
+    }
+  } catch {
+    /* 无文件/坏值：视为无会话 */
+  }
+  return null;
+};
+const writeEmbedSession = (fp) => {
+  try {
+    fs.writeFileSync(embedSessionFile(), JSON.stringify(fp), 'utf8');
+  } catch {
+    /* 写失败不阻断（仅影响重启回寄宿） */
+  }
+};
+const clearEmbedSession = () => {
+  try {
+    if (fs.existsSync(embedSessionFile())) fs.rmSync(embedSessionFile());
+  } catch {
+    /* 同上 */
+  }
+};
 let lastDpiRebuildAt = 0;
 let dpiDebounceTimer = null;
 
@@ -232,6 +264,10 @@ async function captureWindowFrame(sourceId, rect) {
 if (embedHost !== null) {
   embedHost.init({
     onEvent: (payload) => {
+      // FR-16.6 / T-137：目标失效（自动 detach）时清指纹，重启不再尝试回寄宿
+      if (payload !== null && typeof payload === 'object' && payload.type === 'invalid') {
+        clearEmbedSession();
+      }
       if (win !== null && !win.isDestroyed()) win.webContents.send('tt:embed-host-changed', payload);
     },
     // 以下三项都延迟取值：调用发生在运行期，此时 app/screen/win 一定就绪
@@ -730,8 +766,11 @@ ipcMain.handle('tt:embed-host-attach', async (_event, sourceId, rect) => {
     const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
     embedRectDip = dip;
     const r = embedHost.attach(Number(handle), String(sourceId), px);
-    if (r.ok === true) lastEmbedSourceId = String(sourceId);
-    else embedRectDip = null;
+    if (r.ok === true) {
+      lastEmbedSourceId = String(sourceId);
+      const fp = embedHost.sessionFingerprint();
+      if (fp !== null && fp.processPath !== '') writeEmbedSession(fp);
+    } else embedRectDip = null;
     return r;
   } catch (err) {
     embedRectDip = null;
@@ -740,6 +779,27 @@ ipcMain.handle('tt:embed-host-attach', async (_event, sourceId, rect) => {
 });
 
 // poster 静帧：渲染层在 attach 之前调（此时目标还是顶层窗口，抓得到；attach 之后就抓不到了）
+// FR-16.6 / T-137：会话指纹读取 + 指纹重匹配（EnumWindows 枚举，唯一命中才给 sourceId）
+ipcMain.handle('tt:embed-session', async () => {
+  return ok(readEmbedSession());
+});
+ipcMain.handle('tt:embed-find-by-fingerprint', async (_event, body) => {
+  if (embedHost === null) return embedUnavailable();
+  const fp = body ?? {};
+  if (typeof fp.processPath !== 'string' || typeof fp.className !== 'string') {
+    return { ok: false, code: 'bad_request', error: '指纹不完整' };
+  }
+  const hits = embedHost.findByFingerprint(fp.processPath, fp.className);
+  if (hits.length === 1) {
+    return { ok: true, sourceId: `window:${hits[0]}:0`, hwnd: hits[0] };
+  }
+  if (hits.length === 0) return { ok: false, code: 'not_found', error: '未找到上次寄宿的窗口' };
+  return { ok: false, code: 'ambiguous', error: '多个同名实例，无法确定要接管哪一个' };
+});
+ipcMain.handle('tt:embed-session', async () => {
+  return { ok: true, fp: readEmbedSession() };
+});
+
 ipcMain.handle('tt:embed-host-snapshot', async (_event, sourceId, rect) => {
   const dip = sanitizeDipRect(rect);
   if (dip === null) return { ok: false, dataUrl: null };
@@ -765,6 +825,7 @@ ipcMain.handle('tt:embed-relaunch-admin', async () => {
 });
 
 ipcMain.handle('tt:embed-host-detach', async () => {
+  clearEmbedSession();
   embedRectDip = null;
   if (embedHost === null) return { ok: true, detached: false };
   try {

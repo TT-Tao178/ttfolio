@@ -65,6 +65,10 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
       /** poster 静帧：必须在 attach 之前取（窗口被重挂后枚举不到） */
       snapshot: (sourceId, rect) => ipcRenderer.invoke('tt:embed-host-snapshot', String(sourceId), rect),
       detach: () => ipcRenderer.invoke('tt:embed-host-detach'),
+      /** FR-16.6 / T-137：重启后按指纹重匹配上次寄宿窗口 */
+      session: () => ipcRenderer.invoke('tt:embed-session'),
+      findByFingerprint: (processPath, className) =>
+        ipcRenderer.invoke('tt:embed-find-by-fingerprint', { processPath, className }),
       resize: (rect) => ipcRenderer.send('tt:embed-host-resize', rect),
       setVisible: (visible) => ipcRenderer.send('tt:embed-host-set-visible', visible === true),
       onEvent: (cb) => {
