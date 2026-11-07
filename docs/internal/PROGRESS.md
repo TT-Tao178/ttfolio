@@ -2,6 +2,29 @@
 
 # PROGRESS
 
+## 第 98 轮：A 组次两项——Agent 深化 + Token DPAPI（v0.6.2 随包）
+
+- 扩展批次第二对（2026-11-07）。FR-16.3/16.5 收编于 4.16 节。
+- **T-134 Agent 深化（aa50c2d）**：GET /api/agent/projects/:id/handoff 交接单
+  （默认模板 + settings handoff_templates_json 自定义 ≤10 条；占位符缺失
+  「（缺失：key）」标记；L1 审计）；ProjectPage「交接单」→ HandoffModal
+  （模板下拉/复制/下载）；change_event 加 actor（迁移 **0020**，发布取当前
+  链身份与审计同源）+ listChanges actor 过滤 + GET /api/changes actor 参数 +
+  AgentLiveTab actor 下拉 + 活动页 actor 输入过滤；+1 集成回归（actor 过滤/
+  空串不过滤语义）。模板编辑器不做（经设置 API 配置，弹窗内如实标注）。
+- **T-136 Token DPAPI（同提交）**：core/tokenCipher 经 PowerShell .NET
+  ProtectedData（DPAPI CurrentUser）——**设计偏离记录**：蓝本原写 koffi
+  advapi32，实装改 PowerShell 避免服务端 bundle 引原生依赖（同为 DPAPI）；
+  秘密走 stdin 不进进程命令行；读路径收敛 system.ts readGithubToken 唯一
+  出口（解密失败如实未配置，绝不静默降级）；写路径加密落数据目录
+  github_token.bin + 清 settings 值 + protected 标记；启动延迟段一次性迁移
+  （幂等，L2 审计不含内容）；+2 单测（往返/坏密文拒绝，win32）。
+- 门禁三绿每提交真实退出码 0（296→**299 条**，+3）。实施过程记录：
+  integration 新用例 SQL 占位符错位（11 列 10 值/字面量混参数）两轮修正；
+  分析器断言 'unknown' 失败为**级联**——新用例中途抛错留下未分析残留项目，
+  名称排序（第 94 轮默认序）后 listProjects[0] 变成残留项目——cleanup 修正
+  后自愈，测试顺序耦合如实记录。
+
 ## 第 97 轮：A 组前两项——扫描登记 + 规则集合（v0.6.1 随包）
 
 - 用户点名「完成剩余功能，每完成两个测试打包出新版本」。配对计划：v0.6.1
