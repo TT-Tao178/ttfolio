@@ -22,6 +22,11 @@
 - 门禁三绿每提交真实退出码 0（292→**296 条**，+4：scanner 单测 3、规则集合
   集成回归 1）。实施过程记录：C-02 lint 抓 scanner 点前缀 startsWith（slice
   绕行+注释）；isRuleCollection 三处替换首版漏两处（lint unused 抓到补齐）。
+- **版本三处（5eb27cd）** + **链路**：audit/build/build:server/rebuild 一轮过 →
+  builder 双镜像 dist-electron-061t1 → 自检全项（0.6.1 断言）→ 回移 + npm
+  rebuild → 门禁三绿（296）+ e2e 4/4。**发布**：git 直连一次过，tag v0.6.1 →
+  5eb27cd，Release 201 复核全净 0 资产，资产对照已补行（欠账八页）。061t1
+  残留不代删。
 
 ## 第 96 轮：C 组四项——组织导航闭环（v0.6.0 随包）
 
