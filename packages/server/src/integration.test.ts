@@ -17,6 +17,7 @@ import {
   listProjects,
   listCollections,
   collectionParentError,
+  ruleMemberProjectIds,
   checkPathOk,
   needsReanalyze,
   type CollectionMeta,
@@ -306,6 +307,8 @@ describe('集合成员（0.3.5 回归锚点）', () => {
       name: id,
       note: null,
       parentId,
+      kind: 'manual',
+      rules: null,
       memberCount: 0,
       projectIds: [],
       sortOrder: 0,
@@ -356,6 +359,51 @@ describe('集合成员（0.3.5 回归锚点）', () => {
     // 清理自建行
     db.prepare('DELETE FROM collection_members WHERE project_id = ?').run(proj.id);
     db.prepare('DELETE FROM collections WHERE id = ?').run('col-c');
+    db.prepare('DELETE FROM projects WHERE id = ?').run(proj.id);
+  });
+
+  it('规则集合：成员现算（路径/标签/语言条件）、members 拒绝在路由层、清库不留痕（FR-16.2 / T-133）', () => {
+    const dirRule = path.join(root, 'rule-demo-vue');
+    fs.mkdirSync(dirRule, { recursive: true });
+    const proj = insertProject(db, {
+      dirPath: dirRule,
+      dirPathKey: pathKey(dirRule),
+      diskName: 'rule-demo-vue',
+      defaultArchDir: '架构图',
+    });
+    db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, NULL)').run('tag-vue', 'vue');
+    db.prepare('INSERT OR IGNORE INTO project_tags (project_id, tag_id) VALUES (?, ?)').run(
+      proj.id,
+      'tag-vue',
+    );
+    // 路径条件命中
+    expect(ruleMemberProjectIds(db, { conditions: [{ field: 'path', value: 'rule-demo' }] })).toEqual([
+      proj.id,
+    ]);
+    // 标签条件命中
+    expect(ruleMemberProjectIds(db, { conditions: [{ field: 'tag', value: 'VU' }] })).toEqual([proj.id]);
+    // 全部满足才算成员：语言不命中 → 排除
+    expect(
+      ruleMemberProjectIds(db, {
+        conditions: [
+          { field: 'path', value: 'rule-demo' },
+          { field: 'language', value: 'rust' },
+        ],
+      }),
+    ).toEqual([]);
+    // 规则集合入库后 listCollections 现算成员（manual 集合不受影响）
+    const now = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO collections (id, name, note, kind, rules_json, sort_order, created_at, updated_at) VALUES ('col-rule', '规则集合', NULL, 'rule', ?, 0, ?, ?)",
+    ).run(JSON.stringify({ conditions: [{ field: 'path', value: 'rule-demo' }] }), now, now);
+    const rule = listCollections(db).find((c) => c.id === 'col-rule');
+    expect(rule?.kind).toBe('rule');
+    expect(rule?.projectIds).toEqual([proj.id]);
+    expect(rule?.memberCount).toBe(1);
+    // 清理自建行
+    db.prepare('DELETE FROM project_tags WHERE project_id = ?').run(proj.id);
+    db.prepare('DELETE FROM tags WHERE id = ?').run('tag-vue');
+    db.prepare('DELETE FROM collections WHERE id = ?').run('col-rule');
     db.prepare('DELETE FROM projects WHERE id = ?').run(proj.id);
   });
 });

@@ -12,7 +12,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiClientError } from '@/lib/api';
-import type { ProjectSummary } from '@ttfolio/shared';
+import type { CollectionInfo, ProjectSummary } from '@ttfolio/shared';
 import { useAppStore, useTabScroll } from '@/app/store';
 import { useSettings } from '@/app/settings';
 import { Dashboard } from './Dashboard';
@@ -72,6 +72,13 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
   const collectionId = filters['collection'] ?? null;
   // 父子集合（FR-15.1）：集合视图默认含全部子孙集合的项目；开关切换改写当前标签 subTab
   const includeChildren = collectionId === null ? false : filters['includeChildren'] !== '0';
+  // FR-16.2 规则集合：集合视图工具条的「从已登记项目中添加」与自动入集不适用
+  const { data: collections } = useQuery({
+    queryKey: ['collections'],
+    queryFn: () => api.get<CollectionInfo[]>('/api/collections'),
+  });
+  const isRuleCollection =
+    collectionId !== null && (collections ?? []).find((c) => c.id === collectionId)?.kind === 'rule';
   const {
     data: allProjects,
     isLoading,
@@ -329,8 +336,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
                   }
                 />
               </Tooltip>
-              {/* T-130：集合视图专属——把已登记项目勾选加入本集合（与「添加项目」=登记新文件夹互补） */}
-              {collectionId !== null && (
+              {/* T-130：集合视图专属——把已登记项目勾选加入本集合（规则集合不适用，FR-16.2） */}
+              {collectionId !== null && !isRuleCollection && (
                 <Tooltip title="把已登记的项目勾选加入本集合（不登记新文件夹）">
                   <Button
                     icon={<UserAddOutlined />}
@@ -344,7 +351,9 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => useAppStore.getState().requestAddProject(collectionId)}
+                onClick={() =>
+                  useAppStore.getState().requestAddProject(isRuleCollection ? null : collectionId)
+                }
                 data-testid="add-project-btn"
               >
                 添加项目
@@ -357,7 +366,8 @@ export function Workbench({ subTab }: { subTab: string | null }): React.JSX.Elem
               emptyText="还没有登记任何项目：① 粘贴路径 / 选文件夹 / 拖入文件夹（桌面版）登记 → ② 自动分析 → ③ 浏览 · Git · 搜索"
               emptyAction={{
                 label: '添加第一个项目',
-                onClick: () => useAppStore.getState().requestAddProject(collectionId),
+                onClick: () =>
+                  useAppStore.getState().requestAddProject(isRuleCollection ? null : collectionId),
               }}
             >
               {view === 'card' ? (

@@ -65,17 +65,24 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const q = req.query as Record<string, string | undefined>;
     // stale 天数放宽为 1..3650（FR-4.11 自定义视图需要任意 N；原硬编码只认 '30'）
     const staleN = q.stale === undefined || q.stale === '' ? NaN : Number(q.stale);
-    // 父子集合（FR-15.1）：集合过滤默认含全部子孙集合（includeChildren=0 切回仅本集合）
+    // 父子集合（FR-15.1）：集合过滤默认含全部子孙集合（includeChildren=0 切回仅本集合）；
+    // 规则集合（FR-16.2）：成员现算（listCollections 已带），直接作 collectionIds
     let collectionFilter = q.collection;
     let collectionIds: string[] | undefined;
-    if (collectionFilter !== undefined && collectionFilter !== '' && q.includeChildren !== '0') {
+    if (collectionFilter !== undefined && collectionFilter !== '') {
       const cols = listCollections(ctx.db());
-      const ids = [collectionFilter];
-      for (let i = 0; i < ids.length; i++) {
-        for (const c of cols) if (c.parentId === ids[i] && !ids.includes(c.id)) ids.push(c.id);
+      const target = cols.find((c) => c.id === collectionFilter);
+      if (target?.kind === 'rule') {
+        collectionIds = target.projectIds;
+        collectionFilter = undefined;
+      } else if (q.includeChildren !== '0') {
+        const ids = [collectionFilter];
+        for (let i = 0; i < ids.length; i++) {
+          for (const c of cols) if (c.parentId === ids[i] && !ids.includes(c.id)) ids.push(c.id);
+        }
+        collectionIds = ids;
+        collectionFilter = undefined;
       }
-      collectionIds = ids;
-      collectionFilter = undefined;
     }
     const filters: ListFilters = {
       status: q.status === 'archived' ? 'archived' : q.status === 'all' ? 'all' : 'active',
@@ -527,14 +534,34 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionCreateSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
+    const kind = parsed.data.kind === 'rule' ? 'rule' : 'manual';
+    // FR-16.2：规则集合必须带规则，且不参与父子嵌套
+    if (kind === 'rule') {
+      if (parsed.data.rules === undefined || parsed.data.rules === null) {
+        return fail('BAD_REQUEST', '规则集合必须提供筛选规则');
+      }
+      if (parsed.data.parentId !== undefined && parsed.data.parentId !== null) {
+        return fail('BAD_REQUEST', '规则集合不参与父子嵌套');
+      }
+    }
     // FR-15.1 父子集合：父存在 + 深度 ≤3（新建节点无环可能）
     const parentErr = validateParentAssignment(db, null, parsed.data.parentId ?? null);
     if (parentErr !== null) return fail('BAD_REQUEST', parentErr);
     const id = ulid();
     const now = new Date().toISOString();
+    const rulesJson = kind === 'rule' ? JSON.stringify(parsed.data.rules ?? { conditions: [] }) : null;
     db.prepare(
-      'INSERT INTO collections (id, name, note, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)',
-    ).run(id, parsed.data.name, parsed.data.note ?? null, parsed.data.parentId ?? null, now, now);
+      'INSERT INTO collections (id, name, note, parent_id, kind, rules_json, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)',
+    ).run(
+      id,
+      parsed.data.name,
+      parsed.data.note ?? null,
+      parsed.data.parentId ?? null,
+      kind,
+      rulesJson,
+      now,
+      now,
+    );
     return ok(listCollections(db).find((c) => c.id === id) ?? null);
   });
 
@@ -543,6 +570,23 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionCreateSchema.partial().safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
+    const cols = listCollections(db);
+    const cur = cols.find((c) => c.id === id);
+    if (cur === undefined) return fail('NOT_FOUND', '集合不存在', 404);
+    // FR-16.2：类型/规则变更校验——最终态为 rule 必须有规则，且规则集合不可有父
+    const nextKind =
+      parsed.data.kind === 'rule' ? 'rule' : parsed.data.kind === 'manual' ? 'manual' : cur.kind;
+    const nextRules =
+      parsed.data.rules !== undefined ? parsed.data.rules : nextKind === cur.kind ? cur.rules : null;
+    if (nextKind === 'rule' && (nextRules === null || nextRules.conditions.length === 0)) {
+      return fail('BAD_REQUEST', '规则集合必须提供筛选规则');
+    }
+    if (nextKind === 'rule' && parsed.data.parentId !== undefined && parsed.data.parentId !== null) {
+      return fail('BAD_REQUEST', '规则集合不参与父子嵌套');
+    }
+    if (nextKind === 'rule' && cur.parentId !== null && parsed.data.parentId === undefined) {
+      return fail('BAD_REQUEST', '规则集合不参与父子嵌套（当前存在父集合，请先提升顶层）');
+    }
     // FR-15.1：显式传 parentId（含 null=提升顶层）时校验防环/存在/深度
     if (parsed.data.parentId !== undefined) {
       const parentErr = validateParentAssignment(db, id, parsed.data.parentId ?? null);
@@ -562,7 +606,15 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
       sets.push('parent_id = ?');
       vals.push(parsed.data.parentId ?? null);
     }
-    if (sets.length === 0) return ok(listCollections(db).find((c) => c.id === id) ?? null);
+    if (parsed.data.kind !== undefined) {
+      sets.push('kind = ?');
+      vals.push(nextKind);
+    }
+    if (parsed.data.rules !== undefined || parsed.data.kind !== undefined) {
+      sets.push('rules_json = ?');
+      vals.push(nextKind === 'rule' ? JSON.stringify(nextRules ?? { conditions: [] }) : null);
+    }
+    if (sets.length === 0) return ok(cur);
     sets.push('updated_at = ?');
     vals.push(new Date().toISOString(), id);
     db.prepare(`UPDATE collections SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
@@ -597,8 +649,12 @@ export const projectsRoutes: FastifyPluginAsync = async (app) => {
     const parsed = collectionMembersSchema.safeParse(req.body);
     if (!parsed.success) return fail('BAD_REQUEST', '参数不合法');
     const db = ctx.db();
-    const col = db.prepare<[string], { id: string }>('SELECT id FROM collections WHERE id = ?').get(id);
+    const col = db
+      .prepare<[string], { id: string; kind: string }>('SELECT id, kind FROM collections WHERE id = ?')
+      .get(id);
     if (col === undefined) return fail('NOT_FOUND', '集合不存在', 404);
+    // FR-16.2：规则集合成员由规则决定，不接受手动添加
+    if (col.kind === 'rule') return fail('BAD_REQUEST', '规则集合的成员由规则决定，不能手动添加');
     // 成员必须是「登记中」的项目（2026-11-03）：此前零校验直插，对已移除登记的
     // 项目 id 会静默写孤儿成员行（界面不可见，复活时旧归属连带冒出来）
     const invalid = parsed.data.projectIds.filter((pid) => getProjectRow(db, pid) === undefined);

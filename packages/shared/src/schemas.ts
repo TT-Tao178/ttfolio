@@ -179,11 +179,27 @@ export const deleteProjectSchema = z.object({
 
 export const analyzeBodySchema = z.object({ projectIds: z.array(z.string()).optional() });
 
+/** 规则集合条件组（FR-16.2 / T-133）：字段白名单 + 值 ≤200 字符，≤5 条 */
+export const collectionRuleSchema = z.object({
+  conditions: z
+    .array(
+      z.object({
+        field: z.enum(['path', 'name', 'language', 'stack', 'tag']),
+        value: z.string().min(1).max(200),
+      }),
+    )
+    .min(1)
+    .max(5),
+});
+
 export const collectionCreateSchema = z.object({
   name: z.string().min(1),
   note: z.string().nullish(),
   /** 父集合 id（FR-15.1 父子集合）：NULL/缺省 = 顶层；深度 ≤3 与防环由服务层校验 */
   parentId: z.string().min(1).nullish(),
+  /** 集合类型（FR-16.2）：缺省 manual；rule 必须带 rules 且不可有 parentId */
+  kind: z.enum(['manual', 'rule']).nullish(),
+  rules: collectionRuleSchema.nullish(),
 });
 export const collectionPatchSchema = z.object({
   name: z.string().min(1).optional(),
@@ -193,6 +209,10 @@ export const collectionPatchSchema = z.object({
 });
 /** 集合手动排序（0.3.8 补 KNOWN-GAPS #9）：按传入顺序全量重排 sort_order */
 export const collectionReorderSchema = z.object({ ids: z.array(z.string()).min(1) });
+
+/** 目录扫描（FR-16.1 / T-132）：预览根目录 / 忽略名单（全量替换，≤500 条） */
+export const scanPreviewSchema = z.object({ root: z.string().min(1) });
+export const scanIgnoreSchema = z.object({ paths: z.array(z.string().min(1)).max(500) });
 
 /** 媒体派生数据回填（FR-15.4 / T-145）：aHash 16 位十六进制 + 主色 12 桶占比（'0'..'11'） */
 export const mediaDerivativeSchema = z.object({

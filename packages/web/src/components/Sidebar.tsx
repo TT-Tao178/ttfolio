@@ -15,6 +15,7 @@ import {
   FileTextOutlined,
   FolderOpenOutlined,
   FolderTwoTone,
+  FilterOutlined,
   PlusOutlined,
   StarFilled,
   StarOutlined,
@@ -349,6 +350,10 @@ export function Sidebar(): React.JSX.Element {
       return;
     }
     const col = (collections ?? []).find((c) => c.id === cid);
+    if (col?.kind === 'rule') {
+      void message.info('规则集合的成员由规则决定，不能手动添加');
+      return;
+    }
     try {
       await api.post(`/api/collections/${cid}/members`, { projectIds: ids });
       void message.success(`已把 ${ids.length} 个项目加入「${col?.name ?? '集合'}」`);
@@ -499,7 +504,14 @@ export function Sidebar(): React.JSX.Element {
           break;
         }
         case 'editcol':
-          setEditingCol({ id: col.id, name: col.name, note: col.note, parentId: col.parentId });
+          setEditingCol({
+            id: col.id,
+            name: col.name,
+            note: col.note,
+            parentId: col.parentId,
+            kind: col.kind,
+            rules: col.rules,
+          });
           break;
         case 'delcol':
           confirmDeleteCollection(col.id);
@@ -571,6 +583,7 @@ export function Sidebar(): React.JSX.Element {
                 data-collection-id={c.id}
                 onDragOver={(e) => {
                   if (!e.dataTransfer.types.includes('application/x-ttfolio-projects')) return;
+                  if (c.kind === 'rule') return; // 规则集合不是拖拽目标（FR-16.2）
                   e.preventDefault();
                   e.stopPropagation();
                   setDragOverCol(c.id);
@@ -596,7 +609,13 @@ export function Sidebar(): React.JSX.Element {
                   transition: 'background-color 0.15s ease',
                 }}
               >
-                <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
+                {c.kind === 'rule' ? (
+                  <Tooltip title="规则集合（成员按条件自动归集）">
+                    <FilterOutlined style={{ fontSize: 12, color: SEMANTIC.primary, flexShrink: 0 }} />
+                  </Tooltip>
+                ) : (
+                  <FolderTwoTone twoToneColor="#f7ba1e" style={{ fontSize: 13, flexShrink: 0 }} />
+                )}
                 <span className="tt-ellipsis">{`${c.name} (${c.memberCount})`}</span>
               </span>
             ),

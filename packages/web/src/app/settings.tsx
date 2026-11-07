@@ -62,6 +62,7 @@ export interface SettingsShape {
   /** 代码语法配色（FR-13.4）：classic | warm | neon */
   syntaxScheme: string;
   scanRootDirs: unknown[];
+  scanIgnorePaths: string[];
   /** 可拖拽面板尺寸（见 hooks/usePaneSize.ts） */
   uiLayout: {
     sidebarWidth?: number;
@@ -101,6 +102,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   keybindings: {},
   syntaxScheme: 'classic',
   scanRootDirs: [],
+  scanIgnorePaths: [],
   uiLayout: {},
   customViews: [],
 };
@@ -131,6 +133,7 @@ const SERVER_KEY: Record<string, string> = {
   keybindings: 'keybindings_json',
   syntaxScheme: 'syntax_scheme',
   scanRootDirs: 'scan_root_dirs_json',
+  scanIgnorePaths: 'scan_ignore_json',
   uiLayout: 'ui_layout_json',
   customViews: 'custom_views_json',
 };

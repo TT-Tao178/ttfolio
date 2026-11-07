@@ -57,6 +57,10 @@ export interface CollectionRow {
   note: string | null;
   /** 父集合 id（NULL=顶层）；外键 ON DELETE SET NULL——父行硬删时自动提升顶层（FR-15.1） */
   parent_id: string | null;
+  /** 集合类型（FR-16.2 / T-133）：manual（默认）| rule（成员查询时现算） */
+  kind: string;
+  /** 规则集合条件组 JSON（manual 恒 NULL） */
+  rules_json: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

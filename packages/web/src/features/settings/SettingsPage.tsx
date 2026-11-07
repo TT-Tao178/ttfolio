@@ -26,6 +26,7 @@ import { useSettings } from '@/app/settings';
 import { useAppStore } from '@/app/store';
 import { CollectionEditModal } from '@/features/workbench/CollectionEditModal';
 import { TagHub } from './TagHub';
+import { ScanCard } from './ScanCard';
 import { HealthCard } from './HealthCard';
 import { SettingsTransfer } from './SettingsTransfer';
 import { UpdateCheck } from './UpdateCheck';
@@ -294,13 +295,8 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                   onCommit={(v) => setSetting('defaultArchDirName', v)}
                 />
               </Descriptions.Item>
-              <Descriptions.Item label="扫描根目录（预留，不实现自动扫描）">
-                <Input
-                  size="small"
-                  disabled
-                  placeholder="当前版本只支持手动添加项目"
-                  style={{ width: 300 }}
-                />
+              <Descriptions.Item label="扫描根目录（只读扫描出候选，勾选登记）">
+                <ScanCard />
               </Descriptions.Item>
             </Descriptions>
           </Card>

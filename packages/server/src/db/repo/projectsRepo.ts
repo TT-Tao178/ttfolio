@@ -425,6 +425,9 @@ export function collectionParentError(
   if (parentId === null) return null;
   const byId = new Map(cols.map((c) => [c.id, c]));
   if (!byId.has(parentId)) return '父集合不存在';
+  // FR-16.2：规则集合不参与父子嵌套（不可为父亦不可为子）
+  if (id !== null && byId.get(id)?.kind === 'rule') return '规则集合不参与父子嵌套';
+  if (byId.get(parentId)?.kind === 'rule') return '规则集合不参与父子嵌套';
   if (id !== null && parentId === id) return '父集合不能是自身';
   if (id !== null) {
     // 防环：沿新父的祖先链向上走，遇到自身 = 新父在自身子树内
@@ -450,33 +453,121 @@ export function collectionParentError(
   return null;
 }
 
+/** 规则集合成员现算（FR-16.2 / T-133）：active 项目逐条判条件（contains 不区分大小写；
+ *  tag 按标签名包含）。返回按条件全部命中的项目 id。 */
+export function ruleMemberProjectIds(
+  db: Database.Database,
+  rules: { conditions: Array<{ field: 'path' | 'name' | 'language' | 'stack' | 'tag'; value: string }> },
+): string[] {
+  const rows = getAll<{
+    id: string;
+    dir_path: string;
+    disk_name: string;
+    alias: string | null;
+    primary_language: string | null;
+    tech_stack: string | null;
+  }>(
+    db,
+    'SELECT id, dir_path, disk_name, alias, primary_language, tech_stack FROM projects WHERE deleted_at IS NULL',
+  );
+  const tagRows = getAll<{ project_id: string; name: string }>(
+    db,
+    'SELECT pt.project_id, t.name FROM project_tags pt JOIN tags t ON t.id = pt.tag_id',
+  );
+  const tagsBy = new Map<string, string[]>();
+  for (const t of tagRows) {
+    const arr = tagsBy.get(t.project_id) ?? [];
+    arr.push(t.name.toLowerCase());
+    tagsBy.set(t.project_id, arr);
+  }
+  const out: string[] = [];
+  for (const p of rows) {
+    const displayName = (p.alias ?? p.disk_name).toLowerCase();
+    const tags = tagsBy.get(p.id) ?? [];
+    const hit = rules.conditions.every((c0) => {
+      const v = c0.value.toLowerCase();
+      switch (c0.field) {
+        case 'path':
+          return p.dir_path.toLowerCase().includes(v);
+        case 'name':
+          return displayName.includes(v);
+        case 'language':
+          return (p.primary_language ?? '').toLowerCase().includes(v);
+        case 'stack':
+          return (p.tech_stack ?? '').toLowerCase().includes(v);
+        case 'tag':
+          return tags.some((t) => t.includes(v));
+        default:
+          return false;
+      }
+    });
+    if (hit) out.push(p.id);
+  }
+  return out;
+}
+
+function parseCollectionRules(
+  raw: string | null,
+): { conditions: Array<{ field: 'path' | 'name' | 'language' | 'stack' | 'tag'; value: string }> } | null {
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      Array.isArray((parsed as { conditions?: unknown }).conditions)
+    ) {
+      return parsed as {
+        conditions: Array<{ field: 'path' | 'name' | 'language' | 'stack' | 'tag'; value: string }>;
+      };
+    }
+  } catch {
+    // 坏值兜底视为无规则
+  }
+  return null;
+}
+
 export function listCollections(db: Database.Database): CollectionMeta[] {
   const rows = getAll<CollectionRow>(db, 'SELECT * FROM collections ORDER BY sort_order, created_at');
   return rows.map((r) => {
     // JOIN projects 过滤已删项目：现行为（2026-11-03 反转）下 softDeleteProject 已即时
     // 清成员行、迁移 0014 清了存量，理论上不再有孤儿行；过滤保留作纵深防御
     // （2026-10-31 报障：孤儿成员行曾让侧栏集合计数不归零）
-    const members = getAll<{ project_id: string }>(
-      db,
-      `SELECT cm.project_id FROM collection_members cm
-       JOIN projects p ON p.id = cm.project_id
-       WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
-      [r.id],
-    );
-    const c = getOne<{ c: number }>(
-      db,
-      `SELECT COUNT(*) AS c FROM collection_members cm
-       JOIN projects p ON p.id = cm.project_id
-       WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
-      [r.id],
-    );
+    const kind = r.kind === 'rule' ? 'rule' : 'manual';
+    let memberCount = 0;
+    let projectIds: string[] = [];
+    if (kind === 'rule') {
+      // 规则集合（FR-16.2）：成员查询时现算，不读成员表
+      const rules = parseCollectionRules(r.rules_json);
+      projectIds = rules !== null ? ruleMemberProjectIds(db, rules) : [];
+      memberCount = projectIds.length;
+    } else {
+      const members = getAll<{ project_id: string }>(
+        db,
+        `SELECT cm.project_id FROM collection_members cm
+         JOIN projects p ON p.id = cm.project_id
+         WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
+        [r.id],
+      );
+      const c = getOne<{ c: number }>(
+        db,
+        `SELECT COUNT(*) AS c FROM collection_members cm
+         JOIN projects p ON p.id = cm.project_id
+         WHERE cm.collection_id = ? AND p.deleted_at IS NULL`,
+        [r.id],
+      );
+      memberCount = c?.c ?? 0;
+      projectIds = members.map((m) => m.project_id);
+    }
     return {
       id: r.id,
       name: r.name,
       note: r.note,
       parentId: r.parent_id ?? null,
-      memberCount: c?.c ?? 0,
-      projectIds: members.map((m) => m.project_id),
+      kind,
+      rules: kind === 'rule' ? parseCollectionRules(r.rules_json) : null,
+      memberCount,
+      projectIds,
       sortOrder: r.sort_order,
     };
   });

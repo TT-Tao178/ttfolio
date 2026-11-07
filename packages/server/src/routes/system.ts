@@ -123,6 +123,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
         : DEFAULT_SYNTAX_SCHEME,
       keybindings: safeJson(all[SETTING_KEYS.keybindings] ?? '{}'),
       scanRootDirs: safeJson(all[SETTING_KEYS.scanRootDirs] ?? '[]'),
+      scanIgnorePaths: safeJson(all[SETTING_KEYS.scanIgnoreJson] ?? '[]'),
       uiLayout: safeJson(all[SETTING_KEYS.uiLayout] ?? '{}'),
       customViews: parseCustomViews(all[SETTING_KEYS.customViews]),
     });
@@ -166,6 +167,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       syntax_scheme: (v) => (isSyntaxScheme(v) ? v : DEFAULT_SYNTAX_SCHEME),
       keybindings_json: (v) => JSON.stringify(v),
       scan_root_dirs_json: (v) => JSON.stringify(v),
+      scan_ignore_json: (v) => JSON.stringify(v),
       ui_layout_json: (v) => JSON.stringify(v),
       custom_views_json: (v) => JSON.stringify(v),
     };

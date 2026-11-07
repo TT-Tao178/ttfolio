@@ -515,6 +515,19 @@ export interface TodoItem {
   doneAt: string | null;
 }
 
+/** 集合类型（FR-16.2 / T-133）：manual=手动快照（成员表），rule=规则派生（查询时现算不落表） */
+export type CollectionKind = 'manual' | 'rule';
+
+/** 规则条件：contains 不区分大小写；tag 按标签名包含匹配 */
+export interface CollectionRuleCondition {
+  field: 'path' | 'name' | 'language' | 'stack' | 'tag';
+  value: string;
+}
+
+export interface CollectionRules {
+  conditions: CollectionRuleCondition[];
+}
+
 /** 集合 */
 export interface CollectionInfo {
   id: string;
@@ -522,6 +535,10 @@ export interface CollectionInfo {
   note: string | null;
   /** 父集合 id（NULL=顶层）；树由前端按此组装（FR-15.1，服务端保持平表口径） */
   parentId: string | null;
+  /** 集合类型（FR-16.2）；规则集合不可父子嵌套、不可手动添删成员 */
+  kind: CollectionKind;
+  /** 规则集合的条件组（manual 恒 null） */
+  rules: CollectionRules | null;
   memberCount: number;
   projectIds: string[];
 }

@@ -50,7 +50,8 @@ export const SETTING_KEYS = {
   cardColumns: 'card_columns', // auto | 2..6
   showIgnored: 'show_ignored',
   docRootBlacklist: 'doc_root_blacklist_json',
-  scanRootDirs: 'scan_root_dirs_json', // FR-12.6 预留
+  scanRootDirs: 'scan_root_dirs_json', // FR-16.1 实装（T-132）
+  scanIgnoreJson: 'scan_ignore_json', // 扫描候选忽略名单（FR-16.1）
   keybindings: 'keybindings_json', // FR-11.4
   // 代码语法配色方案（FR-13.4 / T-098）：classic | warm | neon，独立于应用主题
   syntaxScheme: 'syntax_scheme',
