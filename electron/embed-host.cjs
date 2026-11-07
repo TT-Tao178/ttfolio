@@ -726,6 +726,12 @@ function detach() {
   visibleGen++;
   if (d !== null) {
     restoreWindow(s);
+    // FR-16.9 / T-140：分离还原目标 AUMID（写空清除；见 applyTaskbarIdentity 注释）
+    try {
+      setWindowAppId(s.hwnd, null);
+    } catch {
+      /* 清除失败不影响分离 */
+    }
     try {
       if (isWindow(s.container)) d.DestroyWindow(s.container);
     } catch {
@@ -984,6 +990,56 @@ function findByFingerprint(processPath, className) {
   return hits;
 }
 
+// FR-16.10 / T-141（2026-11-07，孤儿救援——限制 #5 的降级方案；辅助宿主进程不做）：
+// attach 时把整份还原档案交给主进程落盘；宿主被硬杀后，孤儿容器随进程死亡消失，
+// 但被嵌窗口还带着 WS_CHILD 改挂状态——下次启动按档案整份还原（restoreWindow 同链）。
+function captureRescue() {
+  if (session === null) return null;
+  try {
+    return {
+      hwnd: session.hwnd,
+      origStyle: session.origStyle,
+      origExStyle: session.origExStyle,
+      placement: session.placement.toString('base64'),
+      wasZoomed: session.wasZoomed === true,
+      processPath: exePathOf(session.hwnd),
+      className: session.className,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 孤儿还原：校验指纹（防 hwnd 复用误伤），再走 restoreWindow 同链整份还原。 */
+function rescueOrphan(archived) {
+  try {
+    const hwnd = Number(archived.hwnd);
+    if (!Number.isSafeInteger(hwnd) || hwnd <= 0) return { ok: false, reason: '档案 hwnd 无效' };
+    if (!isWindow(hwnd)) return { ok: false, reason: '窗口已不存在' };
+    if (classNameOf(hwnd) !== archived.className)
+      return { ok: false, reason: '窗口类名不匹配（hwnd 已复用）' };
+    if (
+      archived.processPath !== '' &&
+      exePathOf(hwnd).toLowerCase() !== String(archived.processPath).toLowerCase()
+    ) {
+      return { ok: false, reason: '进程路径不匹配（hwnd 已复用）' };
+    }
+    const placement = Buffer.from(archived.placement, 'base64');
+    const s = {
+      hwnd,
+      origStyle: Number(archived.origStyle) >>> 0,
+      origExStyle: Number(archived.origExStyle) >>> 0,
+      placement,
+      wasZoomed: archived.wasZoomed === true,
+      container: 0,
+    };
+    restoreWindow(s);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** 当前寄宿会话的指纹（进程路径 + 类名）；未挂载返回 null。 */
 function sessionFingerprint() {
   if (session === null) return null;
@@ -1015,6 +1071,8 @@ module.exports = {
   getState,
   findByFingerprint,
   sessionFingerprint,
+  captureRescue,
+  rescueOrphan,
   // 纯函数导出：冒烟脚本直接验证解析口径
   parseSourceId,
   // 提权相关（管理员窗口支持，默认不启用，由渲染层显式入口触发）

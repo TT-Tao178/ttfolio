@@ -161,6 +161,36 @@ const writeEmbedSession = (fp) => {
     /* 写失败不阻断（仅影响重启回寄宿） */
   }
 };
+// FR-16.10 / T-141：孤儿救援档案（attach 写 / 干净 detach 清 / 启动救援读）
+const rescueFile = () => {
+  const env = process.env['TTFOLIO_DATA_DIR'];
+  const dir = env !== undefined && env !== '' ? env : path.join(process.env['APPDATA'] || '', 'ttFolio');
+  return path.join(dir, 'embed-rescue.json');
+};
+const readRescue = () => {
+  try {
+    const raw = fs.readFileSync(rescueFile(), 'utf8');
+    const j = JSON.parse(raw);
+    if (typeof j.hwnd === 'number' && typeof j.className === 'string') return j;
+  } catch {
+    /* 无档案 */
+  }
+  return null;
+};
+const writeRescue = (fp) => {
+  try {
+    fs.writeFileSync(rescueFile(), JSON.stringify(fp), 'utf8');
+  } catch {
+    /* 写失败不阻断 */
+  }
+};
+const clearRescue = () => {
+  try {
+    if (fs.existsSync(rescueFile())) fs.rmSync(rescueFile());
+  } catch {
+    /* 同上 */
+  }
+};
 const clearEmbedSession = () => {
   try {
     if (fs.existsSync(embedSessionFile())) fs.rmSync(embedSessionFile());
@@ -296,6 +326,7 @@ if (embedHost !== null) {
       // FR-16.6 / T-137：目标失效（自动 detach）时清指纹，重启不再尝试回寄宿
       if (payload !== null && typeof payload === 'object' && payload.type === 'invalid') {
         clearEmbedSession();
+        clearRescue();
       }
       if (win !== null && !win.isDestroyed()) win.webContents.send('tt:embed-host-changed', payload);
     },
@@ -508,6 +539,28 @@ async function boot() {
     syncEmbedRect();
     if (embedHost !== null) embedHost.refresh();
   });
+  // FR-16.10 / T-141：孤儿容器救援——宿主被硬杀后按档案还原被嵌窗口（清档案）。
+  // 放窗口创建后跑一次（embed-host 已初始化）；档案 hwnd 校验指纹防复用误伤。
+  try {
+    const archived = readRescue();
+    if (archived !== null && embedHost !== null) {
+      const r = embedHost.rescueOrphan(archived);
+      clearRescue();
+      if (r.ok === true) {
+        process.stdout.write('[ttfolio-electron] orphan embed rescue succeeded\n');
+        if (win !== null && !win.isDestroyed()) {
+          win.webContents.send('tt:embed-host-changed', { event: 'orphan-rescued' });
+        }
+      } else {
+        process.stdout.write(`[ttfolio-electron] orphan rescue skipped: ${r.reason}
+`);
+      }
+    }
+  } catch (err) {
+    process.stdout
+      .write(`[ttfolio-electron] orphan rescue failed: ${err && err.message ? err.message : String(err)}
+`);
+  }
   process.stdout.write(`[ttfolio-electron] server ready on 127.0.0.1:${appPort}, loading window\n`);
   await win.loadURL(`http://127.0.0.1:${appPort}/`);
   // 提权重启回来的那次：自动把嵌入面板打开，让用户接着接管（不用再自己找按钮）。
@@ -799,6 +852,8 @@ ipcMain.handle('tt:embed-host-attach', async (_event, sourceId, rect) => {
       lastEmbedSourceId = String(sourceId);
       const fp = embedHost.sessionFingerprint();
       if (fp !== null && fp.processPath !== '') writeEmbedSession(fp);
+      const rescue = embedHost.captureRescue();
+      if (rescue !== null) writeRescue(rescue);
     } else embedRectDip = null;
     return r;
   } catch (err) {
