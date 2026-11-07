@@ -132,7 +132,13 @@ export const pluginsRoutes: FastifyPluginAsync = async (app) => {
     if (plugin === null) return fail('NOT_FOUND', '插件不存在或已停用', 404);
     if (plugin.kind !== 'script') return fail('BAD_REQUEST', '声明式插件无需运行');
     const r = await runScriptPlugin(
-      { getDb: () => ctx.db(), sse: ctx.sse, logger: ctx.logger, version: ctx.version },
+      {
+        getDb: () => ctx.db(),
+        sse: ctx.sse,
+        logger: ctx.logger,
+        version: ctx.version,
+        dataDir: ctx.layout.dataDir,
+      },
       plugin,
     );
     logActivity(db, {

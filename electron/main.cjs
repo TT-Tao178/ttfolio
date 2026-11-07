@@ -25,6 +25,25 @@ const {
  * "The 'screen' module can't be used before the app 'ready' event"）。
  * 所以不能在顶层解构，统一走这个延迟取值入口，调用点必须保证已 ready。
  */
+// 临时取证（出包自检追查用）：任何未捕获异常/拒绝落盘到临时目录 boot-crash.log
+process.on('uncaughtException', (e) => {
+  try {
+    fs.writeFileSync(path.join(process.cwd(), 'boot-crash.log'), String(e && e.stack ? e.stack : e));
+  } catch {
+    /* ignore */
+  }
+});
+process.on('unhandledRejection', (e) => {
+  try {
+    fs.writeFileSync(
+      path.join(process.cwd(), 'boot-crash.log'),
+      String(e && e instanceof Error && e.stack ? e.stack : e),
+    );
+  } catch {
+    /* ignore */
+  }
+});
+
 function getScreen() {
   return require('electron').screen;
 }
@@ -33,6 +52,16 @@ const http = require('node:http');
 const net = require('node:net');
 const crypto = require('node:crypto');
 const path = require('node:path');
+
+// 打包版（Windows GUI 子系统）没有控制台：往 stdout/stderr 写会抛 EPIPE。
+// 未处理时 Node 当作未捕获异常，Electron 直接弹「A JavaScript error occurred in the
+// main process」把应用顶掉（真实踩过：pino 写日志触发）。这里提前挂 error 监听吸收；
+// 在终端里运行时输出照旧，不受影响。
+for (const stdStream of [process.stdout, process.stderr]) {
+  if (stdStream !== null && typeof stdStream.on === 'function' && stdStream.listenerCount('error') === 0) {
+    stdStream.on('error', () => {});
+  }
+}
 
 // TTFOLIO_DATA_DIR 隔离数据目录时（自检冒烟 / 多数据目录测试），userData 也跟着隔离——
 // 单实例锁按 userData 区分，否则冒烟实例会被用户正在使用的安装版持锁挡掉（启动即退出，
@@ -796,10 +825,6 @@ ipcMain.handle('tt:embed-find-by-fingerprint', async (_event, body) => {
   if (hits.length === 0) return { ok: false, code: 'not_found', error: '未找到上次寄宿的窗口' };
   return { ok: false, code: 'ambiguous', error: '多个同名实例，无法确定要接管哪一个' };
 });
-ipcMain.handle('tt:embed-session', async () => {
-  return { ok: true, fp: readEmbedSession() };
-});
-
 ipcMain.handle('tt:embed-host-snapshot', async (_event, sourceId, rect) => {
   const dip = sanitizeDipRect(rect);
   if (dip === null) return { ok: false, dataUrl: null };
@@ -859,6 +884,14 @@ app
   .whenReady()
   .then(boot)
   .catch((err) => {
+    try {
+      fs.writeFileSync(
+        path.join(process.cwd(), 'boot-crash.log'),
+        'BOOT FAIL: ' + String(err && err.stack ? err.stack : err),
+      );
+    } catch {
+      /* ignore */
+    }
     dialog.showErrorBox('TT项目管理工作台启动失败', String(err && err.stack ? err.stack : err));
     app.quit();
   });
