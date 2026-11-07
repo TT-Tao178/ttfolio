@@ -24,11 +24,29 @@
   首轮 projects=undefined——沙箱模式 API 返回 Promise（插件未 await），据此
   把「沙箱 API 全异步」写进文档语义；EPIPE 未捕获异常（kill 后写管道）加
   write 守卫 + 流错误吞噬。
-- **v0.6.2 待推挂起（网络）**：git 协议被重置（Recv reset/连接失败），但
-  api.github.com 通道活——Release v0.6.2 页已建（201），**远端 tag v0.6.2 被
-  GitHub 自动指到远端 main 旧头 642f736（内容为 0.6.1 时代）**；本地 tag 指向
-  正确 7be77f2。待网络恢复：push main（aa50c2d 起）+ `push origin v0.6.2
-  --force` 修正远端 tag。主进程等出包链不受影响（本地全绿）。
+- **启动即死事故与修复（593a790，出包自检真实拦截）**：063t1 首版冒烟失败
+  （无 stderr）——FR-16.8 首版把 screen 监听挂模块级，Electron 的 screen 在
+  app ready 前**访问即抛错**，主进程 require 即死；对照 062t1 包冒烟通过
+  定位为本轮引入。修复 = getScreen() 懒取入口 + 注册挪进 whenReady（修复在
+  实施过程中已落盘于工作区，本次提交如实收编）。**经验入档：electron/*
+  顶层严禁触碰 screen 等 ready 前受限模块**。
+- **ABI 双态再踩**：063t1 首次构建后跑门禁（忘了 npm rebuild 翻回）→ 沙箱
+  测试 NODE_MODULE_VERSION 报错；且中途翻 ABI 后重建包导致**包内装进 Node
+  ABI 产物**（冒烟日志实证「库打开失败 NODE_MODULE_VERSION 149」）——按定式
+  顺序重走 rebuild→builder→verify 后通过。**铁律固化：builder 必须在
+  electron-rebuild 之后、npm rebuild 之前**。
+- **版本三处（fc76cf2）+ 链路**：audit 0 漏洞；builder 双镜像 + 063t1；
+  自检全项（0.6.3 断言+冒烟）；回移 + npm rebuild + 门禁三绿（303）+
+  e2e 4/4。**发布**：git 直连恢复，补推 main + force 修正 v0.6.2 tag +
+  tag v0.6.3 → 593a790；Release 201 ×（0.6.2 页已在 API 通道建成、0.6.3 新建）
+  复核全净 0 资产；资产对照已补 v0.6.2/v0.6.3 两行（拖传欠账累计九页）。
+  062t1/063t1 残留不代删。
+- **v0.6.2 待推挂起（网络）→ 已闭合（第 99 轮内）**：git 协议一度被重置，
+  api.github.com 通道活——Release v0.6.2 页已建（201），但远端 tag 被 GitHub
+  自动指到远端 main 旧头 642f736。第 99 轮网络恢复后：push main 补齐（至
+  593a790）+ `push origin v0.6.2 --force` 修正远端 tag → 7be77f2 ✓。经验
+  入档：git 协议断而 API 通时，create-release 会隐式建错位 tag——恢复后必须
+  校对 `git rev-parse tag` 与远端 ref 并 force 修正。
 
 ## 第 98 轮：A 组次两项——Agent 深化 + Token DPAPI（v0.6.2 随包）
 
