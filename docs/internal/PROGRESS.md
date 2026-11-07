@@ -2,6 +2,22 @@
 
 # PROGRESS
 
+## 第 101 轮：v0.6.4 发布（寄宿状态记忆 + 多槽挂起）+ 启动即死二连修复
+
+- **版本三处（43c073f）**；链路一轮过但 **064t1 首版冒烟失败**（同 063t1 的
+  无 stderr 模式）——本次真凶：T-137 会话 IPC 在并发实施中出现
+  `tt:embed-session` **同名 handler 双注册**（ipcMain.handle 二次注册抛
+  Attempted to register a second handler，require 即死）。取证手段沿用
+  boot-crash.log 落盘（uncaughtException 钩子 + boot .catch 落盘双保险）。
+  修复 = 删重复块（329a6d5，出包自检真实拦截）；boot-crash.log 落盘机制
+  留作常备取证（main.cjs）。ABI 双态按定式顺序重走后全过。
+- **发布**：回移 + npm rebuild + 门禁三绿（303）+ e2e 4/4；git 直连恢复，
+  push main/tag v0.6.4 → 43c073f；Release 201 复核全净 0 资产；资产对照
+  已补行（拖传欠账累计十页 v0.5.4~v0.6.4）。064t1 残留不代删。
+- 手测提醒：重启 ttFolio 后嵌入面板自动回到上次寄宿窗口（唯一命中才自动，
+  程序未开静默回监控）；槽位 chips 保存/切换/删除/跨重启；寄宿窗口失效后
+  指纹被清（重启不再尝试）。
+
 ## 第 100 轮：扩展批次第四对——寄宿状态记忆 + 多槽挂起（v0.6.4 随包）
 
 - 扩展批次第四对（2026-11-07）。FR-16.6/16.7 收编于 4.16 节。
