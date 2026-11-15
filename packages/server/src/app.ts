@@ -5,6 +5,7 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from 'fastify';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile as fspReadFile } from 'node:fs/promises';
@@ -38,6 +39,36 @@ declare module 'fastify' {
 }
 
 const HOST_OK = ['127.0.0.1', 'localhost', '[::1]'];
+
+/**
+ * 主文档的 CSP（2026-11-15 体检 P2）。
+ *
+ * 取舍说明：
+ * - `script-src` 用 nonce 而不是 `'unsafe-inline'`——index.html 的 inline 脚本必须带 nonce
+ *   才能跑，注入进来的 `<script>` 与 `javascript:` 链接一律被拦（xlsx 那条 XSS 的根被切断）。
+ * - 保留 `'unsafe-eval'`：pdfjs / xlsx 这类库在部分路径上用 `new Function` 做兼容，
+ *   去掉会静默坏掉文档预览；它不放大 inline 注入面。
+ * - `img-src` 放行 `http(s):`：README 徽章、Markdown 外链图片本来就要能显示，
+ *   收紧会破坏现有体验；真正的防外发靠宿主 CSP（见 userContent 的 /arch）。
+ * - `connect-src 'self'`：API 与 SSE 都同源；用户内容端口只出图不出数据。
+ */
+function documentCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: http: https:",
+    "media-src 'self' blob: http: https:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "worker-src 'self' blob:",
+    "frame-src 'self' blob: data:",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
 
 function hostAllowed(host: string | undefined, port: number): boolean {
   if (host === undefined) return false;
@@ -195,13 +226,22 @@ export function buildApp(ctx: AppContext): FastifyInstance {
         );
       return reply;
     }
+    // CSP nonce（2026-11-15 体检 P2）：index.html 里三段 inline 脚本（token 注入 / 主题首帧
+    // 兜底）必须带 nonce 才能在严格 CSP 下执行；每次响应换一个随机值，注入脚本拿不到下一次的。
+    const nonce = crypto.randomBytes(18).toString('base64');
     const html = readFileSync(path.join(ctx.webDist, 'index.html'), 'utf8')
       .replace('%%TTFOLIO_TOKEN%%', ctx.token)
       .replace('%%TTFOLIO_PORT%%', String(ctx.port))
       // 生产为同源：API 基址留空；用户内容基址留空（前端按「后端端口 + 100」推导，保持独立端口隔离）
       .replace('%%TTFOLIO_API_BASE%%', '')
-      .replace('%%TTFOLIO_CONTENT_BASE%%', '');
-    void reply.type('text/html; charset=utf-8').send(html);
+      .replace('%%TTFOLIO_CONTENT_BASE%%', '')
+      .replaceAll('%%TTFOLIO_NONCE%%', nonce);
+    void reply
+      .header('Content-Security-Policy', documentCsp(nonce))
+      .header('X-Content-Type-Options', 'nosniff')
+      .header('Referrer-Policy', 'no-referrer')
+      .type('text/html; charset=utf-8')
+      .send(html);
     return reply;
   });
 

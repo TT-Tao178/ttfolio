@@ -31,6 +31,8 @@ function injectRuntime(): Plugin {
           // dev 下 API 走 vite 代理（同源）；用户内容仍指向独立端口，保持 C-13 的跨源隔离
           .replaceAll('%%TTFOLIO_API_BASE%%', '')
           .replaceAll('%%TTFOLIO_CONTENT_BASE%%', contentBase)
+          // dev 不设 CSP（Vite 的 HMR 内联脚本会与之冲突），nonce 给固定值即可
+          .replaceAll('%%TTFOLIO_NONCE%%', 'dev')
       );
     },
   };

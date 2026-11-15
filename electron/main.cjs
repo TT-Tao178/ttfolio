@@ -44,6 +44,21 @@ process.on('unhandledRejection', (e) => {
   }
 });
 
+/**
+ * 这个 URL 是不是"应用自己"（本机回环上的页面）。
+ * 用于窗口打开/导航白名单：只有它允许留在 Electron 内，其余交系统浏览器。
+ */
+function isLocalAppUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl));
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 function getScreen() {
   return require('electron').screen;
 }
@@ -482,6 +497,31 @@ async function boot() {
   const state = loadWindowState({ width: 1440, height: 900 });
   win = new BrowserWindow(withRememberedBounds(state));
   if (state.maximized === true) win.maximize();
+  /**
+   * 窗口打开/导航策略（2026-11-15 体检 P2）：
+   * 之前全仓没有 setWindowOpenHandler / will-navigate——前端多处 window.open('_blank')
+   * 与 Markdown 外链会在**应用内**开一个无地址栏的 Electron 窗口（钓鱼友好），主窗口
+   * 也能被导航到任意 URL。这里改成：本地页面允许，其余一律交系统浏览器并拒绝新窗。
+   */
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isLocalAppUrl(url)) return { action: 'allow' };
+    void require('electron')
+      .shell.openExternal(url)
+      .catch(() => {
+        /* 打不开外部程序不阻断 */
+      });
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    // 只允许留在本机服务里（应用自身的刷新/路由），其它一律拦下并交系统浏览器
+    if (isLocalAppUrl(url)) return;
+    event.preventDefault();
+    void require('electron')
+      .shell.openExternal(url)
+      .catch(() => {
+        /* ignore */
+      });
+  });
   // 白屏治理（用户反馈）：窗口 show:false，首帧就绪（ready-to-show）才显示——
   // 此前窗口默认立即显示、内容要等 loadURL + 首屏 bundle 解析，中间全白。
   // 8 秒兜底：加载异常时窗口也得出来（宁可白屏不可无窗），并如实打日志。

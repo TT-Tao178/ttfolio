@@ -31,6 +31,17 @@ export function rotateLogIfNeeded(logFile: string): void {
   }
 }
 
+/**
+ * 打包版（Windows GUI 子系统）没有控制台：往 stdout 写会 EPIPE。
+ * pino 的 stdout 分支是 fire-and-forget，这个错误会变成未捕获异常，
+ * 直接弹「A JavaScript error occurred in the main process」把应用顶掉。
+ * 挂一个 error 监听吸收掉即可——终端运行（dev / CLI）时日志照常输出。
+ */
+function stdoutSafe(): NodeJS.WritableStream {
+  if (process.stdout.listenerCount('error') === 0) process.stdout.on('error', () => {});
+  return process.stdout;
+}
+
 export function createLogger(logDir: string, level = 'info'): pino.Logger {
   const logFile = join(logDir, 'ttfolio.log');
   rotateLogIfNeeded(logFile);
@@ -40,7 +51,7 @@ export function createLogger(logDir: string, level = 'info'): pino.Logger {
     pino.multistream([
       { stream: dest },
       {
-        stream: process.stdout,
+        stream: stdoutSafe(),
         level: (['error', 'warn', 'info', 'debug'].includes(level) ? level : 'info') as pino.Level,
       },
     ]),

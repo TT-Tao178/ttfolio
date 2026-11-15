@@ -8,6 +8,7 @@
 import { Alert, Button, Spin, Tabs } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchDocsRaw } from '@/lib/api';
+import { buildSheetGrid, isSafeExternalUrl, type SheetGrid } from './sheetView';
 
 type Kind = 'pdf' | 'docx' | 'sheet';
 
@@ -183,6 +184,18 @@ function DocxView({ data }: { data: Uint8Array }): React.JSX.Element {
           className: 'tt-docx',
           ignoreLastRenderedPageBreak: true,
         });
+        // docx 里的超链接由文档自带关系给出，docx-preview 会原样写进 href——
+        // javascript:/data: 这类必须就地摘掉（同 xlsx 的那条洞），正常外链补 rel。
+        for (const a of Array.from(box.querySelectorAll('a[href]'))) {
+          const href = a.getAttribute('href') ?? '';
+          if (!isSafeExternalUrl(href)) {
+            a.removeAttribute('href');
+            a.removeAttribute('target');
+            continue;
+          }
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
+        }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : String(e));
       }
@@ -203,8 +216,42 @@ function DocxView({ data }: { data: Uint8Array }): React.JSX.Element {
   );
 }
 
+/** 单元格文本渲染：只有通过白名单的 http(s) 链接才变成 <a>，其余一律纯文本。 */
+function SheetTable({ grid }: { grid: SheetGrid }): React.JSX.Element {
+  return (
+    <div className="tt-sheet">
+      <table>
+        <tbody>
+          {grid.rows.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) =>
+                cell === null ? null : (
+                  <td key={ci} colSpan={cell.colSpan} rowSpan={cell.rowSpan}>
+                    {cell.href !== null ? (
+                      <a href={cell.href} target="_blank" rel="noopener noreferrer">
+                        {cell.text}
+                      </a>
+                    ) : (
+                      cell.text
+                    )}
+                  </td>
+                ),
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {grid.truncated && (
+        <div style={{ fontSize: 12, opacity: 0.6, padding: '6px 2px' }}>
+          表格较大，仅预览前 2000 行 / 200 列；完整内容请用系统工具打开。
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SheetView({ data }: { data: Uint8Array }): React.JSX.Element {
-  const [sheets, setSheets] = useState<Array<{ name: string; html: string }> | null>(null);
+  const [sheets, setSheets] = useState<Array<{ name: string; grid: SheetGrid }> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -214,10 +261,12 @@ function SheetView({ data }: { data: Uint8Array }): React.JSX.Element {
         // xlsx 约 430KB：动态加载，不进首屏 vendor chunk
         const XLSX = await import('xlsx');
         const wb = XLSX.read(data.slice(0), { type: 'array' });
+        // 不再用 sheet_to_html + innerHTML：它不转义超链接目标（javascript: 会直接可点）。
+        // 这里只取"格子模型"，DOM 由 React 生成，没有 HTML 注入面（P1）。
         const rows = wb.SheetNames.flatMap((name) => {
           const ws = wb.Sheets[name];
           if (ws === undefined) return [];
-          return [{ name, html: XLSX.utils.sheet_to_html(ws, { header: '', footer: '' }) }];
+          return [{ name, grid: buildSheetGrid(ws as unknown as Parameters<typeof buildSheetGrid>[0]) }];
         });
         if (alive) setSheets(rows);
       } catch (e) {
@@ -234,14 +283,13 @@ function SheetView({ data }: { data: Uint8Array }): React.JSX.Element {
   if (sheets === null) return <Spin style={{ margin: '32px auto', display: 'block' }} />;
   if (sheets.length === 0)
     return <Alert type="error" message="表格为空（文件可能已损坏或为旧版格式）" style={{ marginTop: 16 }} />;
-  if (sheets.length === 1)
-    return <div className="tt-sheet" dangerouslySetInnerHTML={{ __html: sheets[0]?.html ?? '' }} />;
+  if (sheets.length === 1 && sheets[0] !== undefined) return <SheetTable grid={sheets[0].grid} />;
   return (
     <Tabs
       items={sheets.map((s) => ({
         key: s.name,
         label: s.name,
-        children: <div className="tt-sheet" dangerouslySetInnerHTML={{ __html: s.html }} />,
+        children: <SheetTable grid={s.grid} />,
       }))}
     />
   );

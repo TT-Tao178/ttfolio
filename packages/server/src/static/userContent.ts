@@ -110,6 +110,29 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
       reply.header('Content-Type', MIME[ext] ?? 'application/octet-stream');
       reply.header('Cache-Control', 'no-store');
       reply.header('X-Content-Type-Options', 'nosniff');
+      // 架构图页的 CSP（2026-11-15 体检 P3）：这些 HTML 常由 AI 生成或外部获取，而它与
+      // /raw/ 同源同 token——页面脚本本可以读走任意已登记项目的文件再外发。这里允许它读
+      // 自己的相对资源（'self'），但**禁止任何远程连接**（connect/img/form 都收死），
+      // 也不许被嵌框。读得到、但送不出去。
+      if (MIME[ext] === 'text/html; charset=utf-8') {
+        reply.header(
+          'Content-Security-Policy',
+          [
+            "default-src 'self' data: blob:",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "media-src 'self' data: blob:",
+            "font-src 'self' data:",
+            "connect-src 'self'",
+            "frame-src 'none'",
+            "object-src 'none'",
+            "base-uri 'none'",
+            "form-action 'none'",
+            "frame-ancestors 'none'",
+          ].join('; '),
+        );
+      }
       void reply.send(buf);
     } catch (err) {
       const status = err instanceof AppError && err.code === 'PATH_OUT_OF_SCOPE' ? 403 : 404;
