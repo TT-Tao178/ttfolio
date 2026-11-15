@@ -1,6 +1,39 @@
 # PROGRESS
 
-# PROGRESS
+## 第 103 轮：体检报告安全批次（P1~P3），随 v0.6.6 发布
+
+- 起点：本轮先做了一次全项目体检（进度/内容/漏洞），报告落在设计文档目录
+  《ttFolio项目体检报告-2026-11-15.md》。结论：FR 全清、工程质量好，但**存在 1 个真 XSS**
+  与两处 Electron 默认配置缺口。用户点名"修好并打包上传"。
+- **P1 表格预览 XSS（真洞，cc9876d）**：`XLSX.utils.sheet_to_html` 转义单元格**文本**却
+  **不转义超链接目标**——`{l:{Target:'javascript:alert(1)'}}` 会原样输出
+  `<a href="javascript:...">`，而 `OfficePreview` 用 `dangerouslySetInnerHTML` 插进主源。
+  主源里 `window.__TTFOLIO_TOKEN__` 是明文，点一下等于把 173 个接口交出去。
+  取证：一句 node 就能复现（见提交说明）。改法：新增 `sheetView.ts` 把工作表算成
+  「格子模型」（纯文本 + 白名单 http(s) 链接 + 合并 span），DOM 交给 React，
+  **彻底去掉这条 innerHTML**；顺带 2000 行 / 200 列 / 单格 4000 字上限。
+  Word 预览同类风险：`renderAsync` 后就地清洗 `a[href]`（非 http(s) 摘 href，合法补 rel）。
+- **P2 窗口打开/导航策略**：全仓原无 `setWindowOpenHandler` / `will-navigate` /
+  `shell.openExternal`——外链会在应用内开无地址栏窗口、主窗可被导航走。现改为
+  本地回环允许、其余交系统浏览器 + deny。
+- **P2 主文档 CSP**：`/` 每次响应生成 nonce（index.html 三段 inline 脚本加
+  `nonce="%%TTFOLIO_NONCE%%"`，dev 由 vite 插件填 `dev`），头里下发
+  `script-src 'self' 'nonce-…' 'unsafe-eval'`；保留 unsafe-eval 是因为 pdfjs/xlsx 兼容路径
+  用 `new Function`（去掉会静默坏预览，且它不放宽 inline 注入面）；补 nosniff / no-referrer。
+- **P3 架构图页 CSP**：`/arch` 与 `/raw` 同源同 token，页面脚本原本能读走任意已登记项目
+  的文件再外发；现给 HTML 加 CSP（connect-src 'self'、img/media 仅 self/data/blob、
+  form-action 'none'）——读得到、送不出去。**残留**：`connect-src 'self'` 保留是为了
+  不破坏"架构图自己 fetch 本地 json"的用法，所以"读本机文件"这一层没堵死，只堵了外发。
+- **验证**：新增 9 条单测（含真实 xlsx 写读往返、`java\nscript:` 混淆、合并、截断）；
+  全量 **312** 条通过；CSP 真机冒烟（起服务 + chromium）= 头带 nonce / 318 个节点挂载 /
+  token 注入成功 / 主题首帧脚本执行 / **0 条 CSP 违规**；e2e 4/4；自检 10/10（0.6.6 断言）。
+- **出包与发布**：066t1 一轮过；安装包回移 `dist-electron/`；`npm rebuild` 翻回 Node ABI 后
+  门禁与 e2e 复跑。**网络换了路由**：直连 443 超时、沙箱代理 55503 不可达，本机 7897 恢复
+  → 命令级 `git -c http.proxy=…` 推 main/tag，`curl.exe -x` 建 Release 并**用 API 上传资产**
+  （146,894,525 字节，201，核对 size 一致）——这是本仓库第一次把安装包真正传上去，
+  此前 v0.5.4~v0.6.5 共 11 页仍欠账（对照表已标）。
+- 体检报告里关于 `tt:thumb-decode` 的结论本轮复核后修正：它已有"绝对路径 + 扩展名白名单 +
+  80MB 上限"，剩下的只是"没限定在已登记项目内"，属低危，未改代码（报告已回改措辞）。
 
 ## 第 102 轮：扩展批次收尾对——孤儿救援 + 任务栏身份反转（v0.6.5 随包）
 
