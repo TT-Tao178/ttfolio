@@ -47,7 +47,7 @@ import { useCommandContext } from '@/features/command/useCommandContext';
 import { useThumbBackfill } from '@/features/media/useThumbBackfill';
 import { GitOverview, GitTab } from '@/features/git/GitTab';
 import { CommitView } from '@/features/git/CommitView';
-import { api } from '@/lib/api';
+import { api, setAuthLostHandler } from '@/lib/api';
 import { SEMANTIC } from '@/theme/tokens';
 import type { HealthInfo, SessionData } from '@ttfolio/shared';
 import { AddProjectModal } from '@/features/workbench/AddProjectModal';
@@ -106,8 +106,29 @@ function Shell(): React.JSX.Element {
   const updateActiveLocation = useAppStore((s) => s.updateActiveLocation);
   const domain = useAppStore((s) => s.domain);
   const { dark, settings } = useSettings();
-  const { message } = AntdApp.useApp();
+  const { message, notification } = AntdApp.useApp();
   const [sseState, setSseState] = useState<SseState>('connecting');
+  /**
+   * 鉴权失效兜底（T-146）：服务重启会换 token，老标签页所有请求 401。
+   * 之前只有 FilesTab 一处局部提示，用户只会看到"请求失败"却不知道要刷新。
+   * 这里挂一条常驻提示 + 一键刷新；不自动 reload，避免打断正在编辑的内容。
+   */
+  useEffect(() => {
+    setAuthLostHandler(() => {
+      notification.error({
+        key: 'auth-lost',
+        message: '服务已重启，页面需要刷新',
+        description: '令牌在重启时轮换了，当前页面里的操作会失败。刷新后自动恢复。',
+        duration: 0,
+        btn: (
+          <Button size="small" type="primary" onClick={() => window.location.reload()}>
+            刷新页面
+          </Button>
+        ),
+      });
+    });
+    return () => setAuthLostHandler(null);
+  }, [notification]);
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
   // 侧栏域跟随活动标签（体检 P2：顶栏齿轮开设置标签时侧栏不切设置域，分区导航不可见）。
   // file/image 双来源（文件树/架构图）不映射，保留用户手选域

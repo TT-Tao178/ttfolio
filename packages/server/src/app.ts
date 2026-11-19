@@ -247,6 +247,25 @@ export function buildApp(ctx: AppContext): FastifyInstance {
 
   const assetRoot = ctx.webDist !== null ? path.join(ctx.webDist, 'assets') : null;
   if (assetRoot !== null && existsSync(assetRoot)) {
+    /**
+     * favicon（T-150）：vite 把 public/ 拷到 dist 根，但静态托管只认 / 与 /assets/*，
+     * 不补这两条路由浏览器标签页会 404（变成默认地球图标）。
+     */
+    for (const [route, file, mime] of [
+      ['/favicon.ico', 'favicon.ico', 'image/x-icon'],
+      ['/favicon.png', 'favicon.png', 'image/png'],
+    ] as const) {
+      app.get(route, async (_req, reply) => {
+        const abs = ctx.webDist === null ? null : path.join(ctx.webDist, file);
+        if (abs === null || !existsSync(abs)) {
+          void reply.code(404).send();
+          return reply;
+        }
+        void reply.type(mime).header('Cache-Control', 'public, max-age=86400').send(readFileSync(abs));
+        return reply;
+      });
+    }
+
     app.get('/assets/:file', async (req, reply) => {
       const { file } = req.params as { file: string };
       const full = path.join(assetRoot, path.basename(file));

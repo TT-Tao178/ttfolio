@@ -668,6 +668,9 @@ function withRememberedBounds(state) {
     // 白屏治理：初始隐藏，ready-to-show（首帧就绪）再显示（boot 里有 8s 兜底）
     show: false,
     title: 'TT项目管理工作台',
+    // 窗口/任务栏图标（T-150）：打包后 exe 自带 ico，这里覆盖开发模式与 Linux；
+    // electron/** 在 asar 内，nativeImage 读 asar 内的 ico 没问题。
+    icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

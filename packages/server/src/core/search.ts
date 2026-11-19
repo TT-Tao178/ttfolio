@@ -36,6 +36,7 @@ export async function buildProjectIndex(
   let indexed = 0;
   let skipped = 0;
   let processed = 0;
+  let lastYieldAt = Date.now();
   for (const abs of files) {
     ctx.checkCancelled();
     const rel = path.relative(projectRoot, abs).split(path.sep).join('/');
@@ -58,10 +59,11 @@ export async function buildProjectIndex(
       }
       indexed++;
     }
-    if (processed % 200 === 0) {
+    if (processed % 200 === 0 || Date.now() - lastYieldAt > 30) {
       ctx.progress(processed, files.length);
-      // 让出事件循环，保证取消能及时生效
+      // 让出事件循环（T-147）：按条数或 30ms 先到为准，取消也能及时生效
       await new Promise<void>((r) => setTimeout(r, 0));
+      lastYieldAt = Date.now();
     }
   }
   ctx.progress(files.length, files.length);

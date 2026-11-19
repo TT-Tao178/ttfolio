@@ -30,6 +30,30 @@ export class ApiClientError extends Error {
   }
 }
 
+/**
+ * 鉴权失效（T-146）：服务重启会轮换 token，老页面所有请求都 401。
+ * 这里不自己弹 UI（api 层不该依赖 React），只把"失效了"这件事广播出去，
+ * 由 App 层决定怎么提示——避免 api → store → api 的循环依赖。
+ */
+type AuthLostHandler = () => void;
+let authLostHandler: AuthLostHandler | null = null;
+let lastAuthLostAt = 0;
+
+export function setAuthLostHandler(fn: AuthLostHandler | null): void {
+  authLostHandler = fn;
+}
+
+function notifyAuthLost(): void {
+  const now = Date.now();
+  if (now - lastAuthLostAt < 5000) return;
+  lastAuthLostAt = now;
+  authLostHandler?.();
+}
+
+export function isAuthFailure(status: number, code: string | undefined): boolean {
+  return status === 401 || code === 'PERMISSION_DENIED';
+}
+
 function token(): string {
   const t = window.__TTFOLIO_TOKEN__;
   if (t !== undefined && t !== '') return t;
@@ -118,12 +142,9 @@ async function request<T>(
   }
   if (payload !== null && payload.ok === true) return payload.data;
   const err: ApiError | undefined = payload !== null && payload.ok === false ? payload.error : undefined;
-  throw new ApiClientError(
-    err?.code ?? `HTTP_${res.status}`,
-    err?.message ?? `请求失败（HTTP ${res.status}）`,
-    err?.detail,
-    res.status,
-  );
+  const code = err?.code ?? `HTTP_${res.status}`;
+  if (isAuthFailure(res.status, err?.code)) notifyAuthLost();
+  throw new ApiClientError(code, err?.message ?? `请求失败（HTTP ${res.status}）`, err?.detail, res.status);
 }
 
 export const api = {
@@ -142,6 +163,7 @@ export const api = {
     const payload = (await res.json().catch(() => null)) as ApiResponse<T> | null;
     if (payload !== null && payload.ok === true) return payload.data;
     const err = payload !== null && payload.ok === false ? payload.error : undefined;
+    if (isAuthFailure(res.status, err?.code)) notifyAuthLost();
     throw new ApiClientError(
       err?.code ?? `HTTP_${res.status}`,
       err?.message ?? `请求失败（HTTP ${res.status}）`,

@@ -61,6 +61,11 @@ interface ManifestHit {
   size: number;
 }
 
+/** 让出事件循环（T-147）：把同步写库/遍历切碎，SSE 与 IPC 不被整段按住。 */
+function yieldToLoop(): Promise<void> {
+  return new Promise<void>((r) => setTimeout(r, 0));
+}
+
 /** 对单项目执行分析（同步遍历，异步包装以支持取消让步）。 */
 export async function analyzeProject(
   db: Database.Database,
@@ -80,6 +85,7 @@ export async function analyzeProject(
   let scriptBytes = 0;
   let assetBytes = 0;
   let fileCount = 0;
+  let lastYieldAt = Date.now();
   let totalBytes = 0;
   let hasDocs = false;
   let hasArch = false;
@@ -191,9 +197,10 @@ export async function analyzeProject(
         // 架构图目录探测在遍历后统一处理
       }
     }
-    if ((fileCount & 1023) === 0) {
+    if (fileCount % 256 === 0 || Date.now() - lastYieldAt > 30) {
       ctx.progress(fileCount, 0);
-      await new Promise<void>((r) => setTimeout(r, 0));
+      await yieldToLoop();
+      lastYieldAt = Date.now();
     }
   }
 
@@ -290,8 +297,10 @@ export async function analyzeProject(
   const durationMs = Date.now() - t0;
   const finishedAt = new Date().toISOString();
 
-  // ---- 一个事务写库 ----
-  const tx = db.transaction(() => {
+  // ---- 写库（T-147：元信息一次事务；派生数据分块写，块间让出事件循环）----
+  // 为什么分块：派生数据（媒体/语言统计）动辄几千行，原先一个大事务会整段按住事件循环，
+  // 期间 SSE 与 IPC 都会迟滞。拆成 1000 行一块后，最坏停顿降到毫秒级。
+  const writeMeta = db.transaction(() => {
     db.prepare('UPDATE projects SET has_docs = ?, has_arch = ? WHERE id = ?').run(
       hasDocs ? 1 : 0,
       hasArch ? 1 : 0,
@@ -319,15 +328,7 @@ export async function analyzeProject(
       path_checked_at: finishedAt,
     });
     db.prepare('DELETE FROM media_files WHERE project_id = ?').run(project.id);
-    const insMedia = db.prepare(
-      'INSERT INTO media_files (id, project_id, path, kind, bytes, mtime) VALUES (?, ?, ?, ?, ?, ?)',
-    );
-    for (const m of mediaFiles) insMedia.run(ulid(), project.id, m.rel, m.kind, m.bytes, m.mtime);
     db.prepare('DELETE FROM language_stats WHERE project_id = ?').run(project.id);
-    const insLang = db.prepare(
-      'INSERT INTO language_stats (project_id, language, bytes, file_count) VALUES (?, ?, ?, ?)',
-    );
-    for (const l of langs) insLang.run(project.id, l.language, l.bytes, l.files);
     db.prepare(
       `INSERT INTO analysis_runs (project_id, started_at, finished_at, ok, scanned_files, scanned_bytes, duration_ms, error)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -342,7 +343,30 @@ export async function analyzeProject(
       partial ? partialReason : null,
     );
   });
-  tx();
+  writeMeta();
+
+  // 派生数据分块写：每块一个事务，块间 await 让出事件循环（幂等：先删后插，失败下次重跑）
+  const insMedia = db.prepare(
+    'INSERT INTO media_files (id, project_id, path, kind, bytes, mtime) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  for (let i = 0; i < mediaFiles.length; i += 1000) {
+    const chunk = mediaFiles.slice(i, i + 1000);
+    db.transaction(() => {
+      for (const m of chunk) insMedia.run(ulid(), project.id, m.rel, m.kind, m.bytes, m.mtime);
+    })();
+    if (i + 1000 < mediaFiles.length) await yieldToLoop();
+  }
+
+  const insLang = db.prepare(
+    'INSERT INTO language_stats (project_id, language, bytes, file_count) VALUES (?, ?, ?, ?)',
+  );
+  for (let i = 0; i < langs.length; i += 1000) {
+    const chunk = langs.slice(i, i + 1000);
+    db.transaction(() => {
+      for (const l of chunk) insLang.run(project.id, l.language, l.bytes, l.files);
+    })();
+    if (i + 1000 < langs.length) await yieldToLoop();
+  }
 
   sse.publish('project.analyzed', { projectId: project.id });
   return {
