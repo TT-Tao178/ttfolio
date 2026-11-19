@@ -54,6 +54,8 @@ function apiGet(url) {
     'curl.exe',
     [
       '-s',
+      '-m',
+      '30',
       '-w',
       '\n%{http_code}',
       '-H',
@@ -125,6 +127,8 @@ const probe = spawnSync(
   'curl.exe',
   [
     '-sS',
+    '-m',
+    '60',
     '-L',
     '-r',
     '0-1023',

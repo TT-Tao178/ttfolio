@@ -31,7 +31,10 @@ if (version === undefined || title === undefined || version === '' || title === 
 
 // ---- 从 CHANGELOG.md 抽取并重排正文 ----
 const changelog = fs.readFileSync(path.resolve(process.cwd(), 'CHANGELOG.md'), 'utf8');
-const sectionRe = new RegExp(`## ${version.replace(/\./g, '\\.')}（[^）]*）\\n([\\s\\S]*?)(?=\\n## |\\n*$)`);
+// CHANGELOG 在 Windows 上是 CRLF：正则必须容忍 \r，否则整段匹配失败（0.6.9 首发踩到）
+const sectionRe = new RegExp(
+  `## ${version.replace(/\./g, '\\.')}（[^）]*）\r?\n([\\s\\S]*?)(?=\r?\n## |\r?\n*$)`,
+);
 const m = changelog.match(sectionRe);
 if (m === null) {
   console.error(`CHANGELOG.md 中未找到 ${version} 小节`);
