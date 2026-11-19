@@ -127,8 +127,15 @@ const found = api('GET', `https://api.github.com/repos/TT-Tao178/ttfolio/release
 if (found.code === 200 && typeof found.json.id === 'number') {
   const r = api('PATCH', `https://api.github.com/repos/TT-Tao178/ttfolio/releases/${found.json.id}`, payload);
   console.log('http', r.code, 'PATCH', r.json.html_url ?? JSON.stringify(r.json).slice(0, 200));
+  console.log(`体检：node scripts/verify-release.mjs ${version}（上传完再跑，或加 --wait 600）`);
   process.exit(r.code === 200 ? 0 : 1);
 }
 const r = api('POST', 'https://api.github.com/repos/TT-Tao178/ttfolio/releases', payload);
 console.log('http', r.code, 'POST', r.json.html_url ?? JSON.stringify(r.json).slice(0, 200));
+if (r.code === 201) {
+  console.log(
+    `下一步：上传安装包后跑体检（别只看任务状态——2026-11-19 曾误判"没传完"想重传 147MB）\n` +
+      `  https_proxy=http://127.0.0.1:7897 node scripts/verify-release.mjs ${version} --wait 600`,
+  );
+}
 process.exit(r.code === 201 ? 0 : 1);

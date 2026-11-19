@@ -25,7 +25,8 @@
     "doctor": "node scripts/doctor.mjs",
     "verify": "node scripts/verify.mjs",
     "build:server": "node scripts/build-server.mjs",
-    "dist:win": "node scripts/dist-win.mjs"
+    "dist:win": "node scripts/dist-win.mjs",
+    "release:verify": "node scripts/verify-release.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
