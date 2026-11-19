@@ -13,6 +13,8 @@
 const {
   app,
   BrowserWindow,
+  Menu,
+  Tray,
   desktopCapturer,
   dialog,
   ipcMain,
@@ -98,6 +100,98 @@ if (!ELEVATED_RETRY && !app.requestSingleInstanceLock()) {
 }
 
 let win = null;
+/**
+ * 托盘常驻（T-152）。
+ * 语义：开关开 = 点 × 只隐藏窗口、进程与正在跑的分析都留着；关 = 点 × 直接退出（旧行为）。
+ * 设置的真源在服务端 settings（close_to_tray），主进程这边只做两件事：
+ *   ① 启动时读 userData/prefs.json 的缓存（渲染层还没加载，必须有个冷启动值）；
+ *   ② 渲染层每次把权威值推过来（tt:set-close-to-tray）就更新并落盘。
+ * 为什么不直接让主进程查库：那是另一个进程的 SQLite（单写连接在服务进程里），
+ * 主进程去读会撞锁；而 HTTP 又要等服务和 token 就绪，冷启动时序太脆。
+ */
+let closeToTray = true;
+let isQuitting = false;
+let tray = null;
+let trayHintShown = false;
+
+function prefsFile() {
+  return path.join(app.getPath('userData'), 'prefs.json');
+}
+function readPrefs() {
+  try {
+    return JSON.parse(fs.readFileSync(prefsFile(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+function writePrefs(patch) {
+  try {
+    const next = { ...readPrefs(), ...patch };
+    fs.mkdirSync(path.dirname(prefsFile()), { recursive: true });
+    fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2));
+  } catch {
+    /* 偏好写不进去不该影响运行 */
+  }
+}
+function trayIconPath() {
+  return path.join(__dirname, 'build', 'icon.ico');
+}
+function showMainWindow() {
+  if (win === null || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  try {
+    if (embedHost !== null) embedHost.setVisible(true);
+  } catch {
+    /* 寄宿不可用不影响显示主窗口 */
+  }
+}
+function createTray() {
+  if (tray !== null) return;
+  const image = nativeImage.createFromPath(trayIconPath());
+  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
+  tray.setToolTip('TT项目管理工作台');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '显示主窗口', click: () => showMainWindow() },
+      { type: 'separator' },
+      {
+        label: '退出',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on('click', () => showMainWindow());
+  tray.on('double-click', () => showMainWindow());
+}
+function destroyTray() {
+  if (tray === null) return;
+  try {
+    tray.destroy();
+  } catch {
+    /* 已销毁 */
+  }
+  tray = null;
+}
+/** 第一次隐藏时提示一次（Windows 气泡；失败静默）。 */
+function hintTrayOnce() {
+  if (trayHintShown || tray === null) return;
+  trayHintShown = true;
+  writePrefs({ trayHintShown: true });
+  try {
+    tray.displayBalloon({
+      title: '仍在后台运行',
+      content:
+        '点击托盘图标可以重新打开；右键托盘图标可以退出。不想这样可在「设置 → 外观 → 关闭窗口」改回直接退出。',
+    });
+  } catch {
+    /* 部分环境不支持气泡 */
+  }
+}
 
 // 主题跟随（第 34 轮；第 89 轮扩展）：渲染层在主题设置变化/首帧时经 preload 桥上报，主进程切
 // nativeTheme.themeSource——Windows 原生标题栏颜色随 shouldUseDarkColors 走，
@@ -537,10 +631,30 @@ async function boot() {
   // 'close'（而非 'closed'）时保存——此时 win 引用仍在，getNormalBounds 可读。
   // 寄宿还原必须挂在这里（设计 P0-3）：等到 before-quit 时 BrowserWindow 的 HWND 已销毁，
   // 子窗口会被一起带走，正好命中"退出把用户窗口带走"这个最怕的情况。
-  win.on('close', () => {
+  win.on('close', (event) => {
+    // 托盘常驻（T-152）：点 × 只隐藏，**不能 detach**——寄宿的用户窗口要跟着父窗口一起藏起来，
+    // 等真正退出（托盘菜单/系统关机）时再还原，否则用户会以为窗口被关掉了。
+    if (closeToTray && !isQuitting) {
+      event.preventDefault();
+      try {
+        if (embedHost !== null) embedHost.setVisible(false);
+      } catch {
+        /* 寄宿不可用 */
+      }
+      if (win !== null) rememberWindowBounds(win);
+      win.hide();
+      hintTrayOnce();
+      return;
+    }
     if (win !== null) rememberWindowBounds(win);
     detachAllEmbeds();
   });
+  // 托盘偏好：冷启动要用缓存值（渲染层还没跑，推不了权威值）
+  const prefs = readPrefs();
+  closeToTray = prefs.closeToTray !== false;
+  trayHintShown = prefs.trayHintShown === true;
+  if (closeToTray) createTray();
+
   // 渲染进程崩溃兜底（第 33 轮 M9）：reason/exitCode 落 userData/renderer-crash.log，
   // 静默不弹窗（诊断走日志）；载入前挂上，崩溃后不自动重载（避免错误循环）
   win.webContents.on('render-process-gone', (_event, details) => {
@@ -831,7 +945,12 @@ function killAllTerminals() {
 
 // before-quit 只作兜底（真正可靠的还原点是 win.on('close')，见设计 P0-3）：
 // 两条路径都会触发，所以 detachAllEmbeds 与 killAllTerminals 都必须幂等。
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // 托盘菜单点「退出」时 isQuitting 已经置位；系统关机/任务管理器结束进程可能走这里，
+  // 补一次标记，确保 close 处理器不再把"退出"误判成"隐藏"。
+  void event;
+  isQuitting = true;
+  destroyTray();
   killAllTerminals();
   detachAllEmbeds();
 });
@@ -967,16 +1086,27 @@ ipcMain.on('tt:embed-host-resize', (_event, rect) => {
   if (px !== null) embedHost.resize(px);
 });
 
+/**
+ * 托盘开关（T-152）：渲染层读到服务端设置后推过来；这里只做"更新 + 落盘 + 建/毁托盘"。
+ * 幂等：值没变就直接返回，避免每次设置页刷新都重建托盘图标。
+ */
+ipcMain.on('tt:set-close-to-tray', (_event, value) => {
+  const next = value === true;
+  if (next === closeToTray) return;
+  closeToTray = next;
+  writePrefs({ closeToTray: next });
+  if (next) createTray();
+  else destroyTray();
+});
+
 ipcMain.on('tt:embed-host-set-visible', (_event, visible) => {
   if (embedHost === null) return;
   embedHost.setVisible(visible === true);
 });
 
 app.on('second-instance', () => {
-  if (win !== null) {
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  }
+  // 托盘模式下窗口可能是 hidden：必须 show()，否则用户双击图标毫无反应
+  showMainWindow();
 });
 app
   .whenReady()
@@ -993,4 +1123,8 @@ app
     dialog.showErrorBox('TT项目管理工作台启动失败', String(err && err.stack ? err.stack : err));
     app.quit();
   });
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => {
+  // 托盘模式下窗口只是 hide，不会走到这里；真到这一步说明窗口被销毁了，
+  // 若不是"正在退出"就退出进程，避免留下无窗口的后台僵尸。
+  if (!closeToTray || isQuitting) app.quit();
+});

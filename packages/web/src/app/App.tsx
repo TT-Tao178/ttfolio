@@ -107,6 +107,15 @@ function Shell(): React.JSX.Element {
   const domain = useAppStore((s) => s.domain);
   const { dark, settings } = useSettings();
   const { message, notification } = AntdApp.useApp();
+  /**
+   * 托盘开关（T-152）：服务端 settings 是权威值，主进程只持有缓存。
+   * 这里在设置变化/首屏加载后推一次；Web 模式下没有 ttfolioNative，自然 no-op。
+   */
+  useEffect(() => {
+    (
+      window as unknown as { ttfolioNative?: { setCloseToTray?: (v: boolean) => void } }
+    ).ttfolioNative?.setCloseToTray?.(settings.closeToTray);
+  }, [settings.closeToTray]);
   const [sseState, setSseState] = useState<SseState>('connecting');
   /**
    * 鉴权失效兜底（T-146）：服务重启会换 token，老标签页所有请求 401。

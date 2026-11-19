@@ -87,6 +87,10 @@ function SectionAnchor({ id, children }: { id: string; children: React.ReactNode
 }
 
 export function SettingsPage({ anchor = null }: { anchor?: string | null }): React.JSX.Element {
+  const desktopNative =
+    typeof window !== 'undefined' &&
+    (window as unknown as { ttfolioNative?: { setCloseToTray?: (v: boolean) => void } }).ttfolioNative !==
+      undefined;
   const dark = useSettingsDark();
   const { settings, setSetting } = useSettings();
   const { message, modal } = App.useApp();
@@ -219,6 +223,21 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
                   onChange={(v) => setSetting('effectsEnabled', v)}
                 />
               </Form.Item>
+              <Form.Item
+                label="关闭窗口"
+                tooltip="桌面版：点右上角 × 时，是最小化到托盘继续后台运行（分析任务不会中断），还是直接退出。托盘图标右键有「退出」。"
+              >
+                <Segmented
+                  data-testid="set-close-to-tray"
+                  disabled={!desktopNative}
+                  value={settings.closeToTray ? 'tray' : 'quit'}
+                  onChange={(v) => setSetting('closeToTray', v === 'tray')}
+                  options={[
+                    { label: '最小化到托盘', value: 'tray' },
+                    { label: '直接退出', value: 'quit' },
+                  ]}
+                />
+              </Form.Item>
               <Form.Item label="代码配色">
                 <Segmented
                   data-testid="set-syntax-scheme"
@@ -247,6 +266,9 @@ export function SettingsPage({ anchor = null }: { anchor?: string | null }): Rea
             <p style={{ fontSize: 12, opacity: 0.6, marginBottom: 0 }}>
               卡片列数自适应窗口宽度；代码配色独立于主题（编辑器 / 文档代码块 /
               动态视图三处一致）；快捷键表见「?」帮助（Ctrl+, 打开本页）。
+              {settings.closeToTray && desktopNative
+                ? '关闭窗口后程序仍在托盘运行，退出请用托盘图标右键 →「退出」。'
+                : null}
             </p>
             <SchemePreview dark={dark} scheme={settings.syntaxScheme} />
           </Card>

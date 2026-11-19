@@ -51,6 +51,8 @@ export interface SettingsShape {
   agentRepoSnapshots: boolean;
   /** 首次进入仓库的确认标记 */
   agentRepoConfirmed: boolean;
+  /** 关闭窗口行为（T-152，桌面版）：true = 最小化到托盘，false = 直接退出 */
+  closeToTray: boolean;
   /** 集成终端默认 shell（FR-14.2 / T-104）：pwsh | powershell | cmd */
   terminalShell: string;
   defaultArchDirName: string;
@@ -94,6 +96,7 @@ export const DEFAULT_SETTINGS: SettingsShape = {
   agentRepoMode: 'on',
   agentRepoSnapshots: false,
   agentRepoConfirmed: false,
+  closeToTray: true,
   terminalShell: 'powershell',
   defaultArchDirName: '架构图',
   cardSort: 'name', // 默认稳定排序（2026-11-03 去「点击置顶」；最近打开仍是可选排序）
@@ -126,6 +129,7 @@ const SERVER_KEY: Record<string, string> = {
   agentRepoMode: 'agent_repo_mode',
   agentRepoSnapshots: 'agent_repo_snapshots',
   agentRepoConfirmed: 'agent_repo_confirmed',
+  closeToTray: 'close_to_tray',
   terminalShell: 'terminal_shell',
   defaultArchDirName: 'default_arch_dir_name',
   cardSort: 'card_sort',

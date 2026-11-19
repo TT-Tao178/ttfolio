@@ -11,6 +11,13 @@ contextBridge.exposeInMainWorld('ttfolioNative', {
    * mode 取值：light | dark | oled | system；主进程按白名单映射，未知值回 system。
    * overlay 可选 {color, symbolColor}（#rrggbb 实色），主进程校验后 setTitleBarOverlay。
    */
+  /**
+   * 关闭窗口行为（T-152）：true = 点 × 最小化到托盘；false = 直接退出。
+   * 只传布尔，主进程不接受"任意指令"，避免把桥做成万能开关。
+   */
+  setCloseToTray: (value) => {
+    ipcRenderer.send('tt:set-close-to-tray', value === true);
+  },
   setTheme: (mode, overlay) => {
     ipcRenderer.send('tt:theme-changed', String(mode), overlay ?? null);
   },

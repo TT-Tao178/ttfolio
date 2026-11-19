@@ -147,6 +147,8 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       agentRepoMode: all['agent_repo_mode'] === 'off' ? 'off' : 'on',
       agentRepoSnapshots: all['agent_repo_snapshots'] === '1',
       agentRepoConfirmed: all['agent_repo_confirmed'] === '1',
+      // 关闭窗口行为（T-152，桌面版）：默认 true = 最小化到托盘
+      closeToTray: (all['close_to_tray'] ?? '1') === '1',
       terminalShell: ['pwsh', 'powershell', 'cmd'].includes(all['terminal_shell'] ?? '')
         ? all['terminal_shell']
         : 'powershell',
@@ -194,6 +196,7 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
       agent_repo_mode: (v) => (v === 'off' ? 'off' : 'on'),
       agent_repo_snapshots: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
       agent_repo_confirmed: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
+      close_to_tray: (v) => (v === true || v === 'true' || v === '1' ? '1' : '0'),
       terminal_shell: (v) => (v === 'pwsh' || v === 'cmd' ? v : 'powershell'),
       backup_keep_days: (v) => {
         // 0 = 沿用智能保留（最近 10 份 + 每周 1 份）；>0 = 按天清理过期快照
