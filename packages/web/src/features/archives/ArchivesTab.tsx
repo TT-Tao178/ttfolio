@@ -20,6 +20,7 @@ import { StateView } from '@/components/StateView';
 import { PaneSplit } from '@/components/PaneSplit';
 import { SEMANTIC } from '@/theme/tokens';
 import { capList, computeViewDiff } from './viewDiff';
+import { useContentTicket } from '@/lib/contentTicket';
 
 interface ArchFile {
   rel: string;
@@ -30,6 +31,8 @@ interface ArchFile {
 }
 
 export function ArchivesTab({ projectId }: { projectId: string }): React.JSX.Element {
+  // T-148：内容端口票据（图片/缩略图/架构图 URL 都靠它带上 ctoken）
+  useContentTicket(projectId);
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [regOpen, setRegOpen] = useState(false);

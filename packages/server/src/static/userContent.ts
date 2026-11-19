@@ -3,6 +3,7 @@
  * MIME；/thumbs 供媒体页签读数据目录缩略图（文件名白名单 sha1.png）。 */
 import Fastify from 'fastify';
 import path from 'node:path';
+import { verifyContentTicket } from '../core/contentToken.js';
 import { promises as fsp } from 'node:fs';
 import type { AppContext } from '../context.js';
 import { getProjectRow } from '../db/repo/projectsRepo.js';
@@ -63,13 +64,66 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
       void reply.code(403).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '非法 Host' } });
       return;
     }
-    const token =
-      (req.headers['x-ttfolio-token'] as string | undefined) ??
-      (req.query as Record<string, string> | undefined)?.['token'];
-    if (token !== ctx.token) {
+    // 主 token 或能力票（T-148）：这里只判"有没有凭证"，"能读哪个项目"在路由里判。
+    const ticket = ticketOf(req);
+    if (mainTokenOf(req) !== ctx.token && (ticket === null || ticket === '')) {
       void reply.code(401).send({ ok: false, error: { code: 'PERMISSION_DENIED', message: 'token 无效' } });
     }
   });
+
+  /** 读 Cookie（`/arch` 页面里的相对资源带不了 query，只能靠 Cookie）。 */
+  function cookieOf(req: { headers: Record<string, unknown> }, name: string): string | null {
+    const raw = req.headers['cookie'];
+    if (typeof raw !== 'string' || raw === '') return null;
+    for (const part of raw.split(';')) {
+      const i = part.indexOf('=');
+      if (i < 0) continue;
+      if (part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+    }
+    return null;
+  }
+
+  /**
+   * onRequest 阶段 `req.query` 还没被解析（Fastify 在 preValidation 才填），
+   * 所以这里直接解析 `req.url`，同时兼容已经填好的 query。
+   */
+  function queryOf(req: { url?: string; query?: unknown }): Record<string, string> {
+    const q = (req.query ?? {}) as Record<string, string>;
+    const out: Record<string, string> = { ...q };
+    const url = typeof req.url === 'string' ? req.url : '';
+    const i = url.indexOf('?');
+    if (i >= 0) {
+      for (const [k, v] of new URLSearchParams(url.slice(i + 1))) {
+        if (out[k] === undefined) out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  function mainTokenOf(req: {
+    headers: Record<string, unknown>;
+    url?: string;
+    query?: unknown;
+  }): string | null {
+    return (req.headers['x-ttfolio-token'] as string | undefined) ?? queryOf(req)['token'] ?? null;
+  }
+
+  function ticketOf(req: { headers: Record<string, unknown>; url?: string; query?: unknown }): string | null {
+    return (
+      (req.headers['x-ttfolio-ctoken'] as string | undefined) ??
+      queryOf(req)['ctoken'] ??
+      cookieOf(req, 'ttf_ct') ??
+      null
+    );
+  }
+
+  /** 项目级只读授权：必须是该项目的有效票；主 token 不给项目文件面子（T-148）。 */
+  function canReadProject(
+    req: { headers: Record<string, unknown>; url?: string; query?: unknown },
+    projectId: string,
+  ): boolean {
+    return verifyContentTicket(ctx.token, ticketOf(req), projectId) !== null;
+  }
 
   // 只读：非 GET 一律 405（C-13）
   server.addHook('onRequest', async (req, reply) => {
@@ -83,6 +137,12 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
   // GET /arch/:projectId/:archiveId/*
   server.get('/arch/:projectId/:archiveId/*', async (req, reply) => {
     const { projectId, archiveId } = req.params as { projectId: string; archiveId: string };
+    if (!canReadProject(req, projectId)) {
+      void reply
+        .code(401)
+        .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '内容票据无效或已过期' } });
+      return reply;
+    }
     const relPath = (req.params as { '*': string })['*'] ?? '';
     const db = ctx.db();
     const archive = getArchive(db, archiveId);
@@ -115,6 +175,16 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
       // 自己的相对资源（'self'），但**禁止任何远程连接**（connect/img/form 都收死），
       // 也不许被嵌框。读得到、但送不出去。
       if (MIME[ext] === 'text/html; charset=utf-8') {
+        // 页面里的相对资源（./assets/x.js）由浏览器自动请求，带不上 query——
+        // 把票写进 Cookie，Path 限定到该项目的 /arch 目录，HttpOnly 让页面脚本读不到（T-148）。
+        const q = req.query as Record<string, string> | undefined;
+        const fromQuery = q?.['ctoken'];
+        if (typeof fromQuery === 'string' && fromQuery !== '') {
+          reply.header(
+            'Set-Cookie',
+            `ttf_ct=${encodeURIComponent(fromQuery)}; Path=/arch/${projectId}/; HttpOnly; SameSite=Strict; Max-Age=300`,
+          );
+        }
         reply.header(
           'Content-Security-Policy',
           [
@@ -143,6 +213,12 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
 
   // GET /raw/:projectId/*（图片/PDF/音视频原始内容；音视频走 206 Range）
   server.get('/raw/:projectId/*', async (req, reply) => {
+    if (!canReadProject(req, (req.params as { projectId: string }).projectId)) {
+      void reply
+        .code(401)
+        .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '内容票据无效或已过期' } });
+      return reply;
+    }
     const { projectId } = req.params as { projectId: string };
     const relPath = (req.params as { '*': string })['*'] ?? '';
     const db = ctx.db();
@@ -243,6 +319,12 @@ export function startUserContentServer(ctx: AppContext): Promise<number> {
 
   // GET /thumbs/:projectId/:name（数据目录缩略图；文件名白名单，防穿越）
   server.get('/thumbs/:projectId/:name', async (req, reply) => {
+    if (!canReadProject(req, (req.params as { projectId: string }).projectId)) {
+      void reply
+        .code(401)
+        .send({ ok: false, error: { code: 'PERMISSION_DENIED', message: '内容票据无效或已过期' } });
+      return reply;
+    }
     const { projectId, name } = req.params as { projectId: string; name: string };
     // projectId 是 ULID（Crockford base32，含大写字母）；只允许安全字符集，防路径注入
     if (THUMB_NAME.test(name) === false || /^[A-Za-z0-9_-]{1,64}$/.test(projectId) === false) {

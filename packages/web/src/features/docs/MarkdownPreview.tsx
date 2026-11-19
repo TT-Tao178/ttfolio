@@ -11,6 +11,7 @@ import { useSettings } from '@/app/settings';
 import { useSettingsDark } from '@/features/files/useDark';
 import { cmTheme, cmHighlight } from '@/theme/codemirror';
 import { langExtension } from '@/features/files/langExt';
+import { useContentTicket } from '@/lib/contentTicket';
 
 /** 常见语言 id → 文件扩展名（langExtension 按扩展名分流）。 */
 const LANG_EXT: Record<string, string> = {
@@ -53,6 +54,8 @@ export default function MarkdownPreview({
 }): React.JSX.Element {
   void mountId;
   void basePath;
+  // T-148：Markdown 里的相对图片走 /raw，需要内容票据
+  useContentTicket(projectId);
   return (
     <div className="tt-md">
       <ReactMarkdown

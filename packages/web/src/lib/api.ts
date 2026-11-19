@@ -183,12 +183,78 @@ export function userContentBase(): string {
   return `${window.location.protocol}//${window.location.hostname}:${contentPort}`;
 }
 
+/**
+ * 内容端口票据缓存（T-148）。
+ * 为什么"同步读缓存 + 异步补票"：rawUrl/thumbUrl 在 JSX 里是同步调用的，
+ * 改成 async 会牵动十几个调用点；命中即返回，未命中先返回无票 URL（401 一次）
+ * 并在后台取票，票到了由 useContentTicket 触发重渲染。
+ */
+interface TicketEntry {
+  token: string;
+  expiresAt: number;
+}
+const ticketCache = new Map<string, TicketEntry>();
+const ticketInflight = new Map<string, Promise<void>>();
+let ticketVersion = 0;
+const ticketListeners = new Set<() => void>();
+
+export function subscribeTicket(fn: () => void): () => void {
+  ticketListeners.add(fn);
+  return () => {
+    ticketListeners.delete(fn);
+  };
+}
+export function ticketVersionValue(): number {
+  return ticketVersion;
+}
+
+export function cachedTicket(projectId: string): string | null {
+  const e = ticketCache.get(projectId);
+  if (e === undefined) return null;
+  if (e.expiresAt - Date.now() < 60_000) return null;
+  return e.token;
+}
+
+export async function ensureTicket(projectId: string): Promise<void> {
+  if (projectId === '' || cachedTicket(projectId) !== null) return;
+  const running = ticketInflight.get(projectId);
+  if (running !== undefined) return running;
+  const p = (async () => {
+    try {
+      const data = await request<{ token: string; expiresAt: number }>(
+        'GET',
+        '/api/content-token',
+        undefined,
+        {
+          projectId,
+        },
+      );
+      ticketCache.set(projectId, { token: data.token, expiresAt: data.expiresAt });
+      ticketVersion += 1;
+      for (const fn of ticketListeners) fn();
+    } catch {
+      /* 取不到票就让图片 401，不弹提示（避免大量图片同时失败刷屏） */
+    } finally {
+      ticketInflight.delete(projectId);
+    }
+  })();
+  ticketInflight.set(projectId, p);
+  return p;
+}
+
+/** 拼内容端口 URL：有票带票，没票先空着（并由调用方触发 ensureTicket）。 */
+function withTicket(projectId: string, pathAndQuery: string): string {
+  const t = cachedTicket(projectId);
+  const sep = pathAndQuery.includes('?') ? '&' : '?';
+  return `${userContentBase()}${pathAndQuery}${t === null ? '' : `${sep}ctoken=${encodeURIComponent(t)}`}`;
+}
+
 export function archUrl(projectId: string, archiveId: string, rel: string): string {
-  return `${userContentBase()}/arch/${projectId}/${archiveId}/${rel}?token=${encodeURIComponent(token())}`;
+  return withTicket(projectId, `/arch/${projectId}/${archiveId}/${rel}`);
 }
 
 export function rawUrl(projectId: string, rel: string): string {
-  return `${userContentBase()}/raw/${projectId}/${rel.split('\\').join('/')}?token=${encodeURIComponent(token())}`;
+  return withTicket(projectId, `/raw/${projectId}/${rel.split('\\').join('/')}`);
 }
 
 /** 个人头像（FR-13.7）：数据目录 avatar.png，经用户内容端口伺服（query token）。 */
@@ -206,8 +272,14 @@ export function projectAvatarUrl(projectId: string, v: number): string {
 /** 缩略图 URL（FR-13.5 / T-113）：带源文件 mtime 作版本参数，配合服务端 immutable 缓存。 */
 export function thumbUrl(projectId: string, thumbName: string, version?: string | null): string {
   const v =
-    version === undefined || version === null || version === '' ? '' : `&v=${encodeURIComponent(version)}`;
-  return `${userContentBase()}/thumbs/${projectId}/${thumbName}?token=${encodeURIComponent(token())}${v}`;
+    version === undefined || version === null || version === '' ? '' : `v=${encodeURIComponent(version)}`;
+  return withTicket(projectId, `/thumbs/${projectId}/${thumbName}${v === '' ? '' : `?${v}`}`);
+}
+
+/** 用系统浏览器打开原文件（T-148）：先确保票已就绪，否则新窗口会 401。 */
+export async function openRawUrl(projectId: string, rel: string): Promise<void> {
+  await ensureTicket(projectId);
+  window.open(rawUrl(projectId, rel), '_blank');
 }
 
 export function sseUrl(): string {

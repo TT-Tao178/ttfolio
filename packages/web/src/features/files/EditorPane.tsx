@@ -5,7 +5,7 @@ import { Alert, Button, Modal, Space, Tag, App } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiClientError, rawUrl } from '@/lib/api';
+import { api, ApiClientError, openRawUrl } from '@/lib/api';
 import type { DiskVersionInfo, FileContent } from '@ttfolio/shared';
 import { DRAFT_DEBOUNCE_MS } from '@ttfolio/shared';
 import { useAppStore } from '@/app/store';
@@ -315,9 +315,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         type="info"
         message="二进制文件"
         description="该文件是二进制格式，不提供编辑器预览。"
-        action={
-          <Button onClick={() => window.open(rawUrl(projectId, path), '_blank')}>用外部程序打开</Button>
-        }
+        action={<Button onClick={() => void openRawUrl(projectId, path)}>用外部程序打开</Button>}
       />
     );
   }
@@ -437,7 +435,7 @@ export function EditorPane({ projectId, path }: Props): React.JSX.Element {
         title="保存冲突：文件已在磁盘上被修改"
         onCancel={() => setConflict(null)}
         footer={[
-          <Button key="diff" onClick={() => window.open(rawUrl(projectId, path), '_blank')}>
+          <Button key="diff" onClick={() => void openRawUrl(projectId, path)}>
             对比（查看磁盘版本）
           </Button>,
           <Button key="discard" danger onClick={discardLocal}>

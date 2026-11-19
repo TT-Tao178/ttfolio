@@ -15,6 +15,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import { rawUrl } from '@/lib/api';
 import { SEMANTIC } from '@/theme/tokens';
+import { useContentTicket } from '@/lib/contentTicket';
 
 const MIN = 0.1;
 const MAX = 8;
@@ -30,6 +31,8 @@ const checkerBg: React.CSSProperties = {
 };
 
 export function ImagePreview({ projectId, path }: { projectId: string; path: string }): React.JSX.Element {
+  // T-148：内容端口票据（图片/缩略图/架构图 URL 都靠它带上 ctoken）
+  useContentTicket(projectId);
   const [failed, setFailed] = useState(false);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   /** scale=null 表示「适应窗口」（maxWidth/maxHeight 100%），数字为相对原始尺寸的倍率 */

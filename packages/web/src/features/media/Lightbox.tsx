@@ -16,6 +16,7 @@ import { rawUrl, thumbUrl } from '@/lib/api';
 import { KIND_LABEL } from './mediaHelpers';
 import type { MediaItem } from '@ttfolio/shared';
 import type { ThumbState } from './useThumbQueue';
+import { useContentTicket } from '@/lib/contentTicket';
 
 export function Lightbox({
   projectId,
@@ -41,6 +42,8 @@ export function Lightbox({
   onFindSimilar?: (item: MediaItem) => void;
   findingSimilar?: boolean;
 }): React.JSX.Element | null {
+  // T-148：内容端口票据（灯箱图片与缩略图 URL 靠它带上 ctoken）
+  useContentTicket(projectId);
   const item = items[index];
   const dark = false; // 灯箱固定深底，与主题无关
   void dark;

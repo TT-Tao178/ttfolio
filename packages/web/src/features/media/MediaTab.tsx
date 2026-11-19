@@ -39,6 +39,7 @@ import { useThumbQueue } from './useThumbQueue';
 import { Lightbox } from './Lightbox';
 import { AutoScrollControl } from './AutoScrollControl';
 import { COLOR_BUCKETS, COLOR_FILTER_THRESHOLD, computeDerivative, hammingDistance } from './mediaDerivative';
+import { useContentTicket } from '@/lib/contentTicket';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio';
 
@@ -57,6 +58,8 @@ function readViewPrefs(): MediaViewPrefs {
 }
 
 export function MediaTab({ projectId }: { projectId: string }): React.JSX.Element {
+  // T-148：内容端口票据（图片/缩略图/架构图 URL 都靠它带上 ctoken）
+  useContentTicket(projectId);
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [view, setView] = useState<MediaViewPrefs>(readViewPrefs);
   const [isFull, setIsFull] = useState(false);

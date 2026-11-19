@@ -42,6 +42,7 @@ import { OfficePreview } from '@/features/docs/OfficePreview';
 import { resolveViewer } from './viewerDispatch';
 import { ComparePickModal } from '@/features/compare/ComparePickModal';
 import { visibleKeysInOrder, rangeSelect, type TreeNodeLike } from './treeSelect';
+import { useContentTicket } from '@/lib/contentTicket';
 
 const GIT_COLORS: Record<string, string> = {
   modified: SEMANTIC.warning,
@@ -107,6 +108,8 @@ function mergeRoots(prev: DataNode[], next: DataNode[]): DataNode[] {
 }
 
 export function FilesTab({ projectId }: { projectId: string }): React.JSX.Element {
+  // T-148：内容端口票据（图片/缩略图/架构图 URL 都靠它带上 ctoken）
+  useContentTicket(projectId);
   const { settings, setSetting } = useSettings();
   const showIgnored = settings.showIgnored;
   const openPath = useOpenPath();

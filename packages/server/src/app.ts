@@ -11,6 +11,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readFile as fspReadFile } from 'node:fs/promises';
 import type { AppContext } from './context.js';
 import { toApiError } from './routes/helpers.js';
+import { signContentTicket } from './core/contentToken.js';
+import { getProjectRow } from './db/repo/projectsRepo.js';
 import { defaultHttpStatus, AppError } from './core/errors.js';
 import type { ErrorCode } from '@ttfolio/shared';
 import { normalizeActorHeader, enterActor } from './core/actor.js';
@@ -195,6 +197,21 @@ export function buildApp(ctx: AppContext): FastifyInstance {
     void reply
       .code(mapped.status)
       .send({ ok: false, error: { code: mapped.code, message: mapped.message, detail: mapped.detail } });
+  });
+
+  /**
+   * 内容端口能力票（T-148）：给 `<img>/<video>/<iframe>` 用的短期只读凭证。
+   * 主 token 不再能直接读项目文件——否则 URL 一旦外泄就是整库读权限。
+   */
+  app.get('/api/content-token', async (req) => {
+    const { projectId } = req.query as { projectId?: string };
+    if (typeof projectId !== 'string' || projectId.length === 0) {
+      throw new AppError('BAD_REQUEST', '缺少 projectId');
+    }
+    const row = getProjectRow(ctx.db(), projectId);
+    if (row === undefined) throw new AppError('NOT_FOUND', '项目不存在');
+    const { token, expiresAt } = signContentTicket(ctx.token, projectId);
+    return { ok: true, data: { token, expiresAt } };
   });
 
   app.register(systemRoutes);
