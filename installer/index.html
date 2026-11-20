@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>TT项目管理工作台 安装程序</title>
+<style>
+  :root{ --ink:#0f172a; --sub:#5b6478; --brand:#2563eb; }
+  *{box-sizing:border-box;-webkit-user-select:none;user-select:none;}
+  html,body{height:100%;margin:0;overflow:hidden;}
+  body{
+    font:13px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);
+    background:linear-gradient(135deg,#e9f3ff 0%,#f7fbff 48%,#f2edff 100%);
+    border-radius:10px;border:1px solid rgba(15,23,42,.10);
+  }
+  /* ---- 顶部（自绘） ---- */
+  .chrome{height:36px;display:flex;align-items:center;gap:9px;padding:0 6px 0 18px;-webkit-app-region:drag;}
+  .chrome img{width:17px;height:17px;border-radius:5px;}
+  .chrome .t{font-size:11.5px;color:#4b5563;}
+  .chrome .grow{flex:1;}
+  .ctl{display:flex;gap:1px;-webkit-app-region:no-drag;}
+  .ctl button{width:36px;height:26px;display:grid;place-items:center;border:0;background:transparent;border-radius:5px;}
+  .ctl button:hover{background:rgba(15,23,42,.07);}
+  .ctl button.close:hover{background:#e81123;}
+  .ctl button.close:hover svg path{stroke:#fff;}
+
+  /* ---- 主体 ---- */
+  .body{position:absolute;inset:36px 0 0 0;display:flex;}
+  .art{width:196px;flex:none;display:grid;place-items:center;position:relative;}
+  .art .glow{position:absolute;width:158px;height:158px;border-radius:50%;
+    background:radial-gradient(circle at 50% 52%,rgba(56,139,253,.24),rgba(56,139,253,0) 70%);}
+  .art img{width:138px;position:relative;filter:drop-shadow(0 9px 16px rgba(37,99,235,.16));}
+
+  .panel{flex:1;padding:2px 22px 0 0;display:flex;flex-direction:column;min-width:0;}
+  .name{font-size:23px;font-weight:700;letter-spacing:.2px;line-height:1.22;}
+  .slogan{font-size:11.5px;color:var(--sub);margin-top:2px;}
+  .opts{margin-top:11px;display:flex;flex-direction:column;gap:7px;}
+  .opt{display:flex;align-items:center;gap:8px;font-size:12px;color:#28313f;}
+  .cb{width:17px;height:17px;border-radius:5px;display:grid;place-items:center;flex:none;
+    background:linear-gradient(#4f93f5,#2563eb);box-shadow:0 1px 3px rgba(37,99,235,.35);}
+  .cb.off{background:#fff;border:1.5px solid #b9c4d4;box-shadow:none;}
+
+  /* ---- 路径块 / 进度块：同一位置互相替换 ---- */
+  .slot{margin-top:10px;min-height:52px;position:relative;}
+  .pathView .label{font-size:9.5px;color:#6b7689;letter-spacing:.5px;}
+  .pathView .row{margin-top:2px;display:flex;align-items:center;gap:5px;}
+  .pathView .path{font:10.5px/1.5 "Cascadia Mono",Consolas,monospace;color:#1d4ed8;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pathView .edit{width:18px;height:18px;display:grid;place-items:center;border-radius:4px;}
+  .pathView .edit:hover{background:rgba(37,99,235,.09);}
+  .pathView .fine{font-size:9.5px;color:#7a8598;margin-top:4px;}
+
+  .progView{display:none;}
+  body.installing .pathView{display:none;}
+  body.installing .progView{display:block;}
+
+  .progHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+  .progHead .k{font-size:9.5px;color:#6b7689;letter-spacing:.5px;}
+  .progHead .pct{font-size:12px;font-weight:600;color:#1d4ed8;font-variant-numeric:tabular-nums;}
+  .track{position:relative;margin-top:6px;height:5px;border-radius:999px;background:rgba(37,99,235,.12);}
+  .track .fill{position:absolute;inset:0 auto 0 0;width:0%;border-radius:999px;
+    background:linear-gradient(90deg,#7cc0ff,#3b82f6 55%,#2563eb);
+    box-shadow:0 0 10px rgba(59,130,246,.5);transition:width .25s cubic-bezier(.4,0,.2,1);}
+  .track .fill::after{content:"";position:absolute;right:-4px;top:50%;width:9px;height:9px;border-radius:50%;
+    transform:translateY(-50%);background:#fff;box-shadow:0 0 0 2px rgba(37,99,235,.26),0 0 10px rgba(59,130,246,.85);}
+  .track .shine{position:absolute;inset:0;border-radius:999px;overflow:hidden;pointer-events:none;}
+  .track .shine::before{content:"";position:absolute;top:0;bottom:0;width:34%;
+    background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.7),rgba(255,255,255,0));
+    animation:sweep 1.6s ease-in-out infinite;}
+  @keyframes sweep{0%{transform:translateX(-130%)}100%{transform:translateX(330%)}}
+  .progMsg{margin-top:6px;font-size:9.5px;color:#7a8598;display:flex;align-items:center;gap:5px;}
+  .progMsg .dot{width:5px;height:5px;border-radius:50%;background:#3b82f6;animation:pulse 1.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  .foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding-bottom:16px;}
+  .ver{font-size:9.5px;color:#8a93a3;margin-right:auto;white-space:nowrap;flex:none;}
+  .big{width:180px;height:40px;flex:none;white-space:nowrap;border:0;border-radius:8px;color:#fff;
+    font-size:14.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px;
+    background:linear-gradient(180deg,#3b82f6,#2563eb);
+    box-shadow:0 7px 16px rgba(37,99,235,.32),inset 0 1px 0 rgba(255,255,255,.26);
+    transition:transform .12s ease,box-shadow .12s ease;}
+  .big:hover{transform:translateY(-1px);box-shadow:0 9px 20px rgba(37,99,235,.38),inset 0 1px 0 rgba(255,255,255,.28);}
+  .big[disabled]{pointer-events:none;opacity:.55;transform:none;box-shadow:0 4px 10px rgba(37,99,235,.18);}
+  .big.done{background:linear-gradient(180deg,#34d399,#059669);box-shadow:0 7px 16px rgba(5,150,105,.3);}
+  .big.danger{background:linear-gradient(180deg,#f87171,#dc2626);box-shadow:0 7px 16px rgba(220,38,38,.28);}
+</style>
+</head>
+<body>
+  <div class="chrome">
+    <img src="./assets/icon.png" alt="" />
+    <span class="t" id="chromeTitle">TT项目管理工作台 安装程序</span>
+    <span class="grow"></span>
+    <div class="ctl">
+      <button id="btnMin" title="最小化"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="#6b7280" stroke-width="1" stroke-linecap="round"/></svg></button>
+      <button class="close" id="btnClose" title="关闭"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" stroke="#6b7280" stroke-width="1" stroke-linecap="round"/></svg></button>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="art"><div class="glow"></div><img src="./assets/slime.png" alt=""></div>
+    <div class="panel">
+      <div class="name" id="title">TT项目管理工作台</div>
+      <div class="slogan" id="slogan">本地项目管理工作台</div>
+
+      <div class="opts" id="opts">
+        <label class="opt" data-key="desktop"><span class="cb">✓</span>创建桌面快捷方式</label>
+        <label class="opt" data-key="run"><span class="cb">✓</span>安装完成后立即运行</label>
+      </div>
+
+      <div class="slot">
+        <div class="pathView">
+          <div class="label">安装到</div>
+          <div class="row">
+            <span class="path" id="pathText">C:\Users\21936\AppData\Local\Programs\ttFolio</span>
+            <span class="edit" title="更改位置"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10-10-4-4L4 16v4z" stroke="#2563eb" stroke-width="1.9" stroke-linejoin="round"/></svg></span>
+          </div>
+          <div class="fine" id="fine">索引库与回收站不在这个目录，卸载不会删除。</div>
+        </div>
+
+        <div class="progView">
+          <div class="progHead"><span class="k" id="progK">正在安装</span><span class="pct" id="pct">0%</span></div>
+          <div class="track"><div class="fill" id="fill"></div><div class="shine"></div></div>
+          <div class="progMsg"><span class="dot"></span><span id="progMsg">正在解压文件…</span></div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <div class="ver" id="ver">v0.6.10 · 320 MB</div>
+        <button class="big" id="cta">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z" fill="rgba(255,255,255,.2)" stroke="#fff" stroke-width="1.7"/><path d="M8.8 12.2l2.2 2.2 4.4-4.6" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/></svg>
+          <span id="ctaText">安装</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const state = new URLSearchParams(location.search).get('state') ?? 'fresh';
+  const $ = (id) => document.getElementById(id);
+
+  if (state === 'upgrade') {
+    $('slogan').textContent = '本地项目管理工作台 · 升级';
+    $('fine').textContent = '检测到已安装 0.6.9，已沿用上次位置；升级不动索引与设置。';
+    $('ver').textContent = '0.6.9 → 0.6.10';
+    $('ctaText').textContent = '升级';
+    $('opts').innerHTML = '<label class="opt"><span class="cb">✓</span>升级完成后立即运行</label>';
+  }
+
+  if (state === 'uninstall') {
+    $('chromeTitle').textContent = 'TT项目管理工作台 卸载';
+    $('title').textContent = '卸载工作台';
+    $('slogan').textContent = '只移除程序本体，你的数据会留下。';
+    $('opts').innerHTML =
+      '<label class="opt" id="keep"><span class="cb">✓</span>保留我的数据</label>' +
+      '<div style="font-size:9.5px;color:#7a8598;margin:-2px 0 0 25px">索引库 / 回收站 / 备份 · %APPDATA%\\ttFolio</div>';
+    $('keep').addEventListener('click', (e) => {
+      e.preventDefault();
+      const cb = $('keep').querySelector('.cb');
+      cb.classList.toggle('off');
+      cb.textContent = cb.classList.contains('off') ? '' : '✓';
+    });
+    document.querySelector('.slot').style.display = 'none';
+    $('ver').textContent = 'v0.6.10';
+    $('cta').classList.add('danger');
+    $('ctaText').textContent = '卸载';
+  }
+
+  document.querySelectorAll('.opt[data-key]').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      e.preventDefault();
+      const cb = row.querySelector('.cb');
+      cb.classList.toggle('off');
+      cb.textContent = cb.classList.contains('off') ? '' : '✓';
+    });
+  });
+
+  $('btnMin').addEventListener('click', () => window.inst?.action('minimize'));
+  $('btnClose').addEventListener('click', () => window.inst?.action('close'));
+
+  $('cta').addEventListener('click', () => {
+    const cta = $('cta');
+    if (cta.classList.contains('done')) return;
+    document.body.classList.add('installing');
+    cta.disabled = true;
+    const fill = $('fill'), pct = $('pct'), msg = $('progMsg');
+    let p = 0;
+    const timer = setInterval(() => {
+      p = Math.min(100, p + 5 + Math.random() * 7);
+      fill.style.width = p + '%';
+      pct.textContent = Math.round(p) + '%';
+      if (p > 50 && p <= 88) msg.textContent = '正在写入快捷方式…';
+      if (p > 88) msg.textContent = '正在完成…';
+      if (p >= 100) {
+        clearInterval(timer);
+        $('progK').textContent = '已安装';
+        msg.textContent = '安装完成';
+        const dot = document.querySelector('.progMsg .dot');
+        if (dot) dot.style.display = 'none';
+        cta.disabled = false;
+        cta.classList.add('done');
+        $('ctaText').textContent = '启动';
+        cta.querySelector('svg').outerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5.5 5.5L20 6.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+    }, 180);
+  });
+</script>
+</body>
+</html>
