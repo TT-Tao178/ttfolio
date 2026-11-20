@@ -1,0 +1,7 @@
+{
+  "name": "ttfolio-installer",
+  "version": "0.6.10",
+  "private": true,
+  "description": "TT项目管理工作台 安装程序",
+  "main": "main.cjs"
+}

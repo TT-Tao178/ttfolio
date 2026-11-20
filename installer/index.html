@@ -81,6 +81,8 @@
   .big:hover{transform:translateY(-1px);box-shadow:0 9px 20px rgba(37,99,235,.38),inset 0 1px 0 rgba(255,255,255,.28);}
   .big[disabled]{pointer-events:none;opacity:.55;transform:none;box-shadow:0 4px 10px rgba(37,99,235,.18);}
   .big.done{background:linear-gradient(180deg,#34d399,#059669);box-shadow:0 7px 16px rgba(5,150,105,.3);}
+  .errbar{position:absolute;left:16px;right:16px;bottom:64px;background:#fef2f2;border:1px solid #fecaca;
+    color:#b91c1c;font-size:11px;border-radius:7px;padding:6px 10px;}
   .big.danger{background:linear-gradient(180deg,#f87171,#dc2626);box-shadow:0 7px 16px rgba(220,38,38,.28);}
 </style>
 </head>
@@ -102,8 +104,8 @@
       <div class="slogan" id="slogan">本地项目管理工作台</div>
 
       <div class="opts" id="opts">
-        <label class="opt" data-key="desktop"><span class="cb">✓</span>创建桌面快捷方式</label>
-        <label class="opt" data-key="run"><span class="cb">✓</span>安装完成后立即运行</label>
+        <label class="opt" data-key="desktop" id="opt-desktop"><span class="cb">✓</span>创建桌面快捷方式</label>
+        <label class="opt" data-key="run" id="opt-run"><span class="cb">✓</span>安装完成后立即运行</label>
       </div>
 
       <div class="slot">
@@ -134,74 +136,119 @@
   </div>
 
 <script>
-  const state = new URLSearchParams(location.search).get('state') ?? 'fresh';
   const $ = (id) => document.getElementById(id);
+  const qs = new URLSearchParams(location.search);
+  const MODE = qs.get('mode') === 'uninstall' ? 'uninstall' : 'install';
+  let info = { targetDir: '', existing: null, version: '' };
 
-  if (state === 'upgrade') {
-    $('slogan').textContent = '本地项目管理工作台 · 升级';
-    $('fine').textContent = '检测到已安装 0.6.9，已沿用上次位置；升级不动索引与设置。';
-    $('ver').textContent = '0.6.9 → 0.6.10';
-    $('ctaText').textContent = '升级';
-    $('opts').innerHTML = '<label class="opt"><span class="cb">✓</span>升级完成后立即运行</label>';
-  }
+  const setChecked = (id, on) => {
+    const cb = $(id)?.querySelector('.cb');
+    if (!cb) return;
+    cb.classList.toggle('off', !on);
+    cb.textContent = on ? '✓' : '';
+  };
+  const isChecked = (id) => {
+    const cb = $(id)?.querySelector('.cb');
+    return cb ? !cb.classList.contains('off') : false;
+  };
 
-  if (state === 'uninstall') {
-    $('chromeTitle').textContent = 'TT项目管理工作台 卸载';
-    $('title').textContent = '卸载工作台';
-    $('slogan').textContent = '只移除程序本体，你的数据会留下。';
-    $('opts').innerHTML =
-      '<label class="opt" id="keep"><span class="cb">✓</span>保留我的数据</label>' +
-      '<div style="font-size:9.5px;color:#7a8598;margin:-2px 0 0 25px">索引库 / 回收站 / 备份 · %APPDATA%\\ttFolio</div>';
-    $('keep').addEventListener('click', (e) => {
-      e.preventDefault();
-      const cb = $('keep').querySelector('.cb');
-      cb.classList.toggle('off');
-      cb.textContent = cb.classList.contains('off') ? '' : '✓';
-    });
-    document.querySelector('.slot').style.display = 'none';
-    $('ver').textContent = 'v0.6.10';
-    $('cta').classList.add('danger');
-    $('ctaText').textContent = '卸载';
-  }
-
-  document.querySelectorAll('.opt[data-key]').forEach((row) => {
+  function bindToggle(row) {
     row.addEventListener('click', (e) => {
       e.preventDefault();
       const cb = row.querySelector('.cb');
       cb.classList.toggle('off');
       cb.textContent = cb.classList.contains('off') ? '' : '✓';
     });
-  });
+  }
+  document.querySelectorAll('.opt[data-key]').forEach(bindToggle);
+
+  function setProgress(pct, msg) {
+    document.body.classList.add('installing');
+    $('fill').style.width = pct + '%';
+    $('pct').textContent = Math.round(pct) + '%';
+    if (msg) $('progMsg').textContent = msg;
+  }
+
+  function showError(msg) {
+    document.body.classList.remove('installing');
+    $('cta').disabled = false;
+    $('ctaText').textContent = MODE === 'uninstall' ? '卸载' : (info.existing ? '升级' : '安装');
+    const el = document.createElement('div');
+    el.className = 'errbar';
+    el.textContent = '失败：' + msg;
+    document.body.appendChild(el);
+  }
+
+  async function boot() {
+    try {
+      info = (await window.inst?.probe?.()) ?? info;
+    } catch { /* 浏览器里预览时没有桥 */ }
+    if (info.targetDir) $('pathText').textContent = info.targetDir;
+
+    if (MODE === 'uninstall') {
+      $('chromeTitle').textContent = 'TT项目管理工作台 卸载';
+      $('title').textContent = '卸载工作台';
+      $('slogan').textContent = '只移除程序本体，你的数据会留下。';
+      $('opts').innerHTML =
+        '<label class="opt" id="keep"><span class="cb">✓</span>保留我的数据</label>' +
+        '<div style="font-size:9.5px;color:#7a8598;margin:-2px 0 0 25px">索引库 / 回收站 / 备份 · %APPDATA%\\ttFolio</div>';
+      bindToggle($('keep'));
+      document.querySelector('.slot').style.display = 'none';
+      $('ver').textContent = 'v' + (info.version || '');
+      $('cta').classList.add('danger');
+      $('ctaText').textContent = '卸载';
+      return;
+    }
+
+    if (info.existing) {
+      $('slogan').textContent = '本地项目管理工作台 · 升级';
+      $('fine').textContent = '检测到已安装版本，将沿用上次位置；升级不会动索引与设置。';
+      $('ver').textContent = '已安装 → v' + (info.version || '');
+      $('ctaText').textContent = '升级';
+      if ($('opt-run')) setChecked('opt-run', true);
+    }
+  }
+  boot();
 
   $('btnMin').addEventListener('click', () => window.inst?.action('minimize'));
   $('btnClose').addEventListener('click', () => window.inst?.action('close'));
 
-  $('cta').addEventListener('click', () => {
+  window.inst?.onProgress?.(({ pct, msg }) => setProgress(pct, msg));
+  window.inst?.onError?.(({ message }) => showError(message));
+  window.inst?.onDone?.(({ type }) => {
+    setProgress(100, type === 'uninstall' ? '卸载完成' : '安装完成');
+    $('progK').textContent = type === 'uninstall' ? '已卸载' : '已安装';
+    const dot = document.querySelector('.progMsg .dot');
+    if (dot) dot.style.display = 'none';
+    $('cta').disabled = false;
+    if (type === 'uninstall') {
+      $('ctaText').textContent = '关闭';
+      $('cta').onclick = () => window.inst?.action('close');
+      return;
+    }
+    $('cta').classList.add('done');
+    $('ctaText').textContent = '启动';
+    $('cta').querySelector('svg').outerHTML =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5.5 5.5L20 6.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  });
+
+  $('cta').addEventListener('click', async () => {
     const cta = $('cta');
-    if (cta.classList.contains('done')) return;
-    document.body.classList.add('installing');
+    if (cta.disabled || cta.classList.contains('done')) return;
     cta.disabled = true;
-    const fill = $('fill'), pct = $('pct'), msg = $('progMsg');
-    let p = 0;
-    const timer = setInterval(() => {
-      p = Math.min(100, p + 5 + Math.random() * 7);
-      fill.style.width = p + '%';
-      pct.textContent = Math.round(p) + '%';
-      if (p > 50 && p <= 88) msg.textContent = '正在写入快捷方式…';
-      if (p > 88) msg.textContent = '正在完成…';
-      if (p >= 100) {
-        clearInterval(timer);
-        $('progK').textContent = '已安装';
-        msg.textContent = '安装完成';
-        const dot = document.querySelector('.progMsg .dot');
-        if (dot) dot.style.display = 'none';
-        cta.disabled = false;
-        cta.classList.add('done');
-        $('ctaText').textContent = '启动';
-        cta.querySelector('svg').outerHTML =
-          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5.5 5.5L20 6.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      }
-    }, 180);
+    document.body.classList.add('installing');
+    setProgress(1, MODE === 'uninstall' ? '正在移除…' : '正在准备…');
+
+    if (MODE === 'uninstall') {
+      await window.inst?.uninstall?.({
+        targetDir: info.targetDir,
+        deleteData: !isChecked('keep'),
+      });
+      return;
+    }
+    const desktop = isChecked('opt-desktop');
+    const runAfter = isChecked('opt-run');
+    await window.inst?.install?.({ targetDir: info.targetDir || $('pathText').textContent, desktop, runAfter });
   });
 </script>
 </body>

@@ -41,6 +41,14 @@ win:
       arch:
         - x64
 nsis:
+  include: electron/build/installer.nsh
+  installerIcon: electron/build/icon.ico
+  uninstallerIcon: electron/build/icon.ico
+  installerHeader: electron/build/installerHeader.bmp
+  installerSidebar: electron/build/installerSidebar.bmp
+  language: "2052"
+  installerLanguages: [zh_CN]
+  uninstallDisplayName: "TT项目管理工作台"
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

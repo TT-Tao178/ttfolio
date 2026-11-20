@@ -1,0 +1,31 @@
+# 自绘安装器自身的打包配置（与主应用分开：它只是一个 620×330 的窗口 + payload）
+appId: com.tttao.ttfolio.installer
+productName: TT项目管理工作台 安装程序
+directories:
+  output: ../dist-installer
+  buildResources: assets
+files:
+  - "!node_modules/**"
+  - "!**/*.map"
+  - main.cjs
+  - preload.cjs
+  - install.cjs
+  - index.html
+  - assets/**
+  - package.json
+extraResources:
+  - from: payload.zip
+    to: payload.zip
+  - from: payload.zip.meta.json
+    to: payload.zip.meta.json
+asar: true
+win:
+  icon: assets/icon.ico
+  target:
+    - target: portable
+      arch: [x64]
+electronVersion: 44.9.3
+npmRebuild: false
+portable:
+  artifactName: installer-host.exe
+  requestExecutionLevel: user
